@@ -17,13 +17,26 @@ A manual backup button has been added in the `Lore Import` Section for your conv
 - [Python 3.11](https://www.python.org/downloads/): Streamlit App
 - [llama.cpp](https://github.com/ggml-org/llama.cpp): For Backstory Rewrites
 
+## Installation
+
+The easiest way to run the app is:
+
+```bash
+./run_streamlit.sh
+```
+
+This helper script creates a local `.venv` environment if needed, installs the dependencies from `requirements.txt`, and starts the Streamlit app.
+
+If you prefer to manage the environment manually, use:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
 ## Running App
-
-**`run_streamlit.sh` creation of local environment and dependency install for you**
-
-- Launch the app through the command line `./run_streamlit.sh`
-- Store local lore documents in the world_building directory
-- Import local files through the UI or generate them through the app
 
 Note: Character Rewrite feature is only enabled if the user has llama.cpp installed on their local machine. 
 - Model download will be slow the first time it's run but then should run smoothly.  
@@ -53,25 +66,6 @@ Note: Character Rewrite feature is only enabled if the user has llama.cpp instal
 | v1.1.0  | Implemented distinct knowledge graph views for character, place and sesison tab               |
 | v1.0.0  | This release adds a dedicated Knowledge Graph UI using graphviz.                              |
 | v0.1.0  | Packaged as a Streamlit app for local character sheets, campaign lore management.             |
-
-## Setup
-
-The easiest way to run the app is:
-
-```bash
-./run_streamlit.sh
-```
-
-This helper script creates a local `.venv` environment if needed, installs the dependencies from `requirements.txt`, and starts the Streamlit app.
-
-If you prefer to manage the environment manually, use:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run streamlit_app.py
-```
 
 ## Knowledge Graph Views
 
