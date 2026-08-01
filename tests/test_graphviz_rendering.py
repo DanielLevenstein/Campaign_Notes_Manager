@@ -18,6 +18,7 @@ from graphviz_rendering import (
     lore_information_rows,
     session_note_graph,
     markdown_header_lore_graph,
+    render_lore_graph,
 )
 
 
@@ -817,6 +818,50 @@ def test_session_note_graph_keeps_only_session_note_connections():
 
     assert set(filtered.characters) == {"family_tree", "jory_ravenmark"}
     assert [(edge.source, edge.target) for edge in filtered.edges] == [("family_tree", "jory_ravenmark")]
+
+
+def test_duplicate_source_document_nodes_are_collapsed_in_rendered_lore_graph():
+    graph = CombinedCharacterGraph(
+        characters={
+            "family_tree_1": CombinedCharacterNode(
+                id="family_tree_1",
+                name="Family Tree",
+                source_file="world_building/lore/session_notes/Family_Tree.md",
+                node_type="source_document",
+            ),
+            "family_tree_2": CombinedCharacterNode(
+                id="family_tree_2",
+                name="Family Tree",
+                source_file="world_building/lore/session_notes/Family_Tree.md",
+                node_type="source_document",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="family_tree_1",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+            CombinedRelationshipEdge(
+                source="family_tree_2",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+        ],
+    )
+
+    render_lore_graph(graph, label_font_color="#000000", column_layout="session_note_lore")
+
+    assert sum(1 for node in graph.characters.values() if node.node_type == "source_document" and node.name == "Family Tree") == 1
+    assert len(graph.edges) == 1
 
 
 def test_structured_knowledge_view_hides_source_document_knots():
