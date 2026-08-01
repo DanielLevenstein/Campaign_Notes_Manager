@@ -1379,6 +1379,7 @@ def render_session_import_heading_dialog(
         if saved:
             set_active_session_note(saved[0].path)
             set_active_session_note_section()
+            st.session_state["session_notes_imported_source_file"] = str(saved[0].path.resolve())
         mark_combined_graph_dirty()
         st.session_state["clear_session_notes_draft"] = True
         st.rerun()
