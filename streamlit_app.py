@@ -212,8 +212,8 @@ def display_session_note_option(path, show_dates: bool = False) -> str:
     note_date = read_session_note_date_text(path)
     heading = display_session_note_name(path, show_dates=False)
     if note_date and show_dates:
-        return f"{path.name} - {note_date} - {heading}"
-    return f"{path.name} - {heading}"
+        return f"{note_date} - {heading}" if heading else note_date
+    return heading or path.stem.replace("session_notes_", "").replace("_", " ")
 
 
 def session_note_select_options(paths, show_dates: bool = False) -> list[dict[str, str]]:
@@ -228,7 +228,9 @@ def session_note_select_options(paths, show_dates: bool = False) -> list[dict[st
                 options.append({"label": display_session_note_option(path, show_dates=show_dates), "path": path.name, "section": ""})
             continue
         for section in sections:
-            label = f"{path.name} H{section.level}: {section.text}"
+            if section.level == 1:
+                continue
+            label = f"H{section.level}: {section.text}"
             options.append({"label": label, "path": path.name, "section": section.key})
     return options
 
