@@ -1,6 +1,25 @@
 # Knowledge Graph Creation
 Build a role-playing character sheet tracker which will pull in information from multiple data sources and display semantic connections between characters. 
 
+## Features
+
+- **Use local language model to clean up character summaries and backstories**
+- **Import session notes from external data sources extracting heading and date information**
+- **Generate knowledge graph from multiple data import sources and display information to users in clean readable format**
+
+## Dependencies
+
+- [Python 3.11](https://www.python.org/downloads/): Streamlit App
+- [llama.cpp](https://github.com/ggml-org/llama.cpp): For Backstory Rewrites
+
+## Knowledge Graph Views
+
+Main Tab [Characters, Places, Session Notes]
+
+- Characters: [Single Character, Party View]
+- Places: [Location View, Heading View]
+- Session Notes: [Location View, Directory File View]
+
 ## What It Does
 
 - Create and edit character sheets with stats, backstory, summary, details, and character connections.
@@ -26,4 +45,5 @@ Build a role-playing character sheet tracker which will pull in information from
 ## Document Summary
 Build a role-playing character sheet tracker which will pull in information from multiple data sources and display semantic connections between characters. The tool should include the use of local language models to clean up summaries and backstories before importing external session notes into knowledge graphs. Knowledge graph views are available for viewing character, place, and session notes.
 
-Tech Stack - Streamlit, LangChain, Llama Cli, Graphviz
+## Tech Stack
+- Streamlit, LangChain, Llama Cli, Graphviz
