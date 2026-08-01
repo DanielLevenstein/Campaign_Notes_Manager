@@ -2,14 +2,8 @@
 - Move knowledge graph code into a helper module called graphviz_rendering.py
 - Split graph rendering into four tabs [Characters Graph, Place Graph, Session Note Graph, Full Graph]
 
-Specs Update
-1) When the top level tab is Characters only display the ["Single Character", "Party View"]
-2) When the top level tab is "Places" display ["Location View", "Heading View"]
-3) When the top level tab is "Session Notes" display ["Location View", "Directory File View"]
+Move all graph views to their own top level streamlit tab and create sub views below them based on the specs below.
 
-Also remove all non-place or character nodes from the place graph, If no character connections exist, just don't show any. 
-Markdown headings that are recognized as places or groups keep their Markdown heading column, but use the semantic place or group visual icon instead of the generic folder icon.
-Markdown headings that do not qualify as graph entities can appear in the lore information table as one-sentence source-backed summaries.
 
 ## Characters Graph
 Views [Single Character, Party View]
