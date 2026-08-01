@@ -2,8 +2,7 @@
 - Move knowledge graph code into a helper module called graphviz_rendering.py
 - Split graph rendering into four tabs [Characters Graph, Place Graph, Session Note Graph, Full Graph]
 
-Move all graph views to their own top level streamlit tab and create sub views below them based on the specs below.
-
+Move all graph views to their own top-level streamlit tab and create sub views below them based on the specs below.
 
 ## Characters Graph
 Views [Single Character, Party View]
