@@ -15,8 +15,10 @@ from character_graph.combined_graph import (
     combined_relationship_dot,
     combined_relationship_rows,
     compact,
+    dedupe_combined_edges,
     full_character_connection_graph,
     is_lore_source_node,
+    is_session_notes_node,
     other_connection_rows,
     other_connections_graph,
 )
@@ -391,6 +393,7 @@ def render_lore_graph(
         **load_graphviz_config(LORE_GRAPH_CONFIG.key),
         "column_layout": column_layout,
     }
+    deduplicate_source_document_nodes(lore_graph)
     note_rows = lore_information_rows(lore_graph) if show_lore_notes else []
     render_relationship_graph(
         lore_graph,
@@ -411,14 +414,16 @@ def render_session_file_view_tab(
     title: str = FILE_VIEW_TAB,
     key: str = "session_lore_file_view_source_file",
     show_lore_notes: bool = False,
-    hide_source_document_roots: bool = False,
+    hide_source_document_roots: bool = True,
 ) -> None:
     st.subheader(title)
+    pending_import_source_file = st.session_state.pop("session_notes_imported_source_file", None)
     selected_source_file = render_lore_file_filter(
         combined,
         source_predicate=is_session_note_node,
         label="Session Note File",
         key=key,
+        default_source_file=pending_import_source_file,
     )
     session_graph = markdown_header_lore_graph(
         combined,
@@ -437,6 +442,7 @@ def render_session_file_view_tab(
         label_font_color=label_font_color,
         column_layout=column_layout,
         show_lore_notes=show_lore_notes,
+        hide_source_document_roots=hide_source_document_roots,
     )
 
 
@@ -448,9 +454,13 @@ def render_session_heading_view_tab(
     title: str = SESSION_VIEW_TAB,
     key: str = "session_lore_session_view_heading",
     show_lore_notes: bool = True,
+    hide_source_document_roots: bool = True,
 ) -> None:
     st.subheader(title)
-    projected_graph = markdown_header_lore_graph(combined)
+    projected_graph = markdown_header_lore_graph(
+        combined,
+        hide_source_document_roots=hide_source_document_roots,
+    )
     selected_heading_id = render_lore_heading_filter(
         combined,
         source_predicate=is_session_note_node,
@@ -461,7 +471,11 @@ def render_session_heading_view_tab(
     if selected_heading_id is None:
         st.info("Add Markdown Headings To Session Notes To Use Section View.")
         return
-    session_graph = markdown_header_lore_graph(combined, heading_id=selected_heading_id)
+    session_graph = markdown_header_lore_graph(
+        combined,
+        heading_id=selected_heading_id,
+        hide_source_document_roots=hide_source_document_roots,
+    )
     if not session_graph.characters:
         st.info("No Session Note Connections Were Found For This Heading.")
         return
@@ -470,6 +484,7 @@ def render_session_heading_view_tab(
         label_font_color=label_font_color,
         column_layout=column_layout,
         show_lore_notes=show_lore_notes,
+        hide_source_document_roots=hide_source_document_roots,
     )
 
 
@@ -617,13 +632,26 @@ def render_lore_file_filter(
     source_predicate: Callable[[CombinedCharacterNode], bool],
     label: str,
     key: str,
+    default_source_file: str | None = None,
 ) -> str | None:
     options = lore_source_file_options(graph, source_predicate)
     if not options:
         return None
     labels = [option[0] for option in options]
-    selected_label = st.selectbox(label, labels, key=key)
-    return dict(options)[selected_label]
+    option_map = dict(options)
+    selected_label = None
+    default_index = 0
+    if default_source_file is not None:
+        normalized_default = normalized_lore_source_file(default_source_file)
+        for index, option in enumerate(options):
+            if normalized_lore_source_file(option[1]) == normalized_default:
+                default_index = index
+                selected_label = option[0]
+                break
+    if selected_label is not None:
+        st.session_state[key] = selected_label
+    selected_label = st.selectbox(label, labels, index=default_index, key=key)
+    return option_map[selected_label]
 
 
 def render_lore_heading_filter(
@@ -647,7 +675,11 @@ def lore_source_file_options(
 ) -> list[tuple[str, str]]:
     options = []
     for node in graph.characters.values():
-        if node.node_type != "source_document" or not source_predicate(node) or not node.source_file:
+        # Accept any node that has a source_file and matches the predicate.
+        # Some imports create session-note related nodes that are not typed
+        # as `source_document` but still reference a source file. Include
+        # those so the file dropdown reflects actual files in lore.
+        if not node.source_file or not source_predicate(node):
             continue
         source_path = Path(node.source_file)
         label = source_path.name or node.name
@@ -669,10 +701,13 @@ def lore_heading_options(
             for node_id, node in projected_graph.characters.items()
             if is_markdown_heading_node(node)
         }
+    # Use any node that references a source file and matches the predicate
+    # (not only nodes explicitly typed as `source_document`). This allows
+    # session-note files that were imported to appear in heading lists.
     source_ids = {
         node_id
         for node_id, node in graph.characters.items()
-        if node.node_type == "source_document" and source_predicate(node)
+        if node.source_file and source_predicate(node)
     }
     for source_id, headings in markdown_subheadings_by_source(graph, source_ids).items():
         source = graph.characters[source_id]
@@ -882,10 +917,14 @@ def markdown_header_lore_graph(
     fanout_linked_characters: bool = False,
     hide_source_document_roots: bool = False,
 ) -> CombinedCharacterGraph:
+    # Collect any node that references a session-note source file. Some
+    # session-note imports create nodes that are not strictly typed as
+    # `source_document` but still carry a `source_file` path. Use those
+    # so the file-based view can locate the correct files.
     source_document_ids = {
         node_id
         for node_id, node in graph.characters.items()
-        if node.node_type == "source_document" and is_session_note_node(node)
+        if node.source_file and is_session_note_node(node)
     }
     if source_file is not None:
         source_document_ids = filter_source_document_ids_by_file(graph, source_document_ids, source_file)
@@ -997,6 +1036,33 @@ def graph_without_source_document_roots(graph: CombinedCharacterGraph) -> Combin
             if edge.source in visible_characters and edge.target in visible_characters
         ],
     )
+
+
+def deduplicate_source_document_nodes(graph: CombinedCharacterGraph) -> None:
+    remapped_ids: dict[str, str] = {}
+    canonical_by_key: dict[tuple[str, str, str], str] = {}
+    for node_id, node in list(graph.characters.items()):
+        if node.node_type != "source_document":
+            continue
+        key = (
+            node.node_type,
+            compact(node.name),
+            normalized_lore_source_file(node.source_file),
+        )
+        canonical_id = canonical_by_key.setdefault(key, node_id)
+        if canonical_id != node_id:
+            remapped_ids[node_id] = canonical_id
+    if not remapped_ids:
+        return
+    graph.characters = {
+        node_id: node
+        for node_id, node in graph.characters.items()
+        if node_id not in remapped_ids
+    }
+    for edge in graph.edges:
+        edge.source = remapped_ids.get(edge.source, edge.source)
+        edge.target = remapped_ids.get(edge.target, edge.target)
+    dedupe_combined_edges(graph)
 
 
 def markdown_heading_level(node: CombinedCharacterNode | None) -> int | None:
@@ -1734,12 +1800,14 @@ def edge_connects(edge, left_ids: set[str], right_ids: set[str]) -> bool:
 
 
 def is_session_note_node(node: CombinedCharacterNode) -> bool:
-    source_file = node.source_file.replace("\\", "/").lower()
-    return (
-        "/session_notes/" in source_file
-        or source_file.endswith("/session_notes.md")
-        or compact(Path(source_file).stem) in {"sessionnote", "sessionnotes"}
-    )
+    if node.node_type == "source_document":
+        source_file = node.source_file.replace("\\", "/").lower()
+        return (
+            "/session_notes/" in source_file
+            or source_file.endswith("/session_notes.md")
+            or compact(Path(source_file).stem) in {"sessionnote", "sessionnotes"}
+        )
+    return is_session_notes_node(node)
 
 
 def is_place_lore_path(path: Path) -> bool:
