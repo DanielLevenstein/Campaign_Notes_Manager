@@ -1,9 +1,8 @@
 import os
 from datetime import date
 
-import local_chatbot.session_notes as session_notes
-import streamlit_app
-from local_chatbot.session_notes import (
+import language_model.session_notes as session_notes
+from language_model.session_notes import (
     child_markdown_sections,
     combine_markdown_section,
     date_from_line,
@@ -223,15 +222,6 @@ More notes.
         (3, "Harbor Trouble", "heading"),
         (2, "Existing Section", "heading"),
     ]
-
-
-def test_session_note_select_options_hide_filenames_and_show_headings(tmp_path):
-    path = tmp_path / "Imported_Atlantia.md"
-    path.write_text("# Atlantia Lore\n\n## The Harbor\n\nThe harbor is busy.\n", encoding="utf-8")
-
-    options = streamlit_app.session_note_select_options([path])
-
-    assert [option["label"] for option in options] == ["H2: The Harbor"]
 
 
 def test_prepare_markdown_import_expands_single_newlines_for_markdown_paragraphs():

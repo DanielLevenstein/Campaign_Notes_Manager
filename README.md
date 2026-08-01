@@ -12,6 +12,35 @@ The app treats authored markdown in `world_building/lore` as the source of truth
 Backup lore files are stored in `world_building/backup` and are updated everytime the app is loaded.
 A manual backup button has been added in the `Lore Import` Section for your convenience.
 
+## Dependencies
+
+- [Python 3.11](https://www.python.org/downloads/): Streamlit App
+- [llama.cpp](https://github.com/ggml-org/llama.cpp): For Backstory Rewrites
+
+## Installation
+
+The easiest way to run the app is:
+
+```bash
+./run_streamlit.sh
+```
+
+This helper script creates a local `.venv` environment if needed, installs the dependencies from `requirements.txt`, and starts the Streamlit app.
+
+If you prefer to manage the environment manually, use:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+## Running App
+
+Note: Character Rewrite feature is only enabled if the user has llama.cpp installed on their local machine. 
+- Model download will be slow the first time it's run but then should run smoothly.  
+
 ## What It Does
 
 - Create and edit character sheets with stats, backstory, summary, details, and character connections.
@@ -31,40 +60,31 @@ A manual backup button has been added in the `Lore Import` Section for your conv
 ## Release Notes
 
 
-| Version | Summary                                                                           |
-| ------- | --------------------------------------------------------------------------------- |
-| v1.1.0 | Implemented distinct knowledge graph views for character, place and sesison tab|
-| v1.0.0 | This release adds a dedicated Knowledge Graph UI using graphviz.|
-| v0.1.0 | Packaged as a Streamlit app for local character sheets, campaign lore management. |
-
-## Setup
-
-The easiest way to run the app is:
-
-```bash
-./run_streamlit.sh
-```
-
-This helper script creates a local `.venv` environment if needed, installs the dependencies from `requirements.txt`, and starts the Streamlit app.
-
-If you prefer to manage the environment manually, use:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run streamlit_app.py
-```
+| Version | Summary                                                                                       |
+| ------- | --------------------------------------------------------------------------------------------- |
+| v2.0.0  | Adds local character rewrite tuning, rewrite quality reports, and safer generated-text saves. |
+| v1.1.0  | Implemented distinct knowledge graph views for character, place and sesison tab               |
+| v1.0.0  | This release adds a dedicated Knowledge Graph UI using graphviz.                              |
+| v0.1.0  | Packaged as a Streamlit app for local character sheets, campaign lore management.             |
 
 ## Knowledge Graph Views
+
 Main Tab [Characters, Places, Session Notes]
+
 - Characters: [Single Character, Party View]
 - Places: [Location View, Heading View]
 - Session Notes: [Location View, Directory File View]
 
 ### Project Screenshots
 
-![Knowledge Graph](docs/screenshots/Session_Notes_Graph_Session_View.png)
+![Summary Reright](docs/screenshots/backstory_cleanup.png)
+**Use local language model to clean up character summaries and backstories**
+
+![Import Session Notes](docs/screenshots/Import_Session_Notes.png)
+**Import session notes from external data sources extracting heading and date information**
+
+![Knowledge Graph](docs/screenshots/Places_Graph_Session_View.png)
+**Generate knowledge graph from multiple data import sources and display information to users in clean readable format**
 
 ## Storage Source Of Truth
 
@@ -96,31 +116,67 @@ world_building/meta_data/character_graph/*.graph.json
 
 Everything under `world_building/` is local campaign material, runtime data, or generated output and should not be committed.
 
-## Environmental Variables
-
-The app works without any environment variables. By default, it reads and writes under `world_building/` in the repository root.
-
-The `LOCAL_CHATBOT_` prefix is legacy naming from when this project started as a local chatbot.
-The current app is the roleplaying lore and knowledge graph tool; the prefix remains because these are the names currently read by the code.
-
-### Feature and development flags:
-
-
-| Variable                                        | Enabled Value | Purpose                                                                                                                   |
-| ----------------------------------------------- |---------------| ------------------------------------------------------------------------------------------------------------------------- |
-| `LOCAL_CHATBOT_DISABLE_LORE_BACKUPS`            | `1`           | Skips the automatic backup that normally runs when the Streamlit app starts.                                              |
-| `LOCAL_CHATBOT_ENABLE_GRAPH_REWRITES`           | `1`           | Shows graph-backed summary and backstory rewrite controls in the character editor.                                        |
-| `LOCAL_CHATBOT_ENABLE_ATTRIBUTE_GRAPH_OVERRIDE` | `1`           | Shows the internal attribute graph override editor. This is a maintenance/debug surface, not part of the normal app flow. |
-
-Example isolated run:
-
-```bash
-LOCAL_CHATBOT_WORLD_BUILDING_DIR=/tmp/lore_graph_sandbox ./run_streamlit.sh
-```
-
 ## Specs
 
 - [Knowledge Graph Design](docs/specs/KNOWLEDGE_GRAPH_DESIGN.md): Tabular Knowledge Extraction
 - [Combined Knowledge Graph](docs/specs/KNOWLEDGE_GRAPH_DESIGN2.md): Multi Source Knowledge Graph
 - [Graphviz UI Issues](docs/specs/KNOWLEDGE_GRAPH_DESIGN3.md): Knowledge Graph Rendering with Graphviz
 - [Knowledge Graph Views](docs/specs/KNOWLEDGE_GRAPH_DESIGN4.md): Multi View Knowledge Graphs
+
+### Backstory and Summary Rewrites
+
+Backstory and summary rewrites use the local llama.cpp command-line tools.
+Install llama.cpp and the app will download the configured GGUF model the first time it needs it.
+
+Recommended installs:
+
+```bash
+brew install llama.cpp        # macOS or Linux with Homebrew
+winget install llama.cpp      # Windows
+conda install -c conda-forge llama-cpp
+```
+
+The app calls the llama.cpp wrapper as `llama completion`, so verify that `llama` is on your `PATH`:
+
+```bash
+llama --version
+llama completion --help
+```
+
+If your install only exposes `llama-cli`, install or link the llama.cpp wrapper before using model-backed rewrites. The app does not require `llama-server` or any long-running local API service.
+
+After installing llama.cpp, start the app normally:
+
+```bash
+./run_streamlit.sh
+```
+
+The app stores downloaded local language model files in:
+
+```text
+models/character_rewrite/
+```
+
+That directory is ignored by git so the rewrite model is visible for local disk cleanup without being committed.
+
+The default rewrite model is `Qwen/Qwen2.5-0.5B-Instruct-GGUF` using the `Q4_K_M` GGUF artifact. Advanced users can switch the JSON config to a smaller or larger GGUF model when they want to tune the speed/quality tradeoff.
+
+Advanced users can change the model, quantization, download URL, and runtime settings in:
+
+```text
+config/model/local_language_model.json
+```
+
+When the app downloads the rewrite model for the first time, it prints the exact local directory before the download starts so you can remove the artifact later.
+
+To choose a different model cache directory:
+
+```bash
+LOCAL_CHATBOT_MODEL_CACHE_DIR=/path/to/local/character_rewrite_models ./run_streamlit.sh
+```
+
+To regenerate the semantic improvement report with the real local model:
+
+```bash
+.venv/bin/python scripts/generate_single_character_backstory_rewrite_report.py
+```
