@@ -301,7 +301,7 @@ def test_ui_uploaded_session_note_updates_combined_graph_from_configured_notes_d
         """# Uploaded Graph Notes
 
 Neal Lovington warned the party about the Cult of Ignis.
-The Ignis cult later attacked the carnival.
+The Indigo Cult later attacked the carnival.
 """,
         encoding="utf-8",
     )
@@ -316,7 +316,7 @@ The Ignis cult later attacked the carnival.
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
         graph_expander.get_by_role("tab", name="Location View", exact=True).click()
-        expect(graph_expander.get_by_text("Ignis Cult", exact=True).first).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_text("Indigo Cult", exact=True).first).to_be_visible(timeout=10000)
         browser.close()
 
     assert (session_notes_dir / "Uploaded_Graph_Notes.md").exists()

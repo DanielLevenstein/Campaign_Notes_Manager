@@ -32,11 +32,13 @@ Views [Location View, Directory File View]
 - Section View allows users to view lore items from a single Markdown heading
   - For session views hide headings which have no root nodes associated with them. 
 
-Column 0: Source Documents & Group Names
+Column 0: Source Documents
 Column 1: Markdown Heading 1 & Place Name
-Column 2: Markdown Heading 2 & Sub Places
+Column 2: Markdown Heading 2, Sub Places, & Groups
 Column 3: Markdown Heading 3
 Column 4: Character Connections
+
+- Spec Update: Move groups to Column 2 with sub places.
 
 Sort all connections within each column by the number of connections with the edges with the most connections displayed first.
 Display all graph connections as a straight line and enforce that columns are maintained.
@@ -44,7 +46,7 @@ Table of connections should only show edges with character connections
 
 ## Heading View
 Views [Places, Session Notes]
-Uses the same UI as session Notes Graph but allows the user to select what sub heading they would like to see in the UI. 
+Uses the same UI as session Notes Graph but allows the user to select what sub-heading they would like to see in the UI. 
 Currently only available in party tab.
 
 ## Full Structured Graph

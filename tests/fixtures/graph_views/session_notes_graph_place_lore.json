@@ -6,9 +6,9 @@
   "top_level_tab": "Session Notes",
   "screenshot": "Session_Notes_Graph_Place_Lore.png",
   "columns": [
-    "Source Documents & Group Names",
+    "Source Documents",
     "Markdown Heading 1",
-    "Markdown Heading 2",
+    "Markdown Heading 2, Sub Places, & Groups",
     "Markdown Heading 3",
     "Character Connections & Places"
   ],

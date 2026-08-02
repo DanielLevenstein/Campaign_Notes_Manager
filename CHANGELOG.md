@@ -87,3 +87,8 @@
 ## 2026-07-20
 - Remove duplicate Family Tree nodes from the place graph.
 - Move lore_graph_fixture.json to a hidden directory until node deduplication is implemented.
+
+# feature/knowledge_graph2
+## 2026-08-02
+### Feature Implementation
+- Fixed session-note directory graphs so `Session_Notes.md` imports are treated as document roots, added a [File_Name] heading selector option, and added H1-H3 hide controls that preserve labeled child/context connections.

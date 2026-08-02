@@ -8,23 +8,6 @@ H1 Branch
 H2 Date
 H3 Feature Implementation
 
-## Knowledge Graph bugs
-
-- Session Notes show up as a character in the Session_Notes.md directory view.
-- ![Session Note Character](docs/screenshots/session_note_character.png)
-  - I believe this is because the session notes import is using the same character ingestion function as the character sheet one.
-  - This node should be converted from a character type to a header type
-
-## Document View Improvement
-
-- An extra option should be added to the heading selector to view all elements in the file. Relevant for "Session_Notes_Fixture.md" file which has multiple h1 headings.
-- UI buttons should be added to the Directory view to hide elements headings H1 - H3 with a checkbox for each item we support hiding. 
-- When heading elements are hidden, new graph connections should be created from the hidden node to all its children with h1-h3 being the initial connection label.
-
-![Directory View Busy](docs/screenshots/Session_Notes_Busy.png)
-**In the figure above "Tharevon" is connected to the "Pixi Kingdom" through "Session 4" but in current ui it's almost impossible to see**
-
-
 ## Graph View Improvements
 
 - Graphviz views must not change depending on what tab they are displayed under.
@@ -47,3 +30,12 @@ H3 Feature Implementation
 - In `world_building/meta_data/character_graph/session_note__Session_Notes.graph.json` character named "Session Notes" is a case of mistaken identity.
   - "Session Notes" should be saved as a document heading, not a character.
 - In graphviz_rendering.py `is_session_note_node` and , `is_place_lore_path` are determining a node type by string values in file names rather than absolute directory paths.
+
+## Completed
+
+### 2026-08-02
+
+- Fixed the `Session_Notes.md` directory view so imported session-note roots are treated as source documents and no longer render as character nodes.
+- Added an `All Elements` heading selector option for session-note file views.
+- Added Directory File View controls to hide Session Notes H1-H3 headings while preserving direct child/context edges labeled with the hidden heading text.
+- Moved Session Notes group nodes into the Markdown H2/Sub Places column while preserving their source-file and subsection graph links.
