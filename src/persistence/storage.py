@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 from typing import Any, Callable
 
@@ -9,6 +10,7 @@ from src.graph import CanonicalGraphService, canonical_graph_from_character_grap
 
 GRAPH_FILE_SUFFIX = ".graph.json"
 CANONICAL_GRAPH_DATABASE_NAME = "canonical_graph.sqlite3"
+FILE_HASHES_NAME = ".file_hashes.json"
 SYNTHETIC_EDGE_TYPES = {"synthetic", "derived_synthetic"}
 
 
@@ -57,7 +59,75 @@ def save_lore_graph(
         source_file,
         canonical_graph_from_character_graph(persisted_graph, root=root),
     )
+    persist_file_hash(lore_path, meta_data_root=meta_data_root, lore_root=lore_root)
     return graph_path
+
+
+def lore_file_hash_changed(
+    path: Path | str,
+    *,
+    meta_data_root: Path | str,
+    lore_root: Path | str,
+) -> bool:
+    source = Path(path)
+    if not source.exists():
+        return True
+    hashes = read_file_hashes(meta_data_root)
+    return hashes.get(file_hash_key(source, lore_root=lore_root)) != file_sha256(source)
+
+
+def persist_file_hash(
+    path: Path | str,
+    *,
+    meta_data_root: Path | str,
+    lore_root: Path | str,
+) -> None:
+    source = Path(path)
+    if not source.exists():
+        return
+    hashes = read_file_hashes(meta_data_root)
+    hashes[file_hash_key(source, lore_root=lore_root)] = file_sha256(source)
+    write_file_hashes(meta_data_root, hashes)
+
+
+def file_hash_key(path: Path | str, *, lore_root: Path | str) -> str:
+    source = Path(path).resolve()
+    root = Path(lore_root).resolve()
+    try:
+        return source.relative_to(root).as_posix()
+    except ValueError:
+        return source.name
+
+
+def file_hash_manifest_path(meta_data_root: Path | str) -> Path:
+    return Path(meta_data_root) / FILE_HASHES_NAME
+
+
+def read_file_hashes(meta_data_root: Path | str) -> dict[str, str]:
+    path = file_hash_manifest_path(meta_data_root)
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return {str(key): str(value) for key, value in payload.items()}
+
+
+def write_file_hashes(meta_data_root: Path | str, hashes: dict[str, str]) -> None:
+    path = file_hash_manifest_path(meta_data_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(hashes, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def file_sha256(path: Path | str) -> str:
+    hasher = hashlib.sha256()
+    with Path(path).open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def read_markdown(path: Path | str) -> str:

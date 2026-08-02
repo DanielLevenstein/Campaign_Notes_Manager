@@ -13,6 +13,7 @@ from src.persistence.lore_import import (
     list_lore_backups,
     read_lore_backup_date,
     read_backup_date,
+    read_backup_content_hash,
     read_backup_kind,
     read_backup_snapshot_date,
     restore_lore_backup,
@@ -297,6 +298,28 @@ def test_backup_lore_files_updates_existing_backup_without_deleting_missing_file
     assert summary.files == 1
     assert old_backup_file.exists()
     assert (backup_dir / "session_notes" / "Current_Note.md").exists()
+
+
+def test_backup_lore_files_skips_when_lore_folder_hash_is_unchanged(tmp_path, monkeypatch):
+    lore_dir = tmp_path / "world_building" / "lore"
+    meta_data_dir = tmp_path / "world_building" / "meta_data"
+    backup_dir = tmp_path / "world_building" / "backup"
+    character_file = lore_dir / "character_sheets" / "Jory_Ravenmark.md"
+    character_file.parent.mkdir(parents=True)
+    character_file.write_text("# Jory Ravenmark\n", encoding="utf-8")
+    monkeypatch.setattr(lore_import, "META_DATA_DIR", meta_data_dir)
+    monkeypatch.setattr(lore_import, "ensure_base_dirs", lambda: None)
+    first_timestamp = datetime(2026, 7, 13, 9, 30, tzinfo=timezone.utc)
+    second_timestamp = datetime(2026, 7, 13, 9, 31, tzinfo=timezone.utc)
+
+    first = backup_lore_files(lore_dir, backup_dir, backup_date=first_timestamp)
+    second = backup_lore_files(lore_dir, backup_dir, backup_date=second_timestamp)
+
+    assert first.files == 1
+    assert second.files == 0
+    assert second.backup_date == first_timestamp
+    assert read_lore_backup_date(backup_dir) == first_timestamp
+    assert read_backup_content_hash(backup_dir)
 
 
 def test_backup_lore_files_can_create_selectable_snapshot(tmp_path, monkeypatch):

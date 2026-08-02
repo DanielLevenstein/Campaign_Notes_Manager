@@ -466,9 +466,7 @@ def test_ui_save_confirmations_are_visible(isolated_character_app):
         # Test character save confirmation is visible without opening expander
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
-        fill_textbox_in_section(page, "Create Character", "Name", "Test Character")
-        fill_textbox_in_section(page, "Create Character", "First Name", "Test")
-        fill_textbox_in_section(page, "Create Character", "Family Name", "Character")
+        fill_textbox_in_section(page, "Create Character", "Character Name", "Test Character")
         fill_textbox_in_section(page, "Create Character", "Level", "1")
         fill_textbox_in_section(page, "Create Character", "Race", "Human")
         fill_textbox_in_section(page, "Create Character", "Class", "Fighter")
@@ -1031,9 +1029,7 @@ def test_ui_creates_loads_and_undoes_character_changes(isolated_character_app):
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
-        fill_textbox_in_section(page, "Create Character", "Name", "Della Moor")
-        fill_textbox_in_section(page, "Create Character", "First Name", "Della")
-        fill_textbox_in_section(page, "Create Character", "Family Name", "Moor")
+        fill_textbox_in_section(page, "Create Character", "Character Name", "Della Moor")
         fill_textbox_in_section(page, "Create Character", "Level", "5")
         fill_textbox_in_section(page, "Create Character", "Race", "Gnome")
         fill_textbox_in_section(page, "Create Character", "Class", "Rogue")
@@ -1062,8 +1058,17 @@ def test_ui_creates_loads_and_undoes_character_changes(isolated_character_app):
         page.get_by_role("button", name="undo Undo Changes").first.click()
         expect(page.get_by_text("Character Changes Undone.")).to_be_visible(timeout=10000)
         ensure_character_editor_open(page)
+        expect(page.get_by_role("textbox", name="Summary", exact=True).first).to_have_value(
+            "Della is a careful scout with brass lockpicks.",
+            timeout=10000,
+        )
         page.get_by_role("button", name="undo Undo Changes").first.click()
         expect(page.get_by_text("Character Changes Undone.")).to_be_visible(timeout=10000)
+        ensure_character_editor_open(page)
+        expect(page.get_by_role("textbox", name="Summary", exact=True).first).to_have_value(
+            "Della is a careful scout.",
+            timeout=10000,
+        )
         browser.close()
 
     profile = read_character_profile(Character(name="Della Moor", path=character_path))
@@ -1222,12 +1227,12 @@ def test_create_validation_preserves_entered_fields(isolated_character_app):
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
-        fill_textbox_in_section(page, "Create Character", "Name", "Keeps Draft")
+        fill_textbox_in_section(page, "Create Character", "Character Name", "Keeps Draft")
         fill_textbox_in_section(page, "Create Character", "Race", "Human")
         fill_textbox_in_section(page, "Create Character", "Class", "Bard")
         page.get_by_role("button", name="person_add Create Character").click()
         expect(page.get_by_text("Enter Name And Backstory.")).to_be_visible(timeout=10000)
-        expect(section(page, "Create Character").get_by_role("textbox", name="Name", exact=True)).to_have_value("Keeps Draft")
+        expect(section(page, "Create Character").get_by_role("textbox", name="Character Name", exact=True)).to_have_value("Keeps Draft")
         expect(section(page, "Create Character").get_by_role("textbox", name="Race", exact=True)).to_have_value("Human")
         expect(section(page, "Create Character").get_by_role("textbox", name="Class", exact=True)).to_have_value("Bard")
 
@@ -1264,9 +1269,7 @@ def test_ui_deletes_character_place_and_session_note_files(isolated_character_ap
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
-        fill_textbox_in_section(page, "Create Character", "Name", "Delete Me")
-        fill_textbox_in_section(page, "Create Character", "First Name", "Delete")
-        fill_textbox_in_section(page, "Create Character", "Family Name", "Me")
+        fill_textbox_in_section(page, "Create Character", "Character Name", "Delete Me")
         fill_textbox_in_section(page, "Create Character", "Level", "1")
         fill_textbox_in_section(page, "Create Character", "Race", "Human")
         fill_textbox_in_section(page, "Create Character", "Class", "Commoner")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 import json
 from dataclasses import dataclass
@@ -54,6 +55,7 @@ LORE_SUBDIRECTORIES = {
 }
 LORE_BACKUP_STAMP = ".last_backup"
 LORE_BACKUP_METADATA = ".backup_metadata.json"
+LORE_BACKUP_HASH = "lore_content_hash"
 LORE_BACKUP_SNAPSHOT_FORMAT = "%Y-%m-%d_%H-%M-%S"
 BACKUP_KIND_BACKUP = "backup"
 BACKUP_KIND_SNAPSHOT = "snapshot"
@@ -154,6 +156,14 @@ def backup_lore_files(
     backup_dir.mkdir(parents=True, exist_ok=True)
     backup_date = backup_date or current_backup_timestamp()
     snapshot_date = snapshot_date or backup_date
+    content_hash = lore_folder_hash(source_dir)
+    if (
+        not snapshot
+        and normalize_backup_kind(backup_kind) == BACKUP_KIND_BACKUP
+        and content_hash
+        and content_hash == read_backup_content_hash(backup_dir)
+    ):
+        return LoreBackupSummary(files=0, backup_dir=backup_dir.resolve(), backup_date=read_backup_date(backup_dir))
     target_dir = create_backup_snapshot_dir(backup_dir, backup_date) if snapshot else backup_dir
 
     file_count = 0
@@ -161,10 +171,12 @@ def backup_lore_files(
     file_count += copy_directory_files(META_DATA_DIR, target_dir / "meta_data", overwrite=True, include_dotfiles=False)
 
     write_backup_stamp(target_dir, backup_date)
-    write_backup_metadata(target_dir, backup_date, backup_kind, snapshot_date=snapshot_date)
+    write_backup_metadata(target_dir, backup_date, backup_kind, snapshot_date=snapshot_date, content_hash=content_hash)
     write_backup_stamp(backup_dir, backup_date)
     if not snapshot:
-        write_backup_metadata(backup_dir, backup_date, backup_kind, snapshot_date=snapshot_date)
+        write_backup_metadata(backup_dir, backup_date, backup_kind, snapshot_date=snapshot_date, content_hash=content_hash)
+    else:
+        write_backup_content_hash(backup_dir, content_hash)
     return LoreBackupSummary(files=file_count, backup_dir=target_dir, backup_date=backup_date)
 
 
@@ -187,6 +199,7 @@ def write_backup_metadata(
     backup_date: datetime,
     backup_kind: str,
     snapshot_date: datetime | None = None,
+    content_hash: str = "",
 ) -> None:
     snapshot_date = snapshot_date or backup_date
     metadata = {
@@ -194,7 +207,34 @@ def write_backup_metadata(
         "snapshot_date": snapshot_date.isoformat(timespec="seconds"),
         "backup_date": backup_date.isoformat(timespec="seconds"),
     }
+    if content_hash:
+        metadata[LORE_BACKUP_HASH] = content_hash
     (backup_dir / LORE_BACKUP_METADATA).write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+
+
+def write_backup_content_hash(backup_dir: Path, content_hash: str) -> None:
+    if not content_hash:
+        return
+    metadata_path = backup_dir / LORE_BACKUP_METADATA
+    metadata = {}
+    if metadata_path.exists():
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            metadata = {}
+    metadata[LORE_BACKUP_HASH] = content_hash
+    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+
+
+def read_backup_content_hash(backup_dir: Path) -> str:
+    metadata_path = backup_dir / LORE_BACKUP_METADATA
+    if not metadata_path.exists():
+        return ""
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return ""
+    return str(payload.get(LORE_BACKUP_HASH) or "")
 
 
 def read_backup_kind(backup_dir: Path) -> str:
@@ -408,3 +448,21 @@ def copy_directory_files(
         shutil.copy2(source_path, destination_path)
         file_count += 1
     return file_count
+
+
+def lore_folder_hash(source_dir: Path) -> str:
+    source_dir = source_dir.expanduser().resolve()
+    if not source_dir.exists():
+        return ""
+    hasher = hashlib.sha256()
+    found = False
+    for source_path in sorted(source_dir.rglob("*.md")):
+        if not source_path.is_file() or source_path.name.startswith("."):
+            continue
+        relative_path = source_path.relative_to(source_dir).as_posix()
+        hasher.update(relative_path.encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(source_path.read_bytes())
+        hasher.update(b"\0")
+        found = True
+    return hasher.hexdigest() if found else ""

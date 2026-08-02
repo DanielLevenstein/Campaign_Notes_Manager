@@ -1,5 +1,6 @@
 from dataclasses import replace
 from datetime import datetime
+import inspect
 from pathlib import Path
 import os
 import re
@@ -622,7 +623,7 @@ def render_combined_character_graph(active_main_tab: str = "Characters") -> None
             st.info("Add Character Or Place Lore To See The Combined Graph.")
             return
         graph_revision = st.session_state.get("combined_graph_revision", 0)
-        render_knowledge_graph_tabs(
+        render_knowledge_graph_tabs_compatible(
             combined=projection.combined,
             character_sheet_combined=projection.character_sheet_combined,
             character_sheet_detail_rows=projection.character_sheet_detail_rows,
@@ -634,6 +635,11 @@ def render_combined_character_graph(active_main_tab: str = "Characters") -> None
             label_font_color=graph_edge_label_font_color(),
             active_main_tab=active_main_tab,
         )
+
+
+def render_knowledge_graph_tabs_compatible(**kwargs) -> None:
+    supported = inspect.signature(render_knowledge_graph_tabs).parameters
+    render_knowledge_graph_tabs(**{key: value for key, value in kwargs.items() if key in supported})
 
 def connection_rows_for_character(combined, character_id: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
@@ -674,19 +680,15 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
         character_class="",
         backstory="",
     )
-    with st.form(key_prefix, clear_on_submit=True):
-        name = st.text_input("Name", value=draft_profile.name, key=f"{key_prefix}_name")
+    with st.form(key_prefix):
         name_cols = st.columns(2)
-        first_name = name_cols[0].text_input(
-            "First Name",
-            value=draft_profile.first_name,
-            key=f"{key_prefix}_first_name",
+        name = name_cols[0].text_input("Character Name", value=draft_profile.name, key=f"{key_prefix}_name")
+        player_name = name_cols[1].text_input(
+            "Player Name",
+            value=profile_player_name(draft_profile),
+            key=f"{key_prefix}_player_name",
         )
-        family_name = name_cols[1].text_input(
-            "Family Name",
-            value=draft_profile.family_name,
-            key=f"{key_prefix}_family_name",
-        )
+        st.caption("Aliases, first name, and family name are derived from saved character content.")
         stat_cols = st.columns(4)
         level = stat_cols[0].text_input("Level", value=draft_profile.level, key=f"{key_prefix}_level")
         race = stat_cols[1].text_input("Race", value=draft_profile.race, key=f"{key_prefix}_race")
@@ -752,8 +754,7 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
                     race=race.strip(),
                     character_class=character_class.strip(),
                     backstory=backstory.strip(),
-                    first_name=first_name.strip() or character_first_name(name),
-                    family_name=family_name.strip() or character_family_name(name),
+                    player_name=player_name.strip(),
                     summary=summary.strip(),
                     motivations=[],
                     drives=parse_list_field(drives),
@@ -774,6 +775,19 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
                 st.rerun()
 
 
+def render_alias_metadata(*, aliases: dict[str, dict[str, str]] | None = None) -> str:
+    rows: list[str] = []
+    for group, values in (aliases or {}).items():
+        for label, value in values.items():
+            if value:
+                rows.append(f"{label}: {value}")
+    return "\n".join(dict.fromkeys(rows))
+
+
+def profile_player_name(profile: CharacterProfile) -> str:
+    return getattr(profile, "player_name", "")
+
+
 def graph_edge_label_font_color() -> str:
     return "#cbd5e1"
 
@@ -781,8 +795,7 @@ def graph_edge_label_font_color() -> str:
 def clear_character_creator_state(key_prefix: str) -> None:
     for field in (
         "name",
-        "first_name",
-        "family_name",
+        "player_name",
         "level",
         "race",
         "class",
@@ -1545,10 +1558,25 @@ def render_character_editor(character: Character) -> None:
     editor_context = st.container()
     with editor_context:
         with st.form(f"edit_character_{character.name}"):
-            st.text_input("Name", value=profile.name, disabled=True)
             name_cols = st.columns(2)
-            first_name = name_cols[0].text_input("First Name", value=profile.first_name)
-            family_name = name_cols[1].text_input("Family Name", value=profile.family_name)
+            name_cols[0].text_input(
+                "Character Name",
+                value=profile.name,
+                disabled=True,
+                key=f"edit_character_name_{character.name}",
+            )
+            player_name = name_cols[1].text_input(
+                "Player Name",
+                value=profile_player_name(profile),
+                key=f"edit_player_name_{character.name}",
+            )
+            st.text_area(
+                "Aliases",
+                value=render_alias_metadata(aliases=profile.aliases),
+                height=80,
+                disabled=True,
+                key=f"edit_aliases_{character.name}",
+            )
             stat_cols = st.columns(4)
             level = stat_cols[0].text_input("Level", value=profile.level)
             race = stat_cols[1].text_input("Race", value=profile.race)
@@ -1697,8 +1725,7 @@ def render_character_editor(character: Character) -> None:
                     race=race.strip(),
                     character_class=character_class.strip(),
                     backstory=next_backstory,
-                    first_name=first_name.strip(),
-                    family_name=family_name.strip(),
+                    player_name=player_name.strip(),
                     summary=next_summary,
                     motivations=profile.motivations,
                     drives=parse_list_field(drives),

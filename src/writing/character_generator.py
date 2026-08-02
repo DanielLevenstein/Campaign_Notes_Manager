@@ -180,6 +180,7 @@ class RandomCharacterGenerator:
             race=profile.race,
             character_class=profile.character_class,
             backstory=profile.backstory.replace(profile.name, name),
+            player_name=getattr(profile, "player_name", ""),
             summary=profile.summary.replace(profile.name, name).replace(self.first_name(profile.name), self.first_name(name)),
             motivations=profile.motivations,
             drives=profile.drives,

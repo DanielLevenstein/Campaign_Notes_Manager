@@ -50,9 +50,9 @@ def test_render_backstory_matches_character_template_shape():
     assert render_backstory(profile) == (
         "# Mara Voss\n\n"
         "## Character Stats\n\n"
-        "| Name | Level | Race | Class | Pronouns |\n"
-        "| ---- | ----- | ---- | ----- | -------- |\n"
-        "| Mara | 3 | Elf | Wizard | she/her |\n\n"
+        "| Character Name | Level | Race | Class | Pronouns |\n"
+        "| -------------- | ----- | ---- | ----- | -------- |\n"
+        "| Mara Voss | 3 | Elf | Wizard | she/her |\n\n"
         "## Character Backstory\n\n"
         "Mara keeps a silver key from a city no map remembers.\n\n"
         "Mara trusts paper records more than promises.\n\n"
@@ -82,7 +82,7 @@ def test_render_backstory_omits_blank_stat_columns():
         summary="Mara is careful.",
     )
 
-    assert "| Name | Race |" in render_backstory(profile)
+    assert "| Character Name | Race |" in render_backstory(profile)
     assert "Level" not in render_backstory(profile)
     assert "Class" not in render_backstory(profile)
     assert "Pronouns" not in render_backstory(profile)
@@ -488,10 +488,10 @@ def test_random_generator_produces_template_ready_profile():
     assert len(profile.motivations) == 2
     assert profile.motivations[0] != profile.motivations[1]
     assert f"# {profile.name}" in markdown
-    assert profile.name not in markdown.replace(f"# {profile.name}", "")
-    assert "| Name | Level | Race | Class | Pronouns |" in markdown
+    assert f"| {profile.name} |" in markdown
+    assert "| Character Name | Level | Race | Class | Pronouns |" in markdown
     assert (
-        f"| {profile.name.split()[0]} | {profile.level} | {profile.race} | "
+        f"| {profile.name} | {profile.level} | {profile.race} | "
         f"{profile.character_class} | {profile.pronouns} |"
     ) in markdown
     assert "## Character Summary" in markdown
@@ -876,7 +876,7 @@ def test_create_character_allows_blank_optional_stats(tmp_path, monkeypatch):
     assert profile.character_class == ""
     assert profile.level == ""
     assert profile.pronouns == ""
-    assert "| Name |" in text
+    assert "| Character Name |" in text
     assert "Race |" not in text
     assert "Class |" not in text
     assert "Level |" not in text
@@ -1223,6 +1223,44 @@ def test_present_pronouns_stat_updates_in_stats_table(tmp_path, monkeypatch):
     text = character_path.read_text(encoding="utf-8")
     assert "| Family Name | Level | Race | Class | Pronouns |" in text
     assert "| Ravenmark | 4 | Human | Barbarian | they/them |" in text
+
+
+def test_new_character_profiles_store_derived_name_metadata_and_aliases(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "regenerate_character_graph", lambda character: None)
+    monkeypatch.setattr(storage, "CHARACTER_METADATA_DIR", tmp_path / "data" / "character_metadata")
+    monkeypatch.setattr(storage, "CHARACTERS_DIR", tmp_path / "docs" / "lore" / "character_sheets")
+
+    character = create_character(
+        CharacterProfile(
+            name="Della Moor",
+            player_name="Daniel",
+            pronouns="she/her",
+            level="5",
+            race="Gnome",
+            character_class="Rogue",
+            backstory="Della maps locked doors beneath the old city.",
+            first_name="Ignored",
+            family_name="Ignored",
+            summary="Della is a careful scout.",
+        )
+    )
+    profile = read_character_profile(character)
+    metadata = json.loads(character.profile_path.read_text(encoding="utf-8"))
+    text = character.backstory_path.read_text(encoding="utf-8")
+
+    assert profile.first_name == "Della"
+    assert profile.family_name == "Moor"
+    assert profile.player_name == "Daniel"
+    assert metadata["first_name"] == "Della"
+    assert metadata["family_name"] == "Moor"
+    assert metadata["aliases"]["content"] == {
+        "Character Name": "Della Moor",
+        "First Name": "Della",
+        "Family Name": "Moor",
+        "Player Name": "Daniel",
+    }
+    assert "| Character Name | Player Name | Level | Race | Class | Pronouns |" in text
+    assert "| Della Moor | Daniel | 5 | Gnome | Rogue | she/her |" in text
 
 
 def test_app_uses_world_building_lore_as_local_source_of_truth():

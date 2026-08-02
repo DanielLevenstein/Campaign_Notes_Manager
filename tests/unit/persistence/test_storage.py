@@ -7,8 +7,11 @@ from character_graph.schema import (
 )
 from src.persistence.storage import (
     delete_file,
+    file_hash_key,
     graph_path_for_lore_path,
+    lore_file_hash_changed,
     load_graph,
+    persist_file_hash,
     read_json,
     read_markdown,
     save_graph,
@@ -100,6 +103,24 @@ def test_text_write_reads_and_updates_graph_callback(tmp_path):
 
     assert path.read_text(encoding="utf-8") == '{"name": "Jory"}\n'
     assert updated_paths == [path]
+
+
+def test_lore_file_hash_manifest_tracks_unchanged_markdown(tmp_path):
+    lore_root = tmp_path / "world_building" / "lore"
+    meta_data_root = tmp_path / "world_building" / "meta_data"
+    path = lore_root / "character_sheets" / "Jory_Ravenmark.md"
+    write_markdown(path, "# Jory Ravenmark\n")
+
+    assert lore_file_hash_changed(path, lore_root=lore_root, meta_data_root=meta_data_root)
+
+    persist_file_hash(path, lore_root=lore_root, meta_data_root=meta_data_root)
+
+    assert not lore_file_hash_changed(path, lore_root=lore_root, meta_data_root=meta_data_root)
+    assert file_hash_key(path, lore_root=lore_root) == "character_sheets/Jory_Ravenmark.md"
+
+    write_markdown(path, "# Jory Ravenmark\n\nChanged.\n")
+
+    assert lore_file_hash_changed(path, lore_root=lore_root, meta_data_root=meta_data_root)
 
 
 def test_json_and_bytes_helpers_create_parent_directories(tmp_path):

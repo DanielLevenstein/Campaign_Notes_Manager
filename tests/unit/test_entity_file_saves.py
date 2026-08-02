@@ -74,7 +74,7 @@ def test_character_file_save_round_trips_updated_fields(tmp_path, monkeypatch):
     assert reloaded.backstory == "Della maps locked doors beneath the old city and marks every hinge."
     assert reloaded.summary == "Della is a careful scout with brass lockpicks."
     assert reloaded.drives == ["Find the sunken archive", "Protect Brindle Hall"]
-    assert "| Della | 6 | Gnome | Rogue | she/her |" in text
+    assert "| Della Moor | 6 | Gnome | Rogue | she/her |" in text
 
 
 def test_character_save_allows_missing_race_class_and_updates_display_name(tmp_path, monkeypatch):

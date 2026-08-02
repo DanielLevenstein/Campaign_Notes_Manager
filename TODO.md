@@ -31,20 +31,14 @@
 - Add a Node Removal view for low-confidence nodes that should be hidden from rendered graphs while preserving evidence.
 - Store review decisions separately from generated graph JSON so they can be reapplied during regeneration.
 
-## Performance Improvements
-
-- Add a file-hash persistence layer so unchanged Markdown files do not trigger graph updates.
-- Add folder-level hashing for lore backups so backups are not created when no lore files changed.
-
-## Character Improvements
-
-- Show the following name fields on the character creation UI: Character Name, Player Name, Aliases.
-- Make First Name and Family Name derived metadata fields.
-- Add a content-driven Aliases field to the metadata, which is not user-editable.
-
 ## Testing And Rollout
 
 - Add integration tests covering ingestion -> canonical store -> projection -> UI rendering for session-note imports.
 - Add UI contract tests and a small e2e flow for deduplication and graph rendering.
 - Add screenshot or DOM-level coverage for the first presentation-layer graph view.
 - Roll out the new projection path behind a feature flag if later view migrations need staged release control.
+
+## Completed
+
+- Implemented Phase 1.1 character name metadata improvements with `Character Name`, `Player Name`, read-only aliases, derived first/family names, and content-driven alias metadata.
+- Implemented Phase 1.2 persistence hashing so unchanged Markdown skips graph regeneration and unchanged lore folders skip automatic latest-backup rewrites.
