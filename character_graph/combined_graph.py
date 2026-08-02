@@ -28,7 +28,7 @@ CANONICAL_SESSION_NAME_VARIANTS = {
 }
 MAX_FOCUSED_GRAPH_CONNECTIONS = 6
 EvidenceRewriteClient = Callable[[list[dict[str, str]]], str]
-SERVER_TAG_EVIDENCE_RE = re.compile(r"\bServer Tag:\s*TABLEKEEPER\s*[-\u2013\u2014]")
+
 
 
 @dataclass(frozen=True)
@@ -452,12 +452,7 @@ def relationship_row_evidence(evidence: list[str]) -> list[str]:
     return [
         item
         for item in evidence
-        if not is_server_tag_tablekeeper_evidence(item)
     ]
-
-
-def is_server_tag_tablekeeper_evidence(value: str) -> bool:
-    return bool(SERVER_TAG_EVIDENCE_RE.search(value))
 
 
 def combined_attribute_rows(graphs: list[CharacterGraph]) -> list[dict[str, str]]:
