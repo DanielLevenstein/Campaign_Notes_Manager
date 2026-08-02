@@ -7,8 +7,8 @@ import pytest
 from character_graph.extraction import extract_character_graph
 from character_graph.ingest import load_backstory
 from character_graph.schema import CharacterGraph, CharacterNode, PrimaryCharacterRef
-from language_model.character_generator import RandomCharacterGenerator
-from language_model.character_rewrites import (
+from src.writing.character_generator import RandomCharacterGenerator
+from src.writing.character_rewrites import (
     clean_model_rewrite,
     graph_segment_context,
     graph_generated_backstory,
@@ -19,7 +19,7 @@ from language_model.character_rewrites import (
     rewrite_required_terms,
     trim_summary_candidate,
 )
-from language_model.rewrite_model import (
+from src.writing.rewrite_model import (
     LocalRewriteModelConfig,
     LocalRewriteModelError,
     LocalRewriteModelLifecycle,
@@ -28,7 +28,7 @@ from language_model.rewrite_model import (
     parse_llama_timing,
     run_worker_process,
 )
-from language_model.lore_documents import Character, CharacterProfile, read_character_profile
+from src.persistence.lore_documents import Character, CharacterProfile, read_character_profile
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -230,7 +230,7 @@ def test_local_rewrite_model_downloads_when_allowed(tmp_path, monkeypatch):
         if status_callback:
             status_callback("downloaded")
 
-    monkeypatch.setattr("language_model.rewrite_model.download_model", fake_download)
+    monkeypatch.setattr("src.writing.rewrite_model.download_model", fake_download)
     lifecycle = LocalRewriteModelLifecycle(
         LocalRewriteModelConfig(cache_dir=tmp_path, filename="model.gguf", allow_download=True),
         status_callback=events.append,
@@ -394,7 +394,7 @@ def test_worker_process_returns_cli_output_and_timing_metadata(tmp_path, monkeyp
             stderr="prompt eval time = 42.50 ms / 12 tokens\neval time = 10.25 ms / 7 tokens\n",
         )
 
-    monkeypatch.setattr("language_model.rewrite_model.subprocess.run", fake_run)
+    monkeypatch.setattr("src.writing.rewrite_model.subprocess.run", fake_run)
 
     result = run_worker_process(config, [{"role": "user", "content": "Rewrite."}])
 
@@ -429,7 +429,7 @@ def test_worker_process_reports_timeout(tmp_path, monkeypatch):
     def fake_run(*_args, **_kwargs):
         raise subprocess.TimeoutExpired(cmd="worker", timeout=1)
 
-    monkeypatch.setattr("language_model.rewrite_model.subprocess.run", fake_run)
+    monkeypatch.setattr("src.writing.rewrite_model.subprocess.run", fake_run)
 
     result = run_worker_process(config, [{"role": "user", "content": "Rewrite."}])
 

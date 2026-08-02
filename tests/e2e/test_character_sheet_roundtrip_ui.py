@@ -8,7 +8,7 @@ import pytest
 import requests
 from playwright.sync_api import expect, sync_playwright
 
-from language_model.storage import Character, read_character_profile
+from src.persistence.lore_documents import Character, read_character_profile
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -21,12 +21,11 @@ STRUCTURED_KNOWLEDGE_GRAPH_FULL_SCREENSHOT = ROOT_DIR / "docs" / "screenshots" /
 KNOWLEDGE_VIEW_SCREENSHOT_DIR = ROOT_DIR / "tests" / "fixtures" / "screenshots" / "knowledge_views"
 
 
-def streamlit_executable() -> Path:
-    workspace_venv = ROOT_DIR.parent / ".venv/bin/streamlit"
-    project_venv = ROOT_DIR / ".venv/bin/streamlit"
-    if workspace_venv.exists():
-        return workspace_venv
-    return project_venv
+def streamlit_command() -> list[str]:
+    workspace_python = ROOT_DIR.parent / ".venv/bin/python"
+    project_python = ROOT_DIR / ".venv/bin/python"
+    python = project_python if project_python.exists() else workspace_python
+    return [str(python), "-m", "streamlit"]
 
 
 def wait_for_streamlit(url: str, process: subprocess.Popen, timeout: int = 30) -> None:
@@ -98,7 +97,7 @@ def isolated_character_app(tmp_path):
     env["LOCAL_CHATBOT_META_DATA_DIR"] = str(meta_data_dir)
     process = subprocess.Popen(
         [
-            str(streamlit_executable()),
+            *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",
@@ -177,6 +176,23 @@ def open_tab(page, name: str) -> None:
 
 def expand_section(page, name: str) -> None:
     page.get_by_text(name, exact=True).first.click()
+
+
+def section(page, name: str):
+    return page.locator("[data-testid=stExpander]").filter(has_text=name).first
+
+
+def fill_textbox_in_section(page, section_name: str, name: str, value: str) -> None:
+    textbox = section(page, section_name).get_by_role("textbox", name=name, exact=True)
+    expect(textbox).to_be_visible(timeout=10000)
+    textbox.fill(value)
+    expect(textbox).to_have_value(value, timeout=10000)
+
+
+def click_button_in_section(page, section_name: str, button_name: str) -> None:
+    button = section(page, section_name).get_by_role("button", name=button_name)
+    expect(button).to_be_visible(timeout=10000)
+    button.click(force=True)
 
 
 def knowledge_graph_view_specs() -> list[dict[str, object]]:
@@ -284,7 +300,7 @@ def assert_graph_view_spec_set(fixtures: list[dict[str, object]]) -> None:
     }
     assert actual_views == expected_views
     screenshots = [fixture["screenshot"] for fixture in fixtures]
-    assert len(screenshots) == len(set(screenshots)) == 8
+    assert len(screenshots) == len(set(screenshots)) == len(expected_views)
 
 
 def ensure_character_editor_open(page) -> None:
@@ -450,21 +466,21 @@ def test_ui_save_confirmations_are_visible(isolated_character_app):
         # Test character save confirmation is visible without opening expander
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
-        fill_textbox(page, "Name", "Test Character")
-        fill_textbox(page, "First Name", "Test")
-        fill_textbox(page, "Family Name", "Character")
-        fill_textbox(page, "Level", "1")
-        fill_textbox(page, "Race", "Human")
-        fill_textbox(page, "Class", "Fighter")
-        page.get_by_role("textbox", name="Backstory", exact=True).fill("Test backstory for confirmation.")
-        page.get_by_role("textbox", name="Summary", exact=True).fill("Test summary.")
-        page.get_by_role("button", name="person_add Create Character").click()
+        fill_textbox_in_section(page, "Create Character", "Name", "Test Character")
+        fill_textbox_in_section(page, "Create Character", "First Name", "Test")
+        fill_textbox_in_section(page, "Create Character", "Family Name", "Character")
+        fill_textbox_in_section(page, "Create Character", "Level", "1")
+        fill_textbox_in_section(page, "Create Character", "Race", "Human")
+        fill_textbox_in_section(page, "Create Character", "Class", "Fighter")
+        fill_textbox_in_section(page, "Create Character", "Backstory", "Test backstory for confirmation.")
+        fill_textbox_in_section(page, "Create Character", "Summary", "Test summary.")
+        click_button_in_section(page, "Create Character", "person_add Create Character")
         expect(page.get_by_role("heading", name="Test Character", exact=True)).to_be_visible(timeout=10000)
         
         # Save character and verify confirmation is visible
         ensure_character_editor_open(page)
         page.get_by_role("textbox", name="Summary", exact=True).first.fill("Updated test summary.")
-        page.get_by_role("button", name="save Save Character").click()
+        click_button_with_retry(page, "save Save Character")
         # Handle the "Keep Both" dialog if it appears
         for button_name in ("library_books Keep Both", "Keep Both"):
             keep_both = page.get_by_role("button", name=button_name)
@@ -481,18 +497,18 @@ def test_ui_save_confirmations_are_visible(isolated_character_app):
         open_tab(page, "Places")
         expect(page.get_by_role("heading", name="Places")).to_be_visible(timeout=10000)
         expand_section(page, "Create Place")
-        fill_textbox(page, "Name", "Test Place")
-        page.get_by_role("textbox", name="New Place Markdown", exact=True).fill("# Test Place\n\nTest place content.")
-        page.get_by_role("button", name="add_location_alt Create Place").click()
+        fill_textbox_in_section(page, "Create Place", "Name", "Test Place")
+        fill_textbox_in_section(page, "Create Place", "New Place Markdown", "# Test Place\n\nTest place content.")
+        click_button_in_section(page, "Create Place", "add_location_alt Create Place")
         expect(page.get_by_role("heading", name="Test Place", exact=True).last).to_be_visible(timeout=10000)
         assert_place_saved_visible(page)
         assert_place_file_written(places_dir, "Test Place")
         assert not (places_dir / "New Place.md").exists()
         
         # Open place and save it
-        page.get_by_role("combobox", name="Place Files").click()
-        page.get_by_role("option", name="Test Place (Test Place.md)", exact=True).click()
-        page.get_by_role("button", name="location_on Open Place").click()
+        page.get_by_role("combobox", name="Place Files").click(force=True)
+        page.get_by_role("option", name="Test Place (Test Place.md)", exact=True).click(force=True)
+        click_button_with_retry(page, "location_on Open Place")
         ensure_place_editor_open(page)
         fill_place_editor_markdown(page, "# Test Place\n\nUpdated place content.")
         click_place_save_button(page)
@@ -503,13 +519,13 @@ def test_ui_save_confirmations_are_visible(isolated_character_app):
         # Test session note save confirmation is visible
         open_tab(page, "Session Notes")
         expect(page.get_by_role("heading", name="Session Notes", exact=True).last).to_be_visible(timeout=10000)
-        page.get_by_role("combobox", name="Session Note").click()
-        page.get_by_role("option").filter(has_text="test_save_confirmation").first.click()
-        page.get_by_role("button", name="event_note Open Session Note").click()
+        page.get_by_role("combobox", name="Session Note").click(force=True)
+        page.get_by_role("option").filter(has_text="test_save_confirmation").first.click(force=True)
+        click_button_with_retry(page, "event_note Open Session Note")
         open_tab(page, "Session Notes")
         ensure_session_note_editor_open(page)
         page.get_by_role("textbox", name="Session Note", exact=True).fill("Updated test content.")
-        page.get_by_role("button", name="save Save Session Note").click()
+        click_button_with_retry(page, "save Save Session Note")
         assert_session_note_saved_visible(page)  # Should be visible
         expect(page.get_by_role("heading", name="Session Notes", exact=True).last).to_be_visible(timeout=10000)
         
@@ -1015,15 +1031,15 @@ def test_ui_creates_loads_and_undoes_character_changes(isolated_character_app):
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
-        fill_textbox(page, "Name", "Della Moor")
-        fill_textbox(page, "First Name", "Della")
-        fill_textbox(page, "Family Name", "Moor")
-        fill_textbox(page, "Level", "5")
-        fill_textbox(page, "Race", "Gnome")
-        fill_textbox(page, "Class", "Rogue")
-        fill_textbox(page, "Pronouns", "she/her")
-        page.get_by_role("textbox", name="Backstory", exact=True).fill("Della maps locked doors beneath the old city.")
-        page.get_by_role("textbox", name="Summary", exact=True).fill("Della is a careful scout.")
+        fill_textbox_in_section(page, "Create Character", "Name", "Della Moor")
+        fill_textbox_in_section(page, "Create Character", "First Name", "Della")
+        fill_textbox_in_section(page, "Create Character", "Family Name", "Moor")
+        fill_textbox_in_section(page, "Create Character", "Level", "5")
+        fill_textbox_in_section(page, "Create Character", "Race", "Gnome")
+        fill_textbox_in_section(page, "Create Character", "Class", "Rogue")
+        fill_textbox_in_section(page, "Create Character", "Pronouns", "she/her")
+        fill_textbox_in_section(page, "Create Character", "Backstory", "Della maps locked doors beneath the old city.")
+        fill_textbox_in_section(page, "Create Character", "Summary", "Della is a careful scout.")
         page.get_by_role("button", name="person_add Create Character").click()
         expect(page.get_by_role("heading", name="Della Moor", exact=True)).to_be_visible(timeout=10000)
 
@@ -1074,9 +1090,12 @@ def test_ui_creates_loads_and_undoes_place_changes(isolated_character_app):
         open_tab(page, "Places")
         expect(page.get_by_role("heading", name="Places")).to_be_visible(timeout=10000)
         expand_section(page, "Create Place")
-        fill_textbox(page, "Name", "Brindle Hall")
-        page.get_by_role("textbox", name="New Place Markdown", exact=True).fill(
-            "# Brindle Hall\n\nA narrow guildhall where maps are traded.\n\n## Notes\n\nLanterns burn blue near the archives."
+        fill_textbox_in_section(page, "Create Place", "Name", "Brindle Hall")
+        fill_textbox_in_section(
+            page,
+            "Create Place",
+            "New Place Markdown",
+            "# Brindle Hall\n\nA narrow guildhall where maps are traded.\n\n## Notes\n\nLanterns burn blue near the archives.",
         )
         page.get_by_role("button", name="add_location_alt Create Place").click()
         expect(page.get_by_role("heading", name="Brindle Hall", exact=True).last).to_be_visible(timeout=10000)
@@ -1203,21 +1222,21 @@ def test_create_validation_preserves_entered_fields(isolated_character_app):
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
-        fill_textbox(page, "Name", "Keeps Draft")
-        fill_textbox(page, "Race", "Human")
-        fill_textbox(page, "Class", "Bard")
+        fill_textbox_in_section(page, "Create Character", "Name", "Keeps Draft")
+        fill_textbox_in_section(page, "Create Character", "Race", "Human")
+        fill_textbox_in_section(page, "Create Character", "Class", "Bard")
         page.get_by_role("button", name="person_add Create Character").click()
         expect(page.get_by_text("Complete Name, Race, Class, And Backstory.")).to_be_visible(timeout=10000)
-        expect(page.get_by_role("textbox", name="Name", exact=True).first).to_have_value("Keeps Draft")
-        expect(page.get_by_role("textbox", name="Race", exact=True).first).to_have_value("Human")
-        expect(page.get_by_role("textbox", name="Class", exact=True).first).to_have_value("Bard")
+        expect(section(page, "Create Character").get_by_role("textbox", name="Name", exact=True)).to_have_value("Keeps Draft")
+        expect(section(page, "Create Character").get_by_role("textbox", name="Race", exact=True)).to_have_value("Human")
+        expect(section(page, "Create Character").get_by_role("textbox", name="Class", exact=True)).to_have_value("Bard")
 
         open_tab(page, "Places")
         expand_section(page, "Create Place")
-        fill_textbox(page, "Name", "Draft Hall")
+        fill_textbox_in_section(page, "Create Place", "Name", "Draft Hall")
         page.get_by_role("button", name="add_location_alt Create Place").click()
         expect(page.get_by_text("Complete Name And Place Markdown.")).to_be_visible(timeout=10000)
-        expect(page.get_by_role("textbox", name="Name", exact=True).first).to_have_value("Draft Hall")
+        expect(section(page, "Create Place").get_by_role("textbox", name="Name", exact=True)).to_have_value("Draft Hall")
 
         open_tab(page, "Session Notes")
         expect(page.get_by_text("Add Session Note", exact=True)).to_have_count(0)
@@ -1245,15 +1264,15 @@ def test_ui_deletes_character_place_and_session_note_files(isolated_character_ap
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
-        fill_textbox(page, "Name", "Delete Me")
-        fill_textbox(page, "First Name", "Delete")
-        fill_textbox(page, "Family Name", "Me")
-        fill_textbox(page, "Level", "1")
-        fill_textbox(page, "Race", "Human")
-        fill_textbox(page, "Class", "Commoner")
-        fill_textbox(page, "Pronouns", "they/them")
-        page.get_by_role("textbox", name="Backstory", exact=True).fill("A temporary character for deletion.")
-        page.get_by_role("textbox", name="Summary", exact=True).fill("Temporary.")
+        fill_textbox_in_section(page, "Create Character", "Name", "Delete Me")
+        fill_textbox_in_section(page, "Create Character", "First Name", "Delete")
+        fill_textbox_in_section(page, "Create Character", "Family Name", "Me")
+        fill_textbox_in_section(page, "Create Character", "Level", "1")
+        fill_textbox_in_section(page, "Create Character", "Race", "Human")
+        fill_textbox_in_section(page, "Create Character", "Class", "Commoner")
+        fill_textbox_in_section(page, "Create Character", "Pronouns", "they/them")
+        fill_textbox_in_section(page, "Create Character", "Backstory", "A temporary character for deletion.")
+        fill_textbox_in_section(page, "Create Character", "Summary", "Temporary.")
         page.get_by_role("button", name="person_add Create Character").click()
         expect(page.get_by_role("heading", name="Delete Me", exact=True)).to_be_visible(timeout=10000)
         ensure_character_editor_open(page)
@@ -1262,8 +1281,8 @@ def test_ui_deletes_character_place_and_session_note_files(isolated_character_ap
 
         open_tab(page, "Places")
         expand_section(page, "Create Place")
-        fill_textbox(page, "Name", "Delete Hall")
-        page.get_by_role("textbox", name="New Place Markdown", exact=True).fill("# Delete Hall\n\nA temporary place for deletion.")
+        fill_textbox_in_section(page, "Create Place", "Name", "Delete Hall")
+        fill_textbox_in_section(page, "Create Place", "New Place Markdown", "# Delete Hall\n\nA temporary place for deletion.")
         page.get_by_role("button", name="add_location_alt Create Place").click()
         assert_place_file_written(places_dir, "Delete Hall")
         expect(page.get_by_role("heading", name="Delete Hall", exact=True).last).to_be_visible(timeout=10000)

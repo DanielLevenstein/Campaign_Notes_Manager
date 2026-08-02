@@ -1,17 +1,16 @@
 import os
 import subprocess
-from pathlib import Path
 
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
-from language_model.storage import Character, read_character_profile
+from src.persistence.lore_documents import Character, read_character_profile
 from tests.e2e.test_character_sheet_roundtrip_ui import (
     APP_URL,
     ROOT_DIR,
     seed_lore_fixture,
     select_character,
-    streamlit_executable,
+    streamlit_command,
     wait_for_streamlit,
 )
 
@@ -52,7 +51,7 @@ def launch_graph_rewrite_app(tmp_path, extra_env: dict[str, str] | None = None):
     env.update(extra_env or {})
     process = subprocess.Popen(
         [
-            str(streamlit_executable()),
+            *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",

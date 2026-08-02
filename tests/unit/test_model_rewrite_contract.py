@@ -2,7 +2,7 @@ from pathlib import Path
 
 from character_graph.extraction import extract_character_graph
 from character_graph.ingest import load_backstory
-from language_model.character_rewrites import (
+from src.writing.character_rewrites import (
     clean_model_rewrite,
     graph_generated_backstory,
     graph_generated_backstory_result,
@@ -15,8 +15,8 @@ from language_model.character_rewrites import (
     semantic_rewrite_score,
     split_overloaded_summary_sentence,
 )
-from language_model.rewrite_quality import writing_quality_score
-from language_model.lore_documents import Character, read_character_profile
+from src.writing.rewrite_quality import writing_quality_score
+from src.persistence.lore_documents import Character, read_character_profile
 from scripts.generate_single_character_backstory_rewrite_report import summary_length_score
 
 

@@ -15,12 +15,11 @@ APP_URL = "http://127.0.0.1:8513"
 GRAPH_APP_URL = "http://127.0.0.1:8514"
 
 
-def streamlit_executable() -> Path:
-    workspace_venv = ROOT_DIR.parent / ".venv/bin/streamlit"
-    project_venv = ROOT_DIR / ".venv/bin/streamlit"
-    if workspace_venv.exists():
-        return workspace_venv
-    return project_venv
+def streamlit_command() -> list[str]:
+    workspace_python = ROOT_DIR.parent / ".venv/bin/python"
+    project_python = ROOT_DIR / ".venv/bin/python"
+    python = project_python if project_python.exists() else workspace_python
+    return [str(python), "-m", "streamlit"]
 
 
 def wait_for_streamlit(url: str, process: subprocess.Popen, timeout: int = 30) -> None:
@@ -60,7 +59,7 @@ def isolated_session_notes_app(tmp_path):
     env["LOCAL_CHATBOT_SESSION_NOTES_DIR"] = str(docs_lore_dir / "session_notes")
     process = subprocess.Popen(
         [
-            str(streamlit_executable()),
+            *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",
@@ -130,7 +129,7 @@ Neal is a bard.
     env["LOCAL_CHATBOT_META_DATA_DIR"] = str(meta_data_dir)
     process = subprocess.Popen(
         [
-            str(streamlit_executable()),
+            *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",

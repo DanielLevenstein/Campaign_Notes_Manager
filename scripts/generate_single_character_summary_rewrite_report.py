@@ -6,10 +6,9 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
-from language_model.character_rewrites import RewriteClient, graph_generated_summary_result
+from src.writing.character_rewrites import RewriteClient, graph_generated_summary_result
 from scripts.generate_single_character_backstory_rewrite_report import (
     build_character_rewrite_report,
-    real_model_rewrite_client,
 )
 
 

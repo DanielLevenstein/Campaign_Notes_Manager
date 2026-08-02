@@ -3,10 +3,14 @@
 ## Knowledge Graph Implementation Roadmap
 This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4.md and the review workflow in docs/design/NODE_DEDUPLICATION_DESIGN.md.
 
+### Phase 0 — Persistence Layer
+- [x] Ensure all IO operations are handled through a single persistence module
+- [x] Ensure that any time a Markdown file is saved or updated, the persisted version of the graph edges is also updated.
+
 ### Phase 1 – Establish a canonical graph layer
 - [ ] Implement a canonical graph service as the single source of truth for nodes, edges, and metadata.
 - [ ] Add canonicalization and adapter logic so legacy node types and session-note metadata can be mapped into the new model.
-- [ ] Normalize source-file paths with a deterministic helper so file and heading projections use consistent identifiers.
+- [ ] Normalize source-file paths with a deterministic helper, so file and heading projections use consistent identifiers.
 - [ ] Add persistence for canonical graph data with a lightweight embedded store and support for versioned updates.
 
 ### Phase 2 – Build the projection API and event flow

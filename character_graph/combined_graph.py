@@ -443,13 +443,16 @@ def combined_relationship_rows(
         source = graph.characters.get(edge.source)
         target = graph.characters.get(edge.target)
         for evidence in relationship_row_evidence(edge.evidence):
+            compacted_evidence = compact_evidence([evidence], evidence_rewrite_client=evidence_rewrite_client)
+            if not compacted_evidence:
+                continue
             rows.append(
                 {
                     "Character": source.name if source else edge.source,
                     "Relationship": edge.relationship_label,
                     "Connection": target.name if target else edge.target,
                     "Connection Type": target.node_type.title() if target else "",
-                    "Evidence": compact_evidence([evidence], evidence_rewrite_client=evidence_rewrite_client),
+                    "Evidence": compacted_evidence,
                 }
             )
     return rows
@@ -461,7 +464,15 @@ def relationship_row_evidence(evidence: list[str]) -> list[str]:
     return [
         item
         for item in evidence
+        if not is_discord_metadata_evidence(item)
     ]
+
+
+def is_discord_metadata_evidence(value: str) -> bool:
+    text = " ".join(value.strip().split())
+    if not text:
+        return False
+    return bool(re.search(r"\bServer Tag:\s*TABLEKEEPER\b", text, flags=re.IGNORECASE))
 
 
 def combined_attribute_rows(graphs: list[CharacterGraph]) -> list[dict[str, str]]:

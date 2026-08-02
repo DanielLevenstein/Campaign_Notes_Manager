@@ -1,9 +1,9 @@
 from datetime import date
 
-import language_model.session_notes as session_notes
-import language_model.lore_documents as storage
+import src.extraction.session_notes as session_notes
+import src.persistence.lore_documents as storage
 from src.persistence.storage import load_graph
-from language_model.lore_documents import (
+from src.persistence.lore_documents import (
     CharacterProfile,
     PlaceProfile,
     create_character,
@@ -25,7 +25,7 @@ from language_model.lore_documents import (
 def test_character_file_save_round_trips_updated_fields(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "CHARACTERS_DIR", tmp_path / "docs" / "lore" / "character_sheets")
     monkeypatch.setattr(storage, "CHARACTER_METADATA_DIR", tmp_path / "data" / "character_metadata")
-    monkeypatch.setattr(storage, "CHARACTER_GRAPHS_DIR", tmp_path / "data" / "character_graph")
+    monkeypatch.setattr(storage, "META_DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(storage, "regenerate_character_graph", lambda character: None)
 
     character = create_character(
@@ -118,7 +118,7 @@ def test_character_save_allows_missing_race_class_and_updates_display_name(tmp_p
 def test_character_delete_removes_sheet_metadata_and_graph(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "CHARACTERS_DIR", tmp_path / "docs" / "lore" / "character_sheets")
     monkeypatch.setattr(storage, "CHARACTER_METADATA_DIR", tmp_path / "data" / "character_metadata")
-    monkeypatch.setattr(storage, "CHARACTER_GRAPHS_DIR", tmp_path / "data" / "character_graph")
+    monkeypatch.setattr(storage, "META_DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(storage, "regenerate_character_graph", lambda character: None)
 
     character = create_character(

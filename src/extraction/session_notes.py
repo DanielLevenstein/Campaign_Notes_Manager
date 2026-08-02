@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
-from .paths import SESSION_NOTES_DIR
+from src.persistence import storage as persistence
+
+from src.persistence.paths import SESSION_NOTES_DIR
 
 
 ISO_DATE_PATTERN = re.compile(r"\b(?P<year>20\d{2})-(?P<month>\d{1,2})-(?P<day>\d{1,2})\b")
@@ -122,9 +124,8 @@ def import_lore_document_text(text: str, title: str = "") -> SessionNote:
     path = base_lore_document_path(inferred_title)
     body = text.strip()
     if path.exists():
-        body = merge_new_markdown_sections(path.read_text(encoding="utf-8"), body)
-    path.write_text(f"{body}\n", encoding="utf-8")
-    regenerate_session_note_graph(path)
+        body = merge_new_markdown_sections(read_session_note(path), body)
+    persistence.write_markdown(path, f"{body}\n", update_graph=regenerate_session_note_graph)
     return SessionNote(note_date=None, body=body, path=path, title=inferred_title)
 
 
@@ -497,8 +498,7 @@ def write_markdown_section(path: Path, section_key: str, body: str) -> SessionNo
     replacement = body.strip().splitlines()
     updated_lines = lines[: section.start_line] + replacement + lines[section.end_line :]
     updated = "\n".join(updated_lines).strip()
-    path.write_text(f"{updated}\n", encoding="utf-8")
-    regenerate_session_note_graph(path)
+    persistence.write_markdown(path, f"{updated}\n", update_graph=regenerate_session_note_graph)
     title = markdown_title(updated) or path.stem.replace("_", " ")
     return SessionNote(note_date=None, body=updated, path=path, title=title)
 
@@ -720,8 +720,7 @@ def save_session_notes(
     for note_date, note_title, body in extract_session_notes(text, today, title, session_date):
         path = session_note_path(note_date, note_title)
         content = render_session_note(note_date, body, note_title)
-        path.write_text(content, encoding="utf-8")
-        regenerate_session_note_graph(path)
+        persistence.write_markdown(path, content, update_graph=regenerate_session_note_graph)
         notes.append(SessionNote(note_date=note_date, body=body, path=path, title=note_title))
     return notes
 
@@ -749,7 +748,7 @@ def extract_session_notes(
 
 
 def import_discord_session_notes(path: Path, split_sessions: bool = True) -> list[SessionNote]:
-    text = path.read_text(encoding="utf-8")
+    text = persistence.read_markdown(path)
     return import_discord_session_notes_text(text, split_sessions=split_sessions)
 
 
@@ -758,8 +757,11 @@ def import_discord_session_notes_text(text: str, split_sessions: bool = True) ->
     notes: list[SessionNote] = []
     for note_date, title, body in split_discord_session_notes(text, split_sessions=split_sessions):
         note_path = session_note_path(note_date, title)
-        note_path.write_text(render_session_note(note_date, body, title), encoding="utf-8")
-        regenerate_session_note_graph(note_path)
+        persistence.write_markdown(
+            note_path,
+            render_session_note(note_date, body, title),
+            update_graph=regenerate_session_note_graph,
+        )
         notes.append(SessionNote(note_date=note_date, body=body, path=note_path, title=title))
     return notes
 
@@ -951,7 +953,7 @@ def has_session_note_date(path: Path) -> bool:
 
 
 def read_session_note(path: Path) -> str:
-    return path.read_text(encoding="utf-8") if path.exists() else ""
+    return persistence.read_markdown(path)
 
 
 def normalize_session_note_file_headings(path: Path, today: date | None = None) -> bool:
@@ -959,8 +961,7 @@ def normalize_session_note_file_headings(path: Path, today: date | None = None) 
     normalized = remove_duplicate_markdown_headings(text, today=today)
     if normalized == text.strip():
         return False
-    path.write_text(f"{normalized}\n", encoding="utf-8")
-    regenerate_session_note_graph(path)
+    persistence.write_markdown(path, f"{normalized}\n", update_graph=regenerate_session_note_graph)
     return True
 
 
@@ -1037,33 +1038,36 @@ def write_session_note(path: Path, body: str, title: str = "", session_date: str
     note_date = parse_editable_session_date(session_date) or parse_editable_session_date(read_session_note_date_text(path))
     if not note_date:
         note_date = session_note_date_from_path(path)
-    path.write_text(render_session_note(note_date, body, title), encoding="utf-8")
-    regenerate_session_note_graph(path)
+    persistence.write_markdown(
+        path,
+        render_session_note(note_date, body, title),
+        update_graph=regenerate_session_note_graph,
+    )
     return SessionNote(note_date=note_date, body=body.strip(), path=path, title=title.strip())
 
 
 def write_lore_document(path: Path, body: str) -> SessionNote:
     title = markdown_title(body) or path.stem.replace("_", " ")
-    path.write_text(f"{body.strip()}\n", encoding="utf-8")
-    regenerate_session_note_graph(path)
+    persistence.write_markdown(path, f"{body.strip()}\n", update_graph=regenerate_session_note_graph)
     return SessionNote(note_date=None, body=body.strip(), path=path, title=title)
 
 
 def regenerate_session_note_graph(path: Path) -> None:
-    from language_model.storage import regenerate_lore_graph
+    from src.persistence.lore_documents import regenerate_lore_graph
 
     regenerate_lore_graph(path)
 
 
 def delete_session_note_graph(path: Path) -> None:
-    from language_model.storage import graph_path_for_lore_path
+    from src.persistence.lore_documents import graph_path_for_lore_path
 
-    graph_path_for_lore_path(path).unlink(missing_ok=True)
+    persistence.delete_file(graph_path_for_lore_path(path))
 
 
 def delete_session_note(path: Path) -> None:
-    path.unlink(missing_ok=True)
-    delete_session_note_graph(path)
+    from src.persistence.lore_documents import graph_path_for_lore_path
+
+    persistence.delete_file(path, linked_graph_path=graph_path_for_lore_path(path))
 
 
 def render_session_note(note_date: date | str, body: str, title: str = "") -> str:

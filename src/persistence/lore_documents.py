@@ -1,15 +1,17 @@
 import re
-import json
 import shutil
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .paths import (
-    CHARACTER_GRAPHS_DIR,
+from src.persistence import storage as persistence
+
+from src.persistence.paths import (
     CHARACTER_METADATA_DIR,
     CHARACTERS_DIR,
     GENERATED_CHARACTER_SHEETS_DIR,
+    LORE_DIR,
+    META_DATA_DIR,
     PLACES_DIR,
     SESSION_NOTES_DIR,
     ensure_base_dirs,
@@ -78,7 +80,7 @@ class Character:
 
     @property
     def graph_path(self) -> Path:
-        return CHARACTER_GRAPHS_DIR / f"{self.name}.graph.json"
+        return graph_path_for_lore_path(self.backstory_path)
 
 
 @dataclass(frozen=True)
@@ -94,14 +96,30 @@ class Place:
 
 
 def graph_path_for_lore_path(path: Path) -> Path:
+    lore_root = lore_root_for_path(path)
+    meta_data_root = metadata_root_for_lore_root(lore_root)
+    return persistence.graph_path_for_lore_path(
+        path,
+        lore_root=lore_root,
+        meta_data_root=meta_data_root,
+    )
+
+
+def lore_root_for_path(path: Path) -> Path:
     source = path.resolve()
-    if is_relative_to(source, CHARACTERS_DIR.resolve()):
-        return CHARACTER_GRAPHS_DIR / f"{sanitize_name(path.stem)}.graph.json"
-    if is_relative_to(source, PLACES_DIR.resolve()):
-        return CHARACTER_GRAPHS_DIR / f"place__{sanitize_name(path.stem)}.graph.json"
-    if is_relative_to(source, SESSION_NOTES_DIR.resolve()):
-        return CHARACTER_GRAPHS_DIR / f"session_note__{sanitize_name(path.stem)}.graph.json"
-    return CHARACTER_GRAPHS_DIR / f"lore__{sanitize_name(path.stem)}.graph.json"
+    configured_lore_root = LORE_DIR.resolve()
+    if is_relative_to(source, configured_lore_root):
+        return LORE_DIR
+    for configured_source_root in (CHARACTERS_DIR, PLACES_DIR, SESSION_NOTES_DIR):
+        if is_relative_to(source, configured_source_root.resolve()):
+            return configured_source_root.parent
+    return path.parent
+
+
+def metadata_root_for_lore_root(lore_root: Path) -> Path:
+    if lore_root.resolve() == LORE_DIR.resolve():
+        return META_DATA_DIR
+    return lore_root.parent / "meta_data"
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
@@ -219,8 +237,7 @@ def create_place(profile: PlaceProfile) -> Place:
     place = Place(name=safe_name, path=PLACES_DIR / f"{safe_name}.md")
     if place.path.exists():
         raise FileExistsError(place.path)
-    place.path.write_text(render_place(profile), encoding="utf-8")
-    regenerate_lore_graph(place.path)
+    persistence.write_markdown(place.path, render_place(profile), update_graph=regenerate_lore_graph)
     return place
 
 
@@ -243,8 +260,11 @@ def create_place_markdown(name: str, markdown: str) -> Place:
     place = Place(name=safe_name, path=PLACES_DIR / f"{safe_name}.md")
     if place.path.exists():
         raise FileExistsError(place.path)
-    place.path.write_text(normalize_place_markdown(safe_name, markdown), encoding="utf-8")
-    regenerate_lore_graph(place.path)
+    persistence.write_markdown(
+        place.path,
+        normalize_place_markdown(safe_name, markdown),
+        update_graph=regenerate_lore_graph,
+    )
     return place
 
 
@@ -253,8 +273,11 @@ def read_place_markdown(place: Place) -> str:
 
 
 def write_place_markdown(place: Place, markdown: str) -> None:
-    place.path.write_text(normalize_place_markdown(place.name, markdown, replace_existing_title=False), encoding="utf-8")
-    regenerate_lore_graph(place.path)
+    persistence.write_markdown(
+        place.path,
+        normalize_place_markdown(place.name, markdown, replace_existing_title=False),
+        update_graph=regenerate_lore_graph,
+    )
 
 
 def read_place_profile(place: Place) -> PlaceProfile:
@@ -280,13 +303,11 @@ def read_place_profile(place: Place) -> PlaceProfile:
 
 
 def write_place_profile(place: Place, profile: PlaceProfile) -> None:
-    place.path.write_text(render_place(profile), encoding="utf-8")
-    regenerate_lore_graph(place.path)
+    persistence.write_markdown(place.path, render_place(profile), update_graph=regenerate_lore_graph)
 
 
 def delete_place_profile(place: Place) -> None:
-    place.path.unlink(missing_ok=True)
-    graph_path_for_lore_path(place.path).unlink(missing_ok=True)
+    persistence.delete_file(place.path, linked_graph_path=graph_path_for_lore_path(place.path))
 
 
 def render_backstory(profile: CharacterProfile) -> str:
@@ -423,9 +444,9 @@ def create_character(profile: CharacterProfile, destination_dir: Path | None = N
     character.data_dir.mkdir(parents=True, exist_ok=False)
 
     write_character_profile(character, profile)
-    character.memory_path.write_text(
+    persistence.write_markdown(
+        character.memory_path,
         "# Memory\n\nAdd durable character memories here. The chat UI can append notes as you play.\n",
-        encoding="utf-8",
     )
     return character
 
@@ -444,7 +465,7 @@ def import_external_character_sheet(filename: str, content: bytes, display_name:
     directory = external_character_sheets_dir()
     directory.mkdir(parents=True, exist_ok=True)
     path = unique_external_character_sheet_path(directory / f"{safe_source_name}{suffix}")
-    path.write_bytes(content)
+    persistence.write_bytes(path, content)
     return ExternalCharacterSheet(name=path.stem, path=path)
 
 
@@ -500,8 +521,11 @@ def append_character_connections(character: Character, rows: list[dict[str, str]
         next_text = replace_section(text, "Character Connections", table)
     else:
         next_text = f"{text}\n\n## Character Connections\n\n{table}\n"
-    character.backstory_path.write_text(next_text, encoding="utf-8")
-    regenerate_character_graph(character)
+    persistence.write_markdown(
+        character.backstory_path,
+        next_text,
+        update_graph=lambda _path: regenerate_character_graph(character),
+    )
 
 
 def write_character_connections(character: Character, rows: list[dict[str, str]], manual_override: bool = False) -> None:
@@ -511,15 +535,21 @@ def write_character_connections(character: Character, rows: list[dict[str, str]]
         next_text = replace_section(text, "Character Connections", table)
     else:
         next_text = f"{text}\n\n## Character Connections\n\n{table}\n"
-    character.backstory_path.write_text(next_text, encoding="utf-8")
-    regenerate_character_graph(character)
+    persistence.write_markdown(
+        character.backstory_path,
+        next_text,
+        update_graph=lambda _path: regenerate_character_graph(character),
+    )
 
 
 def remove_character_connections(character: Character) -> None:
     text = read_text(character.backstory_path)
     next_text = remove_section(text, "Character Connections")
-    character.backstory_path.write_text(next_text.rstrip() + "\n", encoding="utf-8")
-    regenerate_character_graph(character)
+    persistence.write_markdown(
+        character.backstory_path,
+        next_text.rstrip() + "\n",
+        update_graph=lambda _path: regenerate_character_graph(character),
+    )
 
 
 def render_character_connections_table(rows: list[dict[str, str]]) -> str:
@@ -640,7 +670,7 @@ def read_backstory_template() -> str:
 def read_character_profile(character: Character) -> CharacterProfile:
     markdown_profile = read_character_sheet(character)
     if character.profile_path.exists():
-        payload = json.loads(character.profile_path.read_text(encoding="utf-8"))
+        payload = persistence.read_json(character.profile_path)
         stored_profile = CharacterProfile(
             name=payload.get("name", character.name),
             pronouns=payload.get("pronouns", ""),
@@ -1262,8 +1292,7 @@ def split_detail_values(value: str) -> list[str]:
 
 def write_character_profile(character: Character, profile: CharacterProfile) -> None:
     profile = enrich_profile(profile)
-    character.profile_path.parent.mkdir(parents=True, exist_ok=True)
-    character.profile_path.write_text(json.dumps(asdict(profile), indent=2) + "\n", encoding="utf-8")
+    persistence.write_json(character.profile_path, asdict(profile))
     if character.backstory_path.exists():
         current_profile = read_character_sheet(character)
         current_text = read_text(character.backstory_path)
@@ -1272,18 +1301,18 @@ def write_character_profile(character: Character, profile: CharacterProfile) -> 
         else:
             next_text = update_existing_backstory(current_text, current_profile, profile)
         if next_text != current_text:
-            character.backstory_path.write_text(next_text, encoding="utf-8")
+            persistence.write_markdown(character.backstory_path, next_text)
     else:
-        character.backstory_path.write_text(render_backstory(profile), encoding="utf-8")
+        persistence.write_markdown(character.backstory_path, render_backstory(profile))
     regenerate_character_graph(character)
 
 def delete_character_profile(character: Character) -> None:
     if character.path.is_dir():
         shutil.rmtree(character.path, ignore_errors=True)
     else:
-        character.backstory_path.unlink(missing_ok=True)
+        persistence.delete_file(character.backstory_path)
     shutil.rmtree(character.data_dir, ignore_errors=True)
-    character.graph_path.unlink(missing_ok=True)
+    persistence.delete_file(character.graph_path)
 
 
 def enrich_profile(profile: CharacterProfile) -> CharacterProfile:
@@ -1609,44 +1638,38 @@ def mark_auto_generated_headings(text: str, profile: CharacterProfile) -> str:
 def regenerate_character_graph(character: Character) -> None:
     from character_graph.extraction import extract_character_graph
     from character_graph.ingest import load_backstory
-    from character_graph.storage import save_graph
 
     document = load_backstory(character.backstory_path, character_id=sanitize_name(character.name))
     graph = extract_character_graph(document, primary_name=character.name)
-    save_graph(graph, character.graph_path)
+    persistence.save_graph(graph, character.graph_path)
 
 
 def regenerate_lore_graph(path: Path) -> None:
     from character_graph.extraction import extract_character_graph
     from character_graph.ingest import load_backstory
-    from character_graph.storage import save_graph
 
     document = load_backstory(path, character_id=compact_label(path.stem))
     primary_name = path.stem.replace("_", " ") if is_relative_to(path.resolve(), SESSION_NOTES_DIR.resolve()) else None
     graph = extract_character_graph(document, primary_name=primary_name)
     graph.relationships = [edge for edge in graph.relationships if edge.source != edge.target]
-    save_graph(graph, graph_path_for_lore_path(path))
+    persistence.save_graph(graph, graph_path_for_lore_path(path))
 
 
 def load_or_regenerate_lore_graph(path: Path):
-    from character_graph.storage import load_graph
-
     graph_path = graph_path_for_lore_path(path)
-    graph = load_graph(graph_path)
+    graph = persistence.load_graph(graph_path)
     if graph is None:
         regenerate_lore_graph(path)
-        graph = load_graph(graph_path)
+        graph = persistence.load_graph(graph_path)
     return graph
 
 
 def read_text(path: Path) -> str:
-    if not path.exists():
-        return ""
-    return path.read_text(encoding="utf-8")
+    return persistence.read_markdown(path)
 
 
 def write_memory(character: Character, memory: str) -> None:
-    character.memory_path.write_text(memory.rstrip() + "\n", encoding="utf-8")
+    persistence.write_markdown(character.memory_path, memory.rstrip() + "\n")
 
 
 def append_memory(character: Character, note: str) -> None:

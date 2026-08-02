@@ -7,7 +7,7 @@ from typing import Callable
 from character_graph.embeddings import HashingEmbedder, cosine_similarity
 from character_graph.schema import CharacterGraph
 
-from .storage import CharacterProfile, character_first_name
+from src.persistence.lore_documents import CharacterProfile, character_first_name
 
 
 REWRITE_ENGINE_NAME = "deterministic-graph-rewrite"
@@ -251,18 +251,20 @@ def rewrite_prompt(kind: str, graph: CharacterGraph, profile: CharacterProfile) 
             "Write one polished character summary paragraph in 30 to 60 words. "
             "Return exactly one summary, not alternatives or drafts. "
             "Choose the strongest source-backed details instead of covering every fact. "
+            "If the draft is over 60 words, shorten it before returning. "
             "Mention each motive or loss only once. "
             "Split long or comma-heavy sentences when needed. "
+            "Do not pack identity, origin, and motivation into one sentence. "
             "Avoid chained clauses using by, as, or while. "
             "Do not use ellipses or describe graph labels such as traits as labels. "
             "Do not use markdown tags or formatting."
         )
     elif kind == "backstory":
         instruction = (
-            "Rewrite the character backstory as exactly 2 concise paragraphs."
-            "Preserve the named people, places,  relationships, and drives. "
+            "Rewrite the character backstory as exactly 2 concise paragraphs. "
+            "Preserve the named people, places, relationships, and drives. "
             "Make it read like authored campaign lore, not a bullet list. "
-            "Use double spacing between paragraphs."
+            "Use double spacing between paragraphs. "
             "Do not repeat the same drive, phrase, or sentence. "
             "Use short sentences. Split long or comma-heavy sentences. "
             "Do not use ellipses or describe graph labels such as traits as labels."

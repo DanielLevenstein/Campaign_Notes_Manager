@@ -1,8 +1,8 @@
 import os
 from datetime import date
 
-import language_model.session_notes as session_notes
-from language_model.session_notes import (
+import src.extraction.session_notes as session_notes
+from src.extraction.session_notes import (
     child_markdown_sections,
     combine_markdown_section,
     date_from_line,

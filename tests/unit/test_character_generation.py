@@ -3,10 +3,10 @@ import shutil
 from dataclasses import replace
 from pathlib import Path
 
-import language_model.lore_documents as storage
-from language_model.character_generator import RandomCharacterGenerator
-from language_model.paths import CHARACTER_METADATA_DIR, CHARACTERS_DIR, ROOT_DIR
-from language_model.lore_documents import (
+import src.persistence.lore_documents as storage
+from src.writing.character_generator import RandomCharacterGenerator
+from src.persistence.paths import CHARACTER_METADATA_DIR, CHARACTERS_DIR, ROOT_DIR
+from src.persistence.lore_documents import (
     Character,
     CharacterProfile,
     PlaceProfile,

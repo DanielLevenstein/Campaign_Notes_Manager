@@ -14,6 +14,7 @@ ENTITY_PATTERN = re.compile(
 )
 GROUP_PATTERN = re.compile(
     r"\b(?:(?:the|The)\s+)?(?:(?P<of>cult)\s+of\s+(?P<of_name>[A-Z][A-Za-z]+)|(?P<prefix>[A-Z][A-Za-z]+)\s+(?P<suffix>cult))\b",
+    flags=re.IGNORECASE,
 )
 FAMILY_HEADING_PATTERN = re.compile(r"^\s{0,3}#{1,6}\s+(?:The\s+)?(?P<name>[A-Z][A-Za-z]+)\s+Family\b", re.MULTILINE)
 SENTENCE_PATTERN = re.compile(r"[^.!?\n]+[.!?]?")

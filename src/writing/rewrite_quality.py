@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .character_rewrites import candidate_sentences, rewrite_sentence_quality_score, term_tokens
+from src.writing.character_rewrites import candidate_sentences, rewrite_sentence_quality_score, term_tokens
 
 
 # Mean sentence length from the initial character-sheet fixture backstories.

@@ -20,8 +20,8 @@ from character_graph.extraction import extract_character_graph
 from character_graph.ingest import load_backstory
 from character_graph.schema import AttributeNode, CharacterGraph, CharacterNode, PlaceNode, PrimaryCharacterRef, RelationshipEdge
 from character_graph.session_entities import derived_lore_entity_relationships, extract_lore_entity_candidates
-import language_model.lore_documents as storage
-from language_model.lore_documents import Character, append_character_connections, read_character_profile
+import src.persistence.lore_documents as storage
+from src.persistence.lore_documents import Character, append_character_connections, read_character_profile
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
@@ -477,7 +477,7 @@ def test_full_structured_graph_groups_places_groups_and_families_in_column_zero(
     assert '"royal_tittles"' in places_column
     assert '"lantern_house"' in places_column
     assert '"family_ravenmark" [label="Ravenmark Family", fillcolor="#fef3c7"' in dot
-    assert '"ignis_cult" [label="Ignis Cult", fillcolor="#e9d5ff", color="#94a3b8", shape="trapezium"' in dot
+    assert '"ignis_cult" [label="Indigo Cult", fillcolor="#e9d5ff", color="#94a3b8", shape="trapezium"' in dot
 
 
 def test_other_connection_rows_split_repeated_evidence_into_separate_rows():
@@ -927,14 +927,14 @@ def test_session_note_entity_extraction_promotes_group_names_to_family_column():
         dot.index('subgraph "cluster_column_1_main_characters"')
     ]
 
-    assert combined.characters["igniscult"].name == "Indigo Cult"
-    assert combined.characters["igniscult"].node_type == "group"
-    assert ("session_notes", "igniscult", "mentioned") in {
+    assert combined.characters["indigocult"].name == "Indigo Cult"
+    assert combined.characters["indigocult"].node_type == "group"
+    assert ("session_notes", "indigocult", "mentioned") in {
         (edge.source, edge.target, edge.relationship_type) for edge in combined.edges
     }
-    assert '"igniscult" [label="Indigo Cult", fillcolor="#e9d5ff"' in dot
+    assert '"indigocult" [label="Indigo Cult", fillcolor="#e9d5ff"' in dot
     assert 'shape="trapezium"' in dot
-    assert '"igniscult"' in family_column
+    assert '"indigocult"' in family_column
 
 
 def test_combined_graph_uses_vertical_layout_for_broad_session_note_hubs():
@@ -2136,7 +2136,7 @@ def test_combined_graph_prunes_disconnected_nodes():
 
 
 def test_append_character_connections_adds_prioritized_table(tmp_path, monkeypatch):
-    monkeypatch.setattr("language_model.lore_documents.regenerate_character_graph", lambda character: None)
+    monkeypatch.setattr("src.persistence.lore_documents.regenerate_character_graph", lambda character: None)
     path = tmp_path / "Mara_Voss.md"
     path.write_text(
         """# Mara Voss
@@ -2175,7 +2175,7 @@ Manual summary.
 
 
 def test_append_character_connections_merges_existing_table_without_losing_rows(tmp_path, monkeypatch):
-    monkeypatch.setattr("language_model.lore_documents.regenerate_character_graph", lambda character: None)
+    monkeypatch.setattr("src.persistence.lore_documents.regenerate_character_graph", lambda character: None)
     path = tmp_path / "Mara_Voss.md"
     path.write_text(
         """# Mara Voss
@@ -2221,7 +2221,7 @@ Manual summary.
 
 
 def test_append_character_connections_limits_long_table_cell_text(tmp_path, monkeypatch):
-    monkeypatch.setattr("language_model.lore_documents.regenerate_character_graph", lambda character: None)
+    monkeypatch.setattr("src.persistence.lore_documents.regenerate_character_graph", lambda character: None)
     path = tmp_path / "Mara_Voss.md"
     path.write_text(
         """# Mara Voss
@@ -2265,7 +2265,7 @@ Manual summary.
 
 
 def test_append_character_connections_summarizes_evidence_with_connection_context(tmp_path, monkeypatch):
-    monkeypatch.setattr("language_model.lore_documents.regenerate_character_graph", lambda character: None)
+    monkeypatch.setattr("src.persistence.lore_documents.regenerate_character_graph", lambda character: None)
     path = tmp_path / "Mara_Voss.md"
     path.write_text(
         """# Mara Voss

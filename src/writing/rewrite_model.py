@@ -14,7 +14,7 @@ from typing import Callable
 
 import requests
 
-from .paths import CONFIG_DIR, ROOT_DIR
+from src.persistence.paths import CONFIG_DIR, ROOT_DIR
 
 
 LOCAL_REWRITE_MODEL_ENGINE = "local-language-model-llama-cli"

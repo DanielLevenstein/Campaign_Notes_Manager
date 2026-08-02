@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 import os
 import re
@@ -19,11 +19,11 @@ from character_graph.graph_view import (
 )
 from character_graph.ingest import load_backstory
 from character_graph.session_entities import derived_lore_entity_relationships
-from character_graph.storage import load_graph
+from src.persistence.storage import load_graph
 from graphviz_rendering import render_knowledge_graph_tabs
 
 
-from language_model.storage import (
+from src.persistence.lore_documents import (
     Character,
     CharacterProfile,
     Place,
@@ -47,17 +47,17 @@ from language_model.storage import (
     write_place_markdown,
 )
 
-from language_model.character_rewrites import (
+from src.writing.character_rewrites import (
     graph_generated_backstory as build_graph_generated_backstory,
     graph_generated_summary as build_graph_generated_summary,
 )
-from language_model.rewrite_model import (
+from src.writing.rewrite_model import (
     LocalRewriteModelClient,
     LocalRewriteModelError,
     LocalRewriteModelLifecycle,
     load_local_config,
 )
-from language_model.session_notes import (
+from src.extraction.session_notes import (
     child_markdown_sections,
     combine_markdown_section,
     hide_markdown_section_heading,
@@ -80,7 +80,7 @@ from language_model.session_notes import (
     write_markdown_section,
     write_session_note,
 )
-from language_model.lore_import import (
+from src.persistence.lore_import import (
     BACKUP_KIND_SNAPSHOT,
     backup_lore_files,
     clear_local_lore,
@@ -89,7 +89,7 @@ from language_model.lore_import import (
     read_lore_backup_date,
     restore_lore_backup,
 )
-from language_model.paths import (
+from src.persistence.paths import (
     CHARACTERS_DIR,
     LORE_DIR,
     PLACES_DIR,
