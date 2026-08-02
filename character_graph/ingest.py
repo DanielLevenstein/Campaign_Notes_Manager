@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .schema import SCHEMA_VERSION
+from src.persistence.storage import read_markdown
 
 
 @dataclass(frozen=True)
@@ -18,7 +19,7 @@ class BackstoryDocument:
 
 def load_backstory(source_file: Path | str, character_id: str | None = None) -> BackstoryDocument:
     path = Path(source_file)
-    raw_text = path.read_text(encoding="utf-8")
+    raw_text = read_markdown(path)
     return BackstoryDocument(
         character_id=character_id or path.stem,
         source_file=str(path),

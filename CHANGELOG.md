@@ -9,6 +9,22 @@
 - Copied the persistence module into the new `src/persistence` source root with matching `tests/persistence` coverage for mirrored paths, file helpers, deletes, and synthetic-edge filtering.
 - Added `run_unit_tests.sh` and `run_e2e_tests.sh` wrappers for the top-level unit and e2e suites.
 - Renamed the legacy `language_model.storage` domain module to `language_model.lore_documents`, removed the duplicate `character_graph.storage` module, and documented the path toward one canonical persistence implementation.
+- Added the initial Phase 1 canonical graph layer with typed node/edge models, legacy combined-graph adapters, deterministic source-file normalization, and a lightweight SQLite-backed graph service with versioned upserts.
+- Added a raw initial graph debug snapshot under character metadata so generated edges can be compared against the production persisted graph and inspected as native or derived.
+- Routed Streamlit undo writes and graph-view loading through the persistence read model so UI changes update mirrored graph metadata and graph rendering reads persisted metadata files.
+- Routed markdown graph regeneration through a single lore-graph persistence helper that writes mirrored graph JSON under `world_building/meta_data`, replaces the matching source slice in the canonical SQLite store, and keeps synthetic edges out of persisted graph structures.
+- Added character-graph canonical adapters and source-scoped canonical graph replacement coverage so edited Markdown files cannot leave stale graph nodes or edges behind.
+- Expanded Phase 1 regression coverage for metadata tree mirroring, synthetic-edge filtering in both JSON and canonical SQLite, source-scoped replacement, regeneration from missing graph metadata, and architectural guardrails that keep graph database access behind persistence.
+- Fixed the default test lore import directory so it resolves to `tests/fixtures` from the project root instead of the `src` tree, with regression coverage for the path constant.
+- Began Phase 3 by introducing a pure combined-graph projection read model, moving lore graph loading and combined graph assembly out of `streamlit_app.py`, and adding guardrail tests so the Streamlit entry point consumes the projection API instead of direct graph internals.
+- Added the first presentation-layer graph view by routing Party View through a render-ready presentation contract, keeping the Phase 3 target focused on one stable working view rather than perfecting every graph tab.
+
+### Phase 2-3 Projection And Presentation Layer
+- Established the first projection-read model for combined graph rendering, including lore graph loading, source scanning, place source rows, derived lore relationships, character-sheet graph filtering, and root-node selection outside the Streamlit entry point.
+- Added projection tests that verify combined graph contracts, character-sheet filtering, graph loading through the projection layer, and guardrails that prevent `streamlit_app.py` from reintroducing direct graph assembly calls.
+- Introduced a render-ready presentation contract for relationship graph views and routed Party View through it as the first working end-to-end presentation-layer graph view.
+- Kept legacy Graphviz tab behavior in place for non-Party views while creating a stable vertical slice for the new architecture, so later work can migrate one view at a time instead of rewriting every tab at once.
+- Preserved tab-specific behavior for the current UI while narrowing the intended Phase 3 finish line to a single stable view backed by projection and presentation data.
 
 # feature/knowledge_graph
 

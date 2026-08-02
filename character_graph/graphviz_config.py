@@ -5,6 +5,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from src.persistence.storage import read_json
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 GRAPHVIZ_CONFIG_DIR = PROJECT_ROOT / "config" / "graphviz"
@@ -37,7 +39,7 @@ def inherited_graphviz_config(view_config: dict[str, Any], config_dir: Path) -> 
 
 def read_graphviz_config(path: Path) -> dict[str, Any]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = read_json(path)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid Graphviz config JSON at {path}: {exc}") from exc
     if not isinstance(payload, dict):

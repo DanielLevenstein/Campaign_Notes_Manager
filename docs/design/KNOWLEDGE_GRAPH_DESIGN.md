@@ -273,7 +273,8 @@ world_building/meta_data/character_graph/<name>.graph.json
 
 1. Loads the character's `BACKSTORY.md`.
 2. Extracts a `CharacterGraph`.
-3. Saves the graph JSON to `character.graph_path`.
+3. Writes the raw graph to `character.data_dir / "GRAPH_INITIAL.json"` with per-edge debug origin metadata.
+4. Saves the production graph JSON to `character.graph_path`.
 
 ## Prompt Context Integration
 

@@ -9,15 +9,19 @@ from src.persistence.paths import CHARACTER_METADATA_DIR, CHARACTERS_DIR, ROOT_D
 from src.persistence.lore_documents import (
     Character,
     CharacterProfile,
+    INITIAL_GRAPH_SNAPSHOT_NAME,
     PlaceProfile,
     create_character,
     create_generated_character,
     create_place,
+    graph_edge_origin,
     read_character_profile,
     render_backstory,
     remove_character_connections,
+    regenerate_character_graph,
     write_character_connections,
 )
+from character_graph.schema import RelationshipEdge
 
 
 FIXTURE_CHARACTER_SHEETS_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "character_sheets"
@@ -764,7 +768,59 @@ def test_character_runtime_metadata_paths_are_under_meta_data(tmp_path, monkeypa
 
     assert character.data_dir == tmp_path / "data" / "character_metadata" / "Orin_Nightbloom"
     assert character.memory_path == character.data_dir / "MEMORY.md"
+    assert character.initial_graph_path == character.data_dir / INITIAL_GRAPH_SNAPSHOT_NAME
     assert character.memory_path.parent.exists() is False
+
+
+def test_regenerate_character_graph_writes_initial_debug_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "CHARACTER_METADATA_DIR", tmp_path / "data" / "character_metadata")
+    monkeypatch.setattr(storage, "META_DATA_DIR", tmp_path / "data")
+    character_path = tmp_path / "world_building" / "lore" / "character_sheets" / "Mara_Voss.md"
+    character_path.parent.mkdir(parents=True)
+    character_path.write_text(
+        """# Mara Voss
+
+## Character Stats
+
+| Name | Race | Class |
+| ---- | ---- | ----- |
+| Mara Voss | Elf | Wizard |
+
+## Character Backstory
+
+Mara Voss trusts Jory Ravenmark.
+""",
+        encoding="utf-8",
+    )
+    character = Character(name="Mara_Voss", path=character_path)
+
+    regenerate_character_graph(character)
+
+    snapshot = json.loads(character.initial_graph_path.read_text(encoding="utf-8"))
+    debug_edges = snapshot["debug"]["edge_debug"]
+    assert snapshot["debug"]["artifact"] == "initial_extracted_character_graph"
+    assert snapshot["debug"]["persisted_graph_path"] == str(character.graph_path)
+    assert any(edge["origin"] == "native" for edge in debug_edges)
+    assert character.graph_path.exists()
+
+
+def test_graph_edge_origin_marks_synthetic_edges_as_derived():
+    native = RelationshipEdge(
+        source="mara_voss",
+        target="jory_ravenmark",
+        relationship_type="ally",
+        relationship_label="Ally",
+        evidence=["Mara trusts Jory."],
+    )
+    derived = RelationshipEdge(
+        source="mara_voss",
+        target="mara_voss",
+        relationship_type="derived_synthetic",
+        relationship_label="derived_synthetic",
+    )
+
+    assert graph_edge_origin(native) == "native"
+    assert graph_edge_origin(derived) == "derived"
 
 
 def test_create_character_keeps_only_sheet_in_lore_character_sheets(tmp_path, monkeypatch):

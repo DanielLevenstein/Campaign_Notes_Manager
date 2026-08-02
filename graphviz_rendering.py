@@ -16,13 +16,14 @@ from character_graph.combined_graph import (
     combined_relationship_rows,
     compact,
     dedupe_combined_edges,
-    full_character_connection_graph,
     is_lore_source_node,
     is_session_notes_node,
     other_connection_rows,
     other_connections_graph,
 )
 from character_graph.graphviz_config import load_graphviz_config
+from src.graph.presentation import RelationshipGraphPresentation
+from src.persistence.storage import read_markdown
 
 
 @dataclass(frozen=True)
@@ -126,6 +127,7 @@ def render_knowledge_graph_tabs(
     combined: CombinedCharacterGraph,
     character_sheet_combined: CombinedCharacterGraph,
     character_sheet_detail_rows: list[dict[str, str]],
+    party_view: RelationshipGraphPresentation,
     character_nodes: list[CombinedCharacterNode],
     main_character_ids: set[str],
     main_place_ids: set[str],
@@ -147,12 +149,7 @@ def render_knowledge_graph_tabs(
                     label_font_color=label_font_color,
                 )
             elif tab_name == PARTY_VIEW_TAB:
-                render_party_view_tab(
-                    character_sheet_combined,
-                    character_sheet_detail_rows,
-                    main_character_ids,
-                    label_font_color,
-                )
+                render_party_view_tab(party_view, label_font_color)
             elif tab_name == FILE_VIEW_TAB:
                 if active_main_tab == "Session Notes":
                     render_session_file_view_tab(
@@ -288,18 +285,10 @@ def render_single_character_tab(
 
 
 def render_party_view_tab(
-    character_sheet_combined: CombinedCharacterGraph,
-    character_sheet_detail_rows: list[dict[str, str]],
-    main_character_ids: set[str],
+    presentation: RelationshipGraphPresentation,
     label_font_color: str,
 ) -> None:
-    render_character_data_only_graph_view(
-        character_sheet_combined,
-        character_sheet_detail_rows,
-        main_character_ids,
-        label_font_color,
-        load_graphviz_config(CHARACTER_DATA_ONLY_VIEW.key),
-    )
+    render_presented_relationship_graph(presentation, label_font_color)
 
 
 def render_place_file_view_tab(
@@ -610,19 +599,20 @@ def render_structured_character_view(
                 st.info("No Other Connections Were Found For This Node Yet.")
 
 
-def render_character_data_only_graph_view(
-    combined: CombinedCharacterGraph,
-    detail_rows: list[dict[str, str]],
-    main_character_ids: set[str],
+def render_presented_relationship_graph(
+    presentation: RelationshipGraphPresentation,
     label_font_color: str,
-    graphviz_config: dict[str, Any],
 ) -> None:
+    if not presentation.has_graph:
+        st.info(presentation.empty_message)
+        return
     render_relationship_graph(
-        full_character_connection_graph(combined),
-        main_character_ids=main_character_ids,
+        presentation.graph,
+        main_character_ids=presentation.main_character_ids,
+        main_place_ids=presentation.main_place_ids,
         label_font_color=label_font_color,
-        graphviz_config=graphviz_config,
-        relationship_rows=detail_rows,
+        graphviz_config=load_graphviz_config(presentation.graphviz_config_key),
+        relationship_rows=presentation.relationship_rows,
     )
 
 
@@ -1503,7 +1493,7 @@ def markdown_subheadings_for_source(source: CombinedCharacterNode) -> list[Markd
     if not source_path.exists():
         return []
     try:
-        lines = source_path.read_text(encoding="utf-8").splitlines()
+        lines = read_markdown(source_path).splitlines()
     except OSError:
         return []
     headings: list[MarkdownSubheading] = []
@@ -1569,7 +1559,7 @@ def source_line_index_for_edge(
     if not source_path.exists():
         return None
     try:
-        lines = source_path.read_text(encoding="utf-8").splitlines()
+        lines = read_markdown(source_path).splitlines()
     except OSError:
         return None
     snippets = [item.strip() for item in edge.evidence if item.strip()]
@@ -1812,7 +1802,7 @@ def descriptive_heading_summaries(
     if not source_path.exists():
         return []
     try:
-        lines = source_path.read_text(encoding="utf-8").splitlines()
+        lines = read_markdown(source_path).splitlines()
     except OSError:
         return []
     headings = markdown_subheadings_for_source(source)

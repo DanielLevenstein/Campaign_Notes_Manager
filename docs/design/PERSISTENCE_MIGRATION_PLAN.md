@@ -10,7 +10,8 @@ Legacy modules should delegate to `src.persistence.storage` instead of duplicati
 
 ## Current Roles
 
-- `src/persistence/storage.py`: canonical low-level persistence implementation for Markdown, JSON, bytes, graph file paths, graph serialization, graph loading, and deletes.
+- `src/persistence/storage.py`: canonical low-level persistence implementation for Markdown, text, JSON, bytes, graph file paths, graph serialization, graph loading, and deletes.
+- `src/persistence/sqlite_store.py`: canonical low-level SQLite connection helper for embedded graph database access.
 - `language_model/lore_documents.py`: legacy domain/application service module. It still owns character/place/profile parsing and save workflows, but low-level file IO and graph persistence should call `src.persistence.storage`.
 
 ## Migration Path
@@ -31,6 +32,9 @@ Legacy modules should delegate to `src.persistence.storage` instead of duplicati
 ## Guardrails
 
 - Do not add new direct `Path.write_text`, `Path.write_bytes`, or `Path.unlink` calls in migrated code.
+- UI write and undo flows must go through domain services or `src.persistence` helpers.
+- Graph views should read persisted graph metadata files and only regenerate through persistence/domain services when metadata is missing.
+- Embedded graph database access should go through `src.persistence.sqlite_store`.
 - Do not persist synthetic graph edges.
 - Keep graph metadata paths mirrored under `world_building/meta_data`.
 - Preserve existing UI behavior while moving responsibilities out of `language_model.lore_documents`.

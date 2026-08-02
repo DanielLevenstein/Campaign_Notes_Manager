@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parents[2]
 CONFIG_DIR = ROOT_DIR / "config"
 TEST_FIXTURES_DIRECTORY = Path(os.environ.get("LOCAL_CHATBOT_LORE_FIXTURES_DIR", ROOT_DIR / "tests" / "fixtures")).resolve()
 WORLD_BUILDING_DIR = Path(os.environ.get("LOCAL_CHATBOT_WORLD_BUILDING_DIR", ROOT_DIR / "world_building")).resolve()

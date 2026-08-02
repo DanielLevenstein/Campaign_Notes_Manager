@@ -15,6 +15,7 @@ from src.persistence.storage import (
     write_bytes,
     write_json,
     write_markdown,
+    write_text,
 )
 
 
@@ -88,6 +89,16 @@ def test_markdown_write_reads_and_updates_graph_callback(tmp_path):
     write_markdown(path, "# Atlantia\n", update_graph=updated_paths.append)
 
     assert read_markdown(path) == "# Atlantia\n"
+    assert updated_paths == [path]
+
+
+def test_text_write_reads_and_updates_graph_callback(tmp_path):
+    path = tmp_path / "world_building" / "meta_data" / "character_metadata" / "Jory" / "PROFILE.json"
+    updated_paths = []
+
+    write_text(path, '{"name": "Jory"}\n', update_graph=updated_paths.append)
+
+    assert path.read_text(encoding="utf-8") == '{"name": "Jory"}\n'
     assert updated_paths == [path]
 
 

@@ -7,19 +7,13 @@ import re
 import streamlit as st
 
 from character_graph.combined_graph import (
-    build_combined_character_graph,
-    combined_attribute_rows,
     clean_evidence_text,
-    graph_view_root_nodes,
     compact,
 )
-from character_graph.extraction import extract_character_graph
 from character_graph.graph_view import (
     evidence_rows,
 )
-from character_graph.ingest import load_backstory
-from character_graph.session_entities import derived_lore_entity_relationships
-from src.persistence.storage import load_graph
+from src.persistence import storage as persistence
 from graphviz_rendering import render_knowledge_graph_tabs
 
 
@@ -89,11 +83,9 @@ from src.persistence.lore_import import (
     read_lore_backup_date,
     restore_lore_backup,
 )
+from src.graph.presentation import party_view_presentation
+from src.graph.projections import build_combined_graph_projection
 from src.persistence.paths import (
-    CHARACTERS_DIR,
-    LORE_DIR,
-    PLACES_DIR,
-    SESSION_NOTES_DIR,
     TEST_FIXTURES_DIRECTORY,
     WORLD_BUILDING_BACKUP_DIR,
 )
@@ -316,10 +308,10 @@ def graph_generated_summary(character: Character, profile: CharacterProfile) -> 
 
 
 def character_graph_or_regenerate(character: Character):
-    graph = load_graph(character.graph_path)
+    graph = persistence.load_graph(character.graph_path)
     if graph is None:
         regenerate_character_graph(character)
-        graph = load_graph(character.graph_path)
+        graph = persistence.load_graph(character.graph_path)
     if graph is None:
         raise ValueError("No Character Graph Is Available. Regenerate The Graph First.")
     return graph
@@ -401,17 +393,23 @@ def undo_character_changes(character: Character) -> None:
         return
     previous = snapshots.pop()
     if isinstance(previous, dict):
-        character.backstory_path.write_text(previous.get("backstory", "").rstrip() + "\n", encoding="utf-8")
         profile_text = previous.get("profile", "")
         if profile_text:
-            character.profile_path.parent.mkdir(parents=True, exist_ok=True)
-            character.profile_path.write_text(profile_text.rstrip() + "\n", encoding="utf-8")
+            persistence.write_text(character.profile_path, profile_text.rstrip() + "\n")
         else:
-            character.profile_path.unlink(missing_ok=True)
+            persistence.delete_file(character.profile_path)
+        persistence.write_markdown(
+            character.backstory_path,
+            previous.get("backstory", "").rstrip() + "\n",
+            update_graph=lambda _path: regenerate_character_graph(character),
+        )
     else:
-        character.backstory_path.write_text(str(previous).rstrip() + "\n", encoding="utf-8")
+        persistence.write_markdown(
+            character.backstory_path,
+            str(previous).rstrip() + "\n",
+            update_graph=lambda _path: regenerate_character_graph(character),
+        )
     st.session_state[key] = snapshots
-    regenerate_character_graph(character)
     mark_combined_graph_dirty()
     st.session_state[f"character_status_{character.name}"] = "Character Changes Undone."
     st.rerun()
@@ -465,7 +463,7 @@ def undo_place_changes(place: Place) -> None:
         st.warning("No Place Changes To Undo.")
         return
     previous = snapshots.pop()
-    place.path.write_text(previous.rstrip() + "\n", encoding="utf-8")
+    write_place_markdown(place, previous.rstrip() + "\n")
     st.session_state[key] = snapshots
     sync_place_editor_values(place, previous.rstrip())
     bump_place_editor_revision(place)
@@ -496,10 +494,10 @@ def undo_session_notes_changes() -> None:
     current_paths = {path.name: path for path in list_session_notes()}
     for name, path in current_paths.items():
         if name not in previous:
-            path.unlink(missing_ok=True)
+            delete_session_note(path)
     for path in current_paths.values():
         if path.name in previous:
-            path.write_text(previous[path.name].rstrip() + "\n", encoding="utf-8")
+            write_lore_document(path, previous[path.name].rstrip())
     st.session_state["session_notes_undo"] = snapshots
     for name in set(current_paths) | set(previous):
         st.session_state[f"session_note_editor_revision_{name}"] = st.session_state.get(
@@ -515,7 +513,7 @@ def render_relationship_graph(character: Character) -> None:
     with st.expander("Character Attribute Graph", expanded=False):
         graph = None
         try:
-            graph = load_graph(character.graph_path)
+            graph = persistence.load_graph(character.graph_path)
         except (OSError, ValueError) as exc:
             st.warning(f"Could Not Load Relationship Graph: {exc}")
 
@@ -604,12 +602,7 @@ def attribute_graph_display_rows(profile: CharacterProfile) -> list[dict[str, st
 def render_combined_character_graph(active_main_tab: str = "Characters") -> None:
     characters = list_characters()
     places = list_places()
-    graphs = load_lore_graphs()
-
-    place_sources = [
-        (lore_source_document_id(place.path), display_place_name(place), str(place.path), "source_document")
-        for place in places
-    ]
+    projection = build_combined_graph_projection(characters=characters, places=places)
     with (st.expander(f"Combined Knowledge Graph", expanded=False)):
         if st.button("Regenerate All Lore Graphs", icon=":material/sync:", key="regen_all_lore_graphs"):
             failures = []
@@ -625,258 +618,22 @@ def render_combined_character_graph(active_main_tab: str = "Characters") -> None
                 st.success("All Lore Graphs Regenerated.")
                 st.rerun()
 
-        if not graphs and not place_sources:
+        if not projection.has_lore:
             st.info("Add Character Or Place Lore To See The Combined Graph.")
             return
-        combined = build_combined_character_graph(
-            graphs,
-            place_sources,
-            place_lore_relationships(places) + derived_lore_relationships(characters, places, graphs),
-        )
-        character_nodes = combined_main_tab_nodes(combined, characters, places)
         graph_revision = st.session_state.get("combined_graph_revision", 0)
-        main_character_ids = {node.id for node in character_nodes if node.node_type == "character"}
-        main_place_ids = {node.id for node in character_nodes if node.node_type == "place"}
-        character_sheet_graphs = character_sheet_lore_graphs(graphs)
         render_knowledge_graph_tabs(
-            combined=combined,
-            character_sheet_combined=build_combined_character_graph(character_sheet_graphs),
-            character_sheet_detail_rows=combined_attribute_rows(character_sheet_graphs),
-            character_nodes=character_nodes,
-            main_character_ids=main_character_ids,
-            main_place_ids=main_place_ids,
+            combined=projection.combined,
+            character_sheet_combined=projection.character_sheet_combined,
+            character_sheet_detail_rows=projection.character_sheet_detail_rows,
+            party_view=party_view_presentation(projection),
+            character_nodes=projection.character_nodes,
+            main_character_ids=projection.main_character_ids,
+            main_place_ids=projection.main_place_ids,
             graph_revision=graph_revision,
             label_font_color=graph_edge_label_font_color(),
             active_main_tab=active_main_tab,
         )
-
-
-def load_lore_graphs():
-    graphs = []
-    for path in lore_markdown_files():
-        try:
-            document = load_backstory(path, character_id=compact(path.stem))
-            primary_name = session_note_source_name(path) if path_is_session_note(path) else None
-            graphs.append(extract_character_graph(document, primary_name=primary_name))
-        except (OSError, ValueError):
-            continue
-    return graphs
-
-
-def character_sheet_lore_graphs(graphs):
-    return [
-        graph
-        for graph in graphs
-        if is_character_lore_path(Path(graph.primary_character.source_file))
-    ]
-
-
-def combined_main_tab_nodes(combined, characters, places):
-    return graph_view_root_nodes(
-        combined,
-        [display_character_name(character) for character in characters],
-        [display_place_name(place) for place in places],
-    )
-
-
-def derived_lore_relationships(characters, places, graphs) -> list[dict[str, str]]:
-    graph_sources = {
-        Path(graph.primary_character.source_file).resolve(): graph
-        for graph in graphs
-    }
-    known_character_names = [display_character_name(character) for character in characters]
-    known_place_names = known_knowledge_graph_place_names(places)
-    relationships: list[dict[str, str]] = []
-    for path in lore_markdown_files():
-        if is_character_lore_path(path):
-            continue
-        graph = graph_sources.get(path.resolve())
-        source_id = graph.primary_character.id if graph and not is_place_lore_path(path) else lore_source_document_id(path)
-        source_name = combined_lore_source_name(path, graph)
-        source_type = "source_document" if is_place_lore_path(path) else "character"
-        try:
-            text = read_text(path)
-        except OSError:
-            continue
-        relationships.extend(
-            derived_lore_entity_relationships(
-                source_id=source_id,
-                source_name=source_name,
-                source_type=source_type,
-                source_file=str(path),
-                text=text,
-                known_character_names=known_character_names,
-                known_place_names=known_place_names,
-            )
-        )
-    return relationships
-
-
-def combined_lore_source_name(path: Path, graph) -> str:
-    if graph is not None and path_is_session_note(path):
-        return session_note_source_name(path)
-    if graph is not None:
-        return graph.primary_character.name
-    return path.stem.replace("_", " ")
-
-
-def known_knowledge_graph_place_names(places) -> list[str]:
-    names: list[str] = []
-    for place in places:
-        for name in place_name_aliases(place):
-            if name and name not in names:
-                names.append(name)
-    return names
-
-
-def place_name_aliases(place) -> list[str]:
-    display_name = display_place_name(place)
-    aliases = [display_name, place.path.stem.replace("_", " ")]
-    title = markdown_document_title(read_text(place.path))
-    if title:
-        aliases.append(title)
-    for name in list(aliases):
-        stripped = source_title_without_lore_suffix(name)
-        if stripped and stripped not in aliases:
-            aliases.append(stripped)
-    return aliases
-
-
-def source_title_without_lore_suffix(name: str) -> str:
-    return re.sub(r"\s+Lore$", "", name.strip(), flags=re.IGNORECASE)
-
-
-def lore_source_document_id(path: Path) -> str:
-    return f"source_document__{compact(path.stem)}"
-
-
-def is_character_lore_path(path: Path) -> bool:
-    return "character_sheets" in path.parts
-
-
-def is_place_lore_path(path: Path) -> bool:
-    return "places" in path.parts
-
-
-def path_is_session_note(path: Path) -> bool:
-    normalized = str(path).replace("\\", "/").lower()
-    try:
-        path.resolve().relative_to(SESSION_NOTES_DIR.resolve())
-        return True
-    except ValueError:
-        return "/session_notes/" in normalized or compact(path.stem) in {"sessionnote", "sessionnotes"}
-
-
-def session_note_source_name(path: Path) -> str:
-    name = path.stem.replace("_", " ")
-    return name if name else "Session Notes"
-
-
-def lore_markdown_files():
-    paths: dict[Path, Path] = {}
-    for directory in unique_lore_scan_dirs():
-        if not directory.exists():
-            continue
-        for path in sorted(directory.rglob("*.md")):
-            if (
-                "TEMPLATE" not in path.name.upper()
-                and not path.name.startswith(".")
-                and not should_skip_lore_scan_path(path)
-            ):
-                paths[path.resolve()] = path
-    return [paths[key] for key in sorted(paths, key=lambda item: str(item))]
-
-
-def unique_lore_scan_dirs() -> list[Path]:
-    directories: list[Path] = []
-    for directory in [LORE_DIR, CHARACTERS_DIR, PLACES_DIR, SESSION_NOTES_DIR]:
-        if directory not in directories:
-            directories.append(directory)
-    return directories
-
-
-def should_skip_lore_scan_path(path: Path) -> bool:
-    if not lore_backups_disabled():
-        return False
-    return any(part.lower() == "backup" for part in path.parts)
-
-
-def place_lore_relationships(places) -> list[dict[str, str]]:
-    relationships: list[dict[str, str]] = []
-    known_place_keys = {compact(place.name) for place in places}
-    for place in places:
-        text = read_text(place.path)
-        source_id = lore_source_document_id(place.path)
-        for line in place_connections_lines(text):
-            if ":" in line:
-                name, relationship = line.split(":", 1)
-            else:
-                name, relationship = line, "reference"
-            target_name = name.strip().lstrip("-").strip()
-            if not target_name:
-                continue
-            target_type = "place" if compact(target_name) in known_place_keys or looks_like_place_connection(target_name) else "character"
-            relationships.append(
-                {
-                    "source_id": source_id,
-                    "source_name": place.name,
-                    "source_type": "source_document",
-                    "source_file": str(place.path),
-                    "target_id": compact(target_name),
-                    "target_name": target_name,
-                    "target_type": target_type,
-                    "relationship": relationship.strip() or "reference",
-                    "evidence": line.strip(),
-                }
-            )
-    return relationships
-
-
-def place_connections_lines(text: str) -> list[str]:
-    sections = text.splitlines()
-    lines: list[str] = []
-    in_connections = False
-    for line in sections:
-        stripped = line.strip()
-        if stripped.lower().startswith("## "):
-            in_connections = stripped.lower() == "## place connections"
-            continue
-        if in_connections and stripped.startswith("-"):
-            lines.append(stripped.lstrip("-").strip())
-    return lines
-
-
-def looks_like_place_connection(name: str) -> bool:
-    lowered = name.strip().lower()
-    place_suffixes = {
-        "academy",
-        "bastion",
-        "cavern",
-        "city",
-        "college",
-        "coast",
-        "court",
-        "fortress",
-        "forest",
-        "guild",
-        "hall",
-        "harbor",
-        "keep",
-        "kingdom",
-        "library",
-        "mage college",
-        "monastery",
-        "school",
-        "sea",
-        "shore",
-        "temple",
-        "tower",
-        "tavern",
-        "university",
-        "village",
-    }
-    return any(lowered == suffix or lowered.endswith(f" {suffix}") for suffix in place_suffixes)
-
 
 def connection_rows_for_character(combined, character_id: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []

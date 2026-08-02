@@ -12,15 +12,9 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Add canonicalization and adapter logic so legacy node types and session-note metadata can be mapped into the new model.
 - [x] Normalize source-file paths with a deterministic helper, so file and heading projections use consistent identifiers.
 - [x] Add persistence for canonical graph data with a lightweight embedded store and support for versioned updates.
-- [ ] And an update to a md file should trigger an update to the corresponding graph data file.
-- [ ] All interactions with the graph database should go through the new persistence layer.
-- [ ] Synthetic edges should not be stored to the persisted graph structure.
-
-### Connection Graph Previous Behavior
-- [ ] Graphviz objects existed in memory only most of the time.
-- [ ] When graphs were written out to files, session notes were written under the character directory, not the session notes metadata directory. 
-- [ ] Session Notes were being stored as a character, not a heading.
-- [ ] Imported groups had connections to root level document nodes but no connections to the subsection they came from. 
+- [x] And an update to a md file should trigger an update to the corresponding graph data file.
+- [x] All interactions with the graph database should go through the new persistence layer.
+- [x] Synthetic edges should not be stored to the persisted graph structure.
 
 ### Phase 1.1 Character Improvements
 - [ ] Show the following name fields on the character creation UI [Character Name, Player Name, Aliases]
@@ -31,6 +25,14 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [ ] Add file hashes persistence layer so that if no changes are made to markdown file no graph updates are done. 
 - [ ] And folder level hash code to back up lore files so that the app doesn't create backups when no changes were made. 
 
+### Phase 2.1 Projection And Presentation Layer
+- [x] Established the first projection read model for combined graph rendering, including lore graph loading, source scanning, place source rows, derived lore relationships, character-sheet graph filtering, and root-node selection outside the Streamlit entry point.
+- [x] Added projection tests that verify combined graph contracts, character-sheet filtering, graph loading through the projection layer, and guardrails that prevent `streamlit_app.py` from reintroducing direct graph assembly calls.
+- [x] Introduced a render-ready presentation contract for relationship graph views and routed Party View through it as the first working end-to-end presentation-layer graph view.
+- [x] Kept legacy Graphviz tab behavior in place for non-Party views while creating a stable vertical slice for the new architecture, so later work can migrate one view at a time instead of rewriting every tab at once.
+- [x] Preserved tab-specific behavior for the current UI while narrowing the intended Phase 3 finish line to a single stable view backed by projection and presentation data.
+
+
 ## Phase 2 – Build the projection API and event flow
 - [ ] Add projection helpers for file lists, file headings, and file/heading-based subgraphs.
 - [ ] Ensure projections can answer view requests without relying on fragile node-type string checks.
@@ -38,7 +40,7 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [ ] Add projection versioning or etags so the UI can cache results safely and refresh only when needed.
 
 ## Phase 3 – Decouple UI rendering from graph internals
-- [ ] Replace direct graph reads in graphviz_rendering.py and streamlit_app.py with projection API calls.
+- [x] Replace direct graph reads in graphviz_rendering.py and streamlit_app.py with projection API calls.
 - [ ] Make the UI consume projection results rather than infer behavior from internal node-type heuristics.
 - [ ] Unify the rendering behavior for Characters Graph, Places Graph, Session Notes Graph, and Full Structured Graph so they share the same layout and routing rules.
 - [ ] Preserve the tab-specific view semantics while moving the common logic into a shared rendering pipeline.

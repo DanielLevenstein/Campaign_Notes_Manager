@@ -1,36 +1,50 @@
-# Change log
+# TODO
 
-The changelog has been moved to the bottom of CHANGELOG.md
-Create a changelog for CHANGELOG.md summarizing previous work. Then delete these entities from the TODO file.
+## Phase 2-3 Remaining Work
 
-Use the following Markdown levels
-H1 Branch
-H2 Date
-H3 Feature Implementation
+- Move file-list, heading-list, and file/heading subgraph helpers out of `graphviz_rendering.py` and behind projection APIs.
+- Make graph UI controls consume projection option objects instead of inspecting `node_type`, `source_file`, and Markdown heading IDs directly.
+- Add projection versioning or etags so Streamlit can cache graph views and refresh only when source graph data changes.
+- Add an event/update flow so graph regeneration can notify the UI when files, headings, or projections change.
+- Migrate one additional graph view through the presentation layer after Party View, preferably a file/heading view that exercises source and heading selection.
+- Keep legacy Graphviz rendering available until the migrated view has parity tests and a stable screenshot or contract test.
 
 ## Graph View Improvements
 
-- Graphviz views must not change depending on what tab they are displayed under.
-- Views should take two parameters ("View Name", "Source File", "Heading Selected") Streamlit should handle code determining what files are present in dropdowns.
-- Streamlit should handle filtering based on files while graph projection should handle filtering based on heading. Only nodes from the selected source file should be sent to projection module.
-- In streamlit heading filters should be displayed as a separate dropdown from the "Source File" dropdown.
+- Ensure Graphviz views do not change behavior based on which top-level tab they are displayed under.
+- Standardize graph view inputs as `View Name`, `Source File`, and `Heading Selected`.
+- Keep source-file filtering in Streamlit/projection option selection and heading filtering in the graph projection layer.
+- Display heading filters as a separate dropdown from source-file filters.
+- Preserve Characters, Places, Session Notes, and Full Structured Graph semantics while moving common rendering through one shared presentation pipeline.
 
-## Observations
+## Graph Parity For Later Release
 
-- in lore_source_file_options If I remove `node.node_type != "source_document"` custom session notes show up in the dropdown again but when the option is selected an error saying no session notes connections were found.
-- Session Notes metadata is only stored when imported through the "Import Testing Lore" workflow
-- Session Notes metadata is currently being saved to `world_building/meta_data/character_graoh/session_note__Session_Notes.graph.json`
-- In `world_building/meta_data/character_graoh/session_note__Session_Notes.graph.json` character named "Session Notes" is a case of mistaken identity.
-  - "Session Notes" should be saved as a document heading, not a character.
+- Add the Characters Graph views with Single Character and Party View and preserve the three-column layout.
+- Add the Places Graph views with Location View and Heading View and support document/heading grouping.
+- Add the Session Notes Graph views with Location View and Directory File View and align them with the same projection behavior.
+- Implement the Full Structured Graph view with straight-line routing, stable columns, and the family-name trapezoid shape.
 
-## Current Behavior
+## Review Workflow For Later Release
 
-## Completed
+- Add a Character Deduplication view that groups likely duplicate characters and supports canonical/alias decisions.
+- Add a Place Deduplication view that groups likely duplicate places and supports canonical/alias decisions.
+- Add a Node Removal view for low-confidence nodes that should be hidden from rendered graphs while preserving evidence.
+- Store review decisions separately from generated graph JSON so they can be reapplied during regeneration.
 
-### 2026-08-02
-- Implemented Phase 0 persistence layer helpers for Markdown, JSON, bytes, graph paths, graph deletes, and graph serialization.
-- Routed character, place, and session-note Markdown saves through the persistence layer so graph metadata updates with lore edits.
-- Stored graph metadata under a mirrored `world_building/meta_data` tree and filtered synthetic edges out of persisted graph JSON.
-- Copied the persistence module into the new `src/persistence` source root with focused `tests/persistence` unit tests.
-- Added helper scripts for running unit and e2e test suites.
-- Renamed legacy lore document behavior, routed low-level persistence through `src.persistence.storage`, removed duplicate graph storage, and documented the migration path.
+## Performance Improvements
+
+- Add a file-hash persistence layer so unchanged Markdown files do not trigger graph updates.
+- Add folder-level hashing for lore backups so backups are not created when no lore files changed.
+
+## Character Improvements
+
+- Show the following name fields on the character creation UI: Character Name, Player Name, Aliases.
+- Make First Name and Family Name derived metadata fields.
+- Add a content-driven Aliases field to the metadata, which is not user-editable.
+
+## Testing And Rollout
+
+- Add integration tests covering ingestion -> canonical store -> projection -> UI rendering for session-note imports.
+- Add UI contract tests and a small e2e flow for deduplication and graph rendering.
+- Add screenshot or DOM-level coverage for the first presentation-layer graph view.
+- Roll out the new projection path behind a feature flag if later view migrations need staged release control.
