@@ -23,7 +23,7 @@ from character_graph.storage import load_graph
 from graphviz_rendering import render_knowledge_graph_tabs
 
 
-from local_chatbot.storage import (
+from language_model.storage import (
     Character,
     CharacterProfile,
     Place,
@@ -46,11 +46,18 @@ from local_chatbot.storage import (
     write_character_profile,
     write_place_markdown,
 )
-from local_chatbot.character_rewrites import (
+
+from language_model.character_rewrites import (
     graph_generated_backstory as build_graph_generated_backstory,
     graph_generated_summary as build_graph_generated_summary,
 )
-from local_chatbot.session_notes import (
+from language_model.rewrite_model import (
+    LocalRewriteModelClient,
+    LocalRewriteModelError,
+    LocalRewriteModelLifecycle,
+    load_local_config,
+)
+from language_model.session_notes import (
     child_markdown_sections,
     combine_markdown_section,
     hide_markdown_section_heading,
@@ -73,7 +80,7 @@ from local_chatbot.session_notes import (
     write_markdown_section,
     write_session_note,
 )
-from local_chatbot.lore_import import (
+from language_model.lore_import import (
     BACKUP_KIND_SNAPSHOT,
     backup_lore_files,
     clear_local_lore,
@@ -82,7 +89,7 @@ from local_chatbot.lore_import import (
     read_lore_backup_date,
     restore_lore_backup,
 )
-from local_chatbot.paths import (
+from language_model.paths import (
     CHARACTERS_DIR,
     LORE_DIR,
     PLACES_DIR,
@@ -91,7 +98,6 @@ from local_chatbot.paths import (
     WORLD_BUILDING_BACKUP_DIR,
 )
 
-ENABLE_CHARACTER_REWRITE = "LOCAL_CHATBOT_ENABLE_GRAPH_REWRITES"
 ENABLE_ATTRIBUTE_GRAPH_OVERRIDE = "LOCAL_CHATBOT_ENABLE_ATTRIBUTE_GRAPH_OVERRIDE"
 DISABLE_LORE_BACKUPS = "LOCAL_CHATBOT_DISABLE_LORE_BACKUPS"
 MAIN_NAVIGATION_TABS = ["Characters", "Places", "Session Notes"]
@@ -255,10 +261,6 @@ def clean_display_name(name: str) -> str:
     return cleaned.rstrip(" -:|")
 
 
-def graph_rewrites_enabled() -> bool:
-    return os.environ.get(ENABLE_CHARACTER_REWRITE) == "1"
-
-
 def attribute_graph_override_enabled() -> bool:
     return os.environ.get(ENABLE_ATTRIBUTE_GRAPH_OVERRIDE) == "1"
 
@@ -292,27 +294,25 @@ def remove_auto_generated_section(profile: CharacterProfile, section: str) -> li
 
 
 def accept_current_character_text(profile: CharacterProfile) -> CharacterProfile:
-    accepted = profile
-    if profile.original_backstory.strip():
-        accepted = replace(
-            accepted,
-            original_backstory="",
-            auto_generated_sections=remove_auto_generated_section(accepted, "Character Backstory"),
-            updated_sections=remove_updated_section(accepted.updated_sections or [], "Character Backstory"),
-        )
-    if profile.original_summary.strip():
-        accepted = replace(
-            accepted,
-            original_summary="",
-            auto_generated_sections=remove_auto_generated_section(accepted, "Character Summary"),
-            updated_sections=remove_updated_section(accepted.updated_sections or [], "Character Summary"),
-        )
-    return accepted
+    auto_generated_sections = remove_auto_generated_section(profile, "Character Backstory")
+    auto_generated_sections = [
+        value for value in auto_generated_sections if value.lower() != "character summary"
+    ]
+    updated_sections = remove_updated_section(profile.updated_sections or [], "Character Backstory")
+    updated_sections = remove_updated_section(updated_sections, "Character Summary")
+    return replace(
+        profile,
+        original_backstory="",
+        original_summary="",
+        auto_generated_sections=auto_generated_sections,
+        updated_sections=updated_sections,
+    )
 
 
 def graph_generated_summary(character: Character, profile: CharacterProfile) -> str:
     graph = character_graph_or_regenerate(character)
-    return build_graph_generated_summary(graph, profile)
+    rewrite_client = local_rewrite_client()
+    return build_graph_generated_summary(graph, profile, rewrite_client=rewrite_client)
 
 
 def character_graph_or_regenerate(character: Character):
@@ -327,7 +327,39 @@ def character_graph_or_regenerate(character: Character):
 
 def graph_generated_backstory(character: Character, profile: CharacterProfile) -> str:
     graph = character_graph_or_regenerate(character)
-    return build_graph_generated_backstory(graph, profile)
+    rewrite_client = local_rewrite_client()
+    return build_graph_generated_backstory(graph, profile, rewrite_client=rewrite_client)
+
+
+def local_rewrite_client() -> LocalRewriteModelClient:
+    config = load_local_config()
+    lifecycle = LocalRewriteModelLifecycle(config)
+    if not lifecycle.is_runtime_available():
+        raise LocalRewriteModelError(
+            "Model-backed rewriting needs the llama CLI. Install llama.cpp to enable local model rewrites."
+        )
+    return LocalRewriteModelClient(config=config, status_callback=local_model_status_callback())
+
+
+def local_rewrite_runtime_available() -> bool:
+    return LocalRewriteModelLifecycle(load_local_config()).is_runtime_available()
+
+
+def local_model_status_callback():
+    status_message = st.empty()
+    progress_message = st.empty()
+
+    def update(message: str) -> None:
+        download_match = re.search(r"Downloading local rewrite model:\s*(\d+)%", message)
+        if download_match:
+            percent = max(0, min(100, int(download_match.group(1))))
+            status_message.info(f"Downloading local rewrite model: {percent}%")
+            progress_message.progress(percent)
+            return
+        progress_message.empty()
+        status_message.info(message)
+
+    return update
 
 
 def mark_auto_generated(profile: CharacterProfile, section: str) -> list[str]:
@@ -915,20 +947,19 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
             placeholder="she/her",
             key=f"{key_prefix}_pronouns",
         )
-
-        backstory = st.text_area(
-            "Backstory",
-            value=draft_profile.backstory,
-            placeholder="A careful scholar who keeps notes about every strange place they visit...",
-            height=160,
-            key=f"{key_prefix}_backstory",
-        )
         summary = st.text_area(
             "Summary",
             value=draft_profile.summary,
             placeholder="Ms. Glorious specializes in the study of the dark arts.",
             height=96,
             key=f"{key_prefix}_summary",
+        )
+        backstory = st.text_area(
+            "Backstory",
+            value=draft_profile.backstory,
+            placeholder="A careful scholar who keeps notes about every strange place they visit...",
+            height=160,
+            key=f"{key_prefix}_backstory",
         )
         with st.expander("Optional Metadata", expanded=character_optional_metadata_present(draft_profile)):
             detail_cols = st.columns(3)
@@ -1766,7 +1797,9 @@ def render_character_panel() -> None:
 
 def render_character_editor(character: Character) -> None:
     profile = read_character_profile(character)
-    with st.expander("Edit Character", expanded=bool(st.session_state.get(f"character_status_{character.name}", ""))):
+    st.markdown("#### Edit Character")
+    editor_context = st.container()
+    with editor_context:
         with st.form(f"edit_character_{character.name}"):
             st.text_input("Name", value=profile.name, disabled=True)
             name_cols = st.columns(2)
@@ -1777,24 +1810,6 @@ def render_character_editor(character: Character) -> None:
             race = stat_cols[1].text_input("Race", value=profile.race)
             character_class = stat_cols[2].text_input("Class", value=profile.character_class)
             pronouns = stat_cols[3].text_input("Pronouns", value=profile.pronouns)
-            if has_distinct_original(profile.backstory, profile.original_backstory):
-                backstory_cols = st.columns(2)
-                backstory_cols[0].caption(section_status_label("Character Backstory", profile))
-                backstory = backstory_cols[0].text_area(
-                    "Backstory",
-                    value=profile.backstory,
-                    height=180,
-                )
-                backstory_cols[1].caption("Original Character Backstory")
-                backstory_cols[1].text_area(
-                    "Original Backstory",
-                    value=profile.original_backstory,
-                    height=180,
-                    disabled=True,
-                )
-            else:
-                render_section_status("Character Backstory", profile)
-                backstory = st.text_area("Backstory", value=profile.backstory, height=180)
             if has_distinct_original(profile.summary, profile.original_summary):
                 summary_cols = st.columns(2)
                 summary_cols[0].caption(section_status_label("Character Summary", profile))
@@ -1813,6 +1828,25 @@ def render_character_editor(character: Character) -> None:
             else:
                 render_section_status("Character Summary", profile)
                 summary = st.text_area("Summary", value=profile.summary, height=96)
+            if has_distinct_original(profile.backstory, profile.original_backstory):
+                backstory_cols = st.columns(2)
+                backstory_cols[0].caption(section_status_label("Character Backstory", profile))
+                backstory = backstory_cols[0].text_area(
+                    "Backstory",
+                    value=profile.backstory,
+                    height=180,
+                )
+                backstory_cols[1].caption("Original Character Backstory")
+                backstory_cols[1].text_area(
+                    "Original Backstory",
+                    value=profile.original_backstory,
+                    height=180,
+                    disabled=True,
+                )
+            else:
+                render_section_status("Character Backstory", profile)
+                backstory = st.text_area("Backstory", value=profile.backstory, height=180)
+
             with st.expander("Optional Metadata", expanded=character_optional_metadata_present(profile)):
                 detail_cols = st.columns(3)
                 drives = detail_cols[0].text_area("Drives", value=render_list_field(profile.drives), height=96)
@@ -1820,7 +1854,7 @@ def render_character_editor(character: Character) -> None:
                 enemies = detail_cols[2].text_area("Enemies", value=render_list_field(profile.enemies), height=96)
                 details_value = profile.details or default_details(profile)
                 details = st.text_area("Character Details", value=details_value, height=120)
-            action_cols = st.columns(5 if graph_rewrites_enabled() else 3)
+            action_cols = st.columns(5)
             save_requested = action_cols[0].form_submit_button(
                 "Save Character",
                 icon=":material/save:",
@@ -1830,7 +1864,7 @@ def render_character_editor(character: Character) -> None:
             populate_summary = False
             repopulate_summary = False
             rewrite_backstory = False
-            if graph_rewrites_enabled():
+            if local_rewrite_runtime_available():
                 repopulate_summary = action_cols[1].form_submit_button(
                     "Repopulate Summary",
                     icon=":material/sync:",
@@ -1843,11 +1877,8 @@ def render_character_editor(character: Character) -> None:
                     on_click=request_main_navigation_tab,
                     args=("Characters",),
                 )
-                delete_col = action_cols[3]
-                undo_col = action_cols[4]
-            else:
-                delete_col = action_cols[1]
-                undo_col = action_cols[2]
+            delete_col = action_cols[3]
+            undo_col = action_cols[4]
             delete_requested = delete_col.form_submit_button(
                 "Delete Character",
                 icon=":material/delete_forever:",
