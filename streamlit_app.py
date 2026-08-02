@@ -917,47 +917,41 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
         character_class="",
         backstory="",
     )
-    with st.form(key_prefix):
-        name = st.text_input("Name", value=draft_profile.name, placeholder="Ms. Glorious", key=f"{key_prefix}_name")
+    with st.form(key_prefix, clear_on_submit=True):
+        name = st.text_input("Name", value=draft_profile.name, key=f"{key_prefix}_name")
         name_cols = st.columns(2)
         first_name = name_cols[0].text_input(
             "First Name",
             value=draft_profile.first_name,
-            placeholder="Glorious",
             key=f"{key_prefix}_first_name",
         )
         family_name = name_cols[1].text_input(
             "Family Name",
             value=draft_profile.family_name,
-            placeholder="Maximus",
             key=f"{key_prefix}_family_name",
         )
         stat_cols = st.columns(4)
-        level = stat_cols[0].text_input("Level", value=draft_profile.level, placeholder="3", key=f"{key_prefix}_level")
-        race = stat_cols[1].text_input("Race", value=draft_profile.race, placeholder="Elf", key=f"{key_prefix}_race")
+        level = stat_cols[0].text_input("Level", value=draft_profile.level, key=f"{key_prefix}_level")
+        race = stat_cols[1].text_input("Race", value=draft_profile.race, key=f"{key_prefix}_race")
         character_class = stat_cols[2].text_input(
             "Class",
             value=draft_profile.character_class,
-            placeholder="Wizard",
             key=f"{key_prefix}_class",
         )
         pronouns = stat_cols[3].text_input(
             "Pronouns",
             value=draft_profile.pronouns,
-            placeholder="she/her",
             key=f"{key_prefix}_pronouns",
         )
         summary = st.text_area(
             "Summary",
             value=draft_profile.summary,
-            placeholder="Ms. Glorious specializes in the study of the dark arts.",
             height=96,
             key=f"{key_prefix}_summary",
         )
         backstory = st.text_area(
             "Backstory",
             value=draft_profile.backstory,
-            placeholder="A careful scholar who keeps notes about every strange place they visit...",
             height=160,
             key=f"{key_prefix}_backstory",
         )
@@ -966,36 +960,32 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
             drives = detail_cols[0].text_area(
                 "Drives",
                 value=render_list_field(draft_profile.drives),
-                placeholder="Protect A Shared Home\nFollow A Longstanding Promise",
                 height=96,
                 key=f"{key_prefix}_drives",
             )
             alliances = detail_cols[1].text_area(
                 "Alliances",
                 value=render_list_field(draft_profile.alliances),
-                placeholder="The Harbor Circle",
                 height=96,
                 key=f"{key_prefix}_alliances",
             )
             enemies = detail_cols[2].text_area(
                 "Enemies",
                 value=render_list_field(draft_profile.enemies),
-                placeholder="The Hollow Council\nAlder Grin",
                 height=96,
                 key=f"{key_prefix}_enemies",
             )
             details = st.text_area(
                 "Character Details",
                 value=draft_profile.details,
-                placeholder="Add any extra notes, traits, or background details here.",
                 height=120,
                 key=f"{key_prefix}_details",
             )
 
         submitted = st.form_submit_button("Create Character", icon=":material/person_add:")
         if submitted:
-            if not all([name.strip(), race.strip(), character_class.strip(), backstory.strip()]):
-                st.error("Complete Name, Race, Class, And Backstory.")
+            if not all([name.strip(), backstory.strip()]):
+                st.error("Enter Name And Backstory.")
                 return
             try:
                 profile = CharacterProfile(
@@ -1063,18 +1053,17 @@ def render_place_creator_form(key_prefix: str, draft_profile: PlaceProfile | Non
     draft_profile = draft_profile or PlaceProfile(name="", place_type="", summary="")
     with st.form(key_prefix):
         st.caption("Describe the place with a name and a short overview. You can add more detail later if you want to expand the lore.")
-        name = st.text_input("Name", value=draft_profile.name, placeholder="Lantern House", key=f"{key_prefix}_name")
+        name = st.text_input("Name", value=draft_profile.name, key=f"{key_prefix}_name")
         markdown = st.text_area(
             "New Place Markdown",
             value=draft_place_markdown(draft_profile),
-            placeholder="# Lantern House\n\nA welcoming inn where travelers share stories and quiet conversations.",
             height=220,
             key=f"{key_prefix}_markdown",
         )
         submitted = st.form_submit_button("Create Place", icon=":material/add_location_alt:")
         if submitted:
             if not all([name.strip(), markdown.strip()]):
-                st.error("Complete Name And Place Markdown.")
+                st.error("Enter Name And Place Description")
                 return
             try:
                 place = create_place_markdown(name.strip(), markdown.strip())
@@ -1437,7 +1426,7 @@ def import_session_note():
         )
         title = st.text_input(
             "Imported File Name",
-            placeholder=uploaded_notes.name if uploaded_notes is not None else "Optional title or source filename",
+            placeholder=uploaded_notes.name if uploaded_notes is not None else "source filename",
             key="markdown_import_source_name",
         )
         if st.button("Upload Session Note", icon=":material/upload_file:", key="upload_session_notes"):
@@ -1685,13 +1674,11 @@ def render_session_note_editor(path, show_dates: bool = False, section_key: str 
                 session_date = st.text_input(
                     "Session Date",
                     value=note_date,
-                    placeholder="Session date",
                     key=f"session_note_date_{path.name}_{editor_revision}",
                 )
                 title = st.text_input(
                     "Title",
                     value=note_title,
-                    placeholder="Optional session heading",
                     key=f"session_note_title_{path.name}_{editor_revision}",
                 )
             body = st.text_area(

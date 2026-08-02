@@ -1226,7 +1226,7 @@ def test_create_validation_preserves_entered_fields(isolated_character_app):
         fill_textbox_in_section(page, "Create Character", "Race", "Human")
         fill_textbox_in_section(page, "Create Character", "Class", "Bard")
         page.get_by_role("button", name="person_add Create Character").click()
-        expect(page.get_by_text("Complete Name, Race, Class, And Backstory.")).to_be_visible(timeout=10000)
+        expect(page.get_by_text("Enter Name And Backstory.")).to_be_visible(timeout=10000)
         expect(section(page, "Create Character").get_by_role("textbox", name="Name", exact=True)).to_have_value("Keeps Draft")
         expect(section(page, "Create Character").get_by_role("textbox", name="Race", exact=True)).to_have_value("Human")
         expect(section(page, "Create Character").get_by_role("textbox", name="Class", exact=True)).to_have_value("Bard")
@@ -1235,7 +1235,7 @@ def test_create_validation_preserves_entered_fields(isolated_character_app):
         expand_section(page, "Create Place")
         fill_textbox_in_section(page, "Create Place", "Name", "Draft Hall")
         page.get_by_role("button", name="add_location_alt Create Place").click()
-        expect(page.get_by_text("Complete Name And Place Markdown.")).to_be_visible(timeout=10000)
+        expect(page.get_by_text("Enter Name And Place Description")).to_be_visible(timeout=10000)
         expect(section(page, "Create Place").get_by_role("textbox", name="Name", exact=True)).to_have_value("Draft Hall")
 
         open_tab(page, "Session Notes")

@@ -792,6 +792,41 @@ def test_create_character_keeps_only_sheet_in_lore_character_sheets(tmp_path, mo
     assert character.profile_path == tmp_path / "data" / "character_metadata" / "Mara Voss" / "PROFILE.json"
     assert character.profile_path.exists()
 
+
+def test_create_character_allows_blank_optional_stats(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "regenerate_character_graph", lambda character: None)
+    monkeypatch.setattr(storage, "CHARACTERS_DIR", tmp_path / "docs" / "lore" / "character_sheets")
+    monkeypatch.setattr(storage, "CHARACTER_METADATA_DIR", tmp_path / "data" / "character_metadata")
+    storage.CHARACTERS_DIR.mkdir(parents=True)
+    storage.CHARACTER_METADATA_DIR.mkdir(parents=True)
+
+    character = create_character(
+        CharacterProfile(
+            name="Mara Voss",
+            pronouns="",
+            level="",
+            race="",
+            character_class="",
+            backstory="Manual backstory.",
+            summary="Manual summary.",
+        )
+    )
+
+    text = character.backstory_path.read_text(encoding="utf-8")
+    profile = read_character_profile(character)
+
+    assert profile.name == "Mara Voss"
+    assert profile.race == ""
+    assert profile.character_class == ""
+    assert profile.level == ""
+    assert profile.pronouns == ""
+    assert "| Name |" in text
+    assert "Race |" not in text
+    assert "Class |" not in text
+    assert "Level |" not in text
+    assert "Pronouns |" not in text
+
+
 def test_create_generated_character_writes_to_data_lore_character_sheets(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "regenerate_character_graph", lambda character: None)
     monkeypatch.setattr(storage, "CHARACTER_METADATA_DIR", tmp_path / "data" / "character_metadata")
