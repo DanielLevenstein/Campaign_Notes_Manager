@@ -428,11 +428,6 @@ def render_session_file_view_tab(
     if selected_source_file is None:
         st.info("Add Session Notes To Use File View.")
         return
-    hide_source_document_roots = st.checkbox(
-        "Hide document root nodes",
-        value=hide_source_document_roots,
-        key=f"{key}_hide_source_doc_roots",
-    )
     source_graph = markdown_header_lore_graph(
         combined,
         source_file=selected_source_file,
@@ -489,11 +484,6 @@ def render_session_heading_view_tab(
     if selected_source_file is None:
         st.info("Add Session Notes To Use Section View.")
         return
-    hide_source_document_roots = st.checkbox(
-        "Hide document root nodes",
-        value=hide_source_document_roots,
-        key=f"{key}_hide_source_doc_roots",
-    )
     source_graph = markdown_header_lore_graph(
         combined,
         source_file=selected_source_file,
