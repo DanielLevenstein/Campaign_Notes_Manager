@@ -610,7 +610,6 @@ def render_combined_character_graph(active_main_tab: str = "Characters") -> None
         (lore_source_document_id(place.path), display_place_name(place), str(place.path), "source_document")
         for place in places
     ]
-    source_label = os.environ.get("LOCAL_CHATBOT_KNOWLEDGE_GRAPH_SOURCE_LABEL", "Local Lore")
     with (st.expander(f"Combined Knowledge Graph", expanded=False)):
         if st.button("Regenerate All Lore Graphs", icon=":material/sync:", key="regen_all_lore_graphs"):
             failures = []

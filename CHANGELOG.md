@@ -76,6 +76,7 @@
 
 ### Graph Tab And Table Cleanup
 - Select favorite views from test views and tag as v1.1.0
+
 # tag/v1.1.1
 ## 2026-07-20
 ### Full Structured Graph Restore 
@@ -88,7 +89,7 @@
 - Remove duplicate Family Tree nodes from the place graph.
 - Move lore_graph_fixture.json to a hidden directory until node deduplication is implemented.
 
-# tag/v2.0.0
+# feature/character_rewrite
 ## 2026-07-20
 
 ### Local Character Rewrite Evaluation
@@ -120,3 +121,9 @@
 
 ### Supporting Graph Cleanup
 - Included post-`knowledge_graph2` fixture and graph cleanup where it affected character rewrite inputs and report stability.
+
+# feature/knowledge_graph2
+## 2026-08-02
+### Feature Implementation
+- Fixed session-note directory graphs so `Session_Notes.md` imports are treated as document roots, added a [File_Name] heading selector option, and added H1-H3 hide controls that preserve labeled child/context connections.
+

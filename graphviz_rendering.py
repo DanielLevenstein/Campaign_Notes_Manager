@@ -425,15 +425,50 @@ def render_session_file_view_tab(
         key=key,
         default_source_file=pending_import_source_file,
     )
-    session_graph = markdown_header_lore_graph(
+    if selected_source_file is None:
+        st.info("Add Session Notes To Use File View.")
+        return
+    source_graph = markdown_header_lore_graph(
         combined,
         source_file=selected_source_file,
         fanout_linked_characters=True,
         hide_source_document_roots=hide_source_document_roots,
     )
-    if selected_source_file is None:
-        st.info("Add Session Notes To Use File View.")
-        return
+    selected_heading_id = render_lore_heading_filter(
+        combined,
+        source_predicate=is_session_note_node,
+        label="Session Note Heading",
+        key=f"{key}_heading",
+        projected_graph=source_graph,
+        include_all_option=True,
+        all_option_label=Path(selected_source_file).name,
+    )
+    effective_hide_source_document_roots = hide_source_document_roots
+    hidden_heading_levels: set[int] = set()
+    if column_layout == "session_note_lore_directory":
+        effective_hide_source_document_roots, hidden_heading_levels = render_session_directory_hide_options(
+            key=f"{key}_hidden_elements",
+            default_hide_file_name=hide_source_document_roots,
+        )
+    source_graph = markdown_header_lore_graph(
+        combined,
+        source_file=selected_source_file,
+        fanout_linked_characters=True,
+        hide_source_document_roots=effective_hide_source_document_roots,
+        hidden_heading_levels=hidden_heading_levels,
+    )
+    session_graph = (
+        markdown_header_lore_graph(
+            combined,
+            source_file=selected_source_file,
+            heading_id=selected_heading_id,
+            fanout_linked_characters=True,
+            hide_source_document_roots=effective_hide_source_document_roots,
+            hidden_heading_levels=hidden_heading_levels,
+        )
+        if selected_heading_id
+        else source_graph
+    )
     if not session_graph.characters:
         st.info("No Session Note Connections Were Found For This File.")
         return
@@ -442,7 +477,7 @@ def render_session_file_view_tab(
         label_font_color=label_font_color,
         column_layout=column_layout,
         show_lore_notes=show_lore_notes,
-        hide_source_document_roots=hide_source_document_roots,
+        hide_source_document_roots=effective_hide_source_document_roots,
     )
 
 
@@ -457,22 +492,33 @@ def render_session_heading_view_tab(
     hide_source_document_roots: bool = True,
 ) -> None:
     st.subheader(title)
-    projected_graph = markdown_header_lore_graph(
+    selected_source_file = render_lore_file_filter(
         combined,
+        source_predicate=is_session_note_node,
+        label="Session Note File",
+        key=f"{key}_source_file",
+    )
+    if selected_source_file is None:
+        st.info("Add Session Notes To Use Section View.")
+        return
+    source_graph = markdown_header_lore_graph(
+        combined,
+        source_file=selected_source_file,
         hide_source_document_roots=hide_source_document_roots,
     )
     selected_heading_id = render_lore_heading_filter(
         combined,
         source_predicate=is_session_note_node,
         label="Session Note Heading",
-        key=key,
-        projected_graph=projected_graph,
+        key=f"{key}_heading",
+        projected_graph=source_graph,
     )
     if selected_heading_id is None:
         st.info("Add Markdown Headings To Session Notes To Use Section View.")
         return
     session_graph = markdown_header_lore_graph(
         combined,
+        source_file=selected_source_file,
         heading_id=selected_heading_id,
         hide_source_document_roots=hide_source_document_roots,
     )
@@ -661,12 +707,36 @@ def render_lore_heading_filter(
     label: str,
     key: str,
     projected_graph: CombinedCharacterGraph | None = None,
+    include_all_option: bool = False,
+    all_option_label: str = "All Elements",
 ) -> str | None:
     options = lore_heading_options(graph, source_predicate, projected_graph=projected_graph)
     if not options:
         return None
+    if include_all_option:
+        options = [(all_option_label, "")] + options
     selected_label = st.selectbox(label, [option[0] for option in options], key=key)
     return dict(options)[selected_label]
+
+
+def render_session_directory_hide_options(
+    *,
+    key: str,
+    default_hide_file_name: bool,
+) -> tuple[bool, set[int]]:
+    columns = st.columns(4)
+    with columns[0]:
+        hide_file_name = st.checkbox(
+            "Hide File Name",
+            value=default_hide_file_name,
+            key=f"{key}_file_name",
+        )
+    hidden_levels: set[int] = set()
+    for column, level in zip(columns[1:], (1, 2, 3)):
+        with column:
+            if st.checkbox(f"Hide H{level} Headings", key=f"{key}_h{level}"):
+                hidden_levels.add(level)
+    return hide_file_name, hidden_levels
 
 
 def lore_source_file_options(
@@ -916,6 +986,8 @@ def markdown_header_lore_graph(
     heading_id: str | None = None,
     fanout_linked_characters: bool = False,
     hide_source_document_roots: bool = False,
+    hidden_heading_levels: set[int] | None = None,
+    hidden_heading_ids: set[str] | None = None,
 ) -> CombinedCharacterGraph:
     # Collect any node that references a session-note source file. Some
     # session-note imports create nodes that are not strictly typed as
@@ -1019,23 +1091,273 @@ def markdown_header_lore_graph(
     )
     if hide_source_document_roots:
         projected_graph = graph_without_source_document_roots(projected_graph)
-    return filter_lore_graph_by_heading(projected_graph, heading_id) if heading_id is not None else projected_graph
+    if heading_id is not None:
+        projected_graph = filter_lore_graph_by_heading(projected_graph, heading_id)
+    projected_graph = graph_without_markdown_heading_levels(projected_graph, hidden_heading_levels or set())
+    return graph_without_markdown_heading_nodes(projected_graph, hidden_heading_ids or set())
 
 
 def graph_without_source_document_roots(graph: CombinedCharacterGraph) -> CombinedCharacterGraph:
+    hidden_ids = {
+        node_id
+        for node_id, node in graph.characters.items()
+        if is_lore_source_node(node)
+    }
     visible_characters = {
         node_id: node
         for node_id, node in graph.characters.items()
-        if node.node_type != "source_document"
+        if node_id not in hidden_ids
     }
+    replacement_edges = [
+        edge
+        for edge in graph.edges
+        if edge.source in visible_characters and edge.target in visible_characters
+    ]
+    for hidden_id in sorted(hidden_ids, key=lambda item: graph.characters[item].name.lower()):
+        hidden_node = graph.characters[hidden_id]
+        visible_parents = visible_boundary_nodes(
+            graph,
+            hidden_id,
+            hidden_ids,
+            direction="incoming",
+        )
+        visible_children = visible_boundary_nodes(
+            graph,
+            hidden_id,
+            hidden_ids,
+            direction="outgoing",
+        )
+        for parent_id in visible_parents:
+            for child_id in visible_children:
+                if parent_id == child_id:
+                    continue
+                append_projected_edge(
+                    replacement_edges,
+                    CombinedRelationshipEdge(
+                        source=parent_id,
+                        target=child_id,
+                        relationship_type="source",
+                        relationship_label=hidden_node.name,
+                    ),
+                )
     return CombinedCharacterGraph(
         characters=visible_characters,
         edges=[
             edge
-            for edge in graph.edges
+            for edge in replacement_edges
             if edge.source in visible_characters and edge.target in visible_characters
         ],
     )
+
+
+def graph_without_markdown_heading_levels(
+    graph: CombinedCharacterGraph,
+    hidden_levels: set[int],
+) -> CombinedCharacterGraph:
+    hidden_heading_ids = {
+        node_id
+        for node_id, node in graph.characters.items()
+        if (markdown_heading_level(node) or 0) in hidden_levels
+    }
+    return graph_without_markdown_heading_nodes(graph, hidden_heading_ids)
+
+
+def graph_without_markdown_heading_nodes(
+    graph: CombinedCharacterGraph,
+    hidden_heading_ids: set[str],
+) -> CombinedCharacterGraph:
+    hidden_heading_ids = {
+        node_id
+        for node_id in hidden_heading_ids
+        if is_markdown_heading_node(graph.characters.get(node_id))
+    }
+    if not hidden_heading_ids:
+        return graph
+    visible_nodes = {
+        node_id: node
+        for node_id, node in graph.characters.items()
+        if node_id not in hidden_heading_ids
+    }
+    replacement_edges = [
+        edge
+        for edge in graph.edges
+        if edge.source in visible_nodes and edge.target in visible_nodes
+    ]
+    for heading_id in sorted(hidden_heading_ids, key=lambda item: graph.characters[item].name.lower()):
+        heading = graph.characters[heading_id]
+        visible_parents = visible_markdown_boundary_nodes(
+            graph,
+            heading_id,
+            hidden_heading_ids,
+            direction="incoming",
+        )
+        visible_children = visible_markdown_boundary_nodes(
+            graph,
+            heading_id,
+            hidden_heading_ids,
+            direction="outgoing",
+        )
+        visible_children.extend(visible_markdown_descendant_headings(graph, heading_id, visible_nodes))
+        visible_children = list(dict.fromkeys(visible_children))
+        heading_label = heading.name
+        for parent_id in visible_parents:
+            for child_id in visible_children:
+                if parent_id == child_id:
+                    continue
+                append_projected_edge(
+                    replacement_edges,
+                    CombinedRelationshipEdge(
+                        source=parent_id,
+                        target=child_id,
+                        relationship_type="heading",
+                        relationship_label=heading_label,
+                    ),
+                )
+        contextual_children = direct_visible_non_heading_children(graph, heading_id, visible_nodes)
+        for source_id, target_id in contextual_heading_child_pairs(visible_nodes, contextual_children):
+            append_projected_edge(
+                replacement_edges,
+                CombinedRelationshipEdge(
+                    source=source_id,
+                    target=target_id,
+                    relationship_type="context",
+                    relationship_label=heading_label,
+                ),
+            )
+    visible_edges = [
+        edge
+        for edge in replacement_edges
+        if edge.source in visible_nodes and edge.target in visible_nodes and edge.source != edge.target
+    ]
+    connected_ids = node_ids_in_edges(visible_edges)
+    return CombinedCharacterGraph(
+        characters={
+            node_id: node
+            for node_id, node in visible_nodes.items()
+            if node_id in connected_ids
+        },
+        edges=visible_edges,
+    )
+
+
+def visible_markdown_boundary_nodes(
+    graph: CombinedCharacterGraph,
+    heading_id: str,
+    hidden_heading_ids: set[str],
+    *,
+    direction: str,
+) -> list[str]:
+    return visible_boundary_nodes(
+        graph,
+        heading_id,
+        hidden_heading_ids,
+        direction=direction,
+    )
+
+
+def visible_markdown_descendant_headings(
+    graph: CombinedCharacterGraph,
+    heading_id: str,
+    visible_nodes: dict[str, CombinedCharacterNode],
+) -> list[str]:
+    descendants: list[str] = []
+    pending = [heading_id]
+    visited = {heading_id}
+    while pending:
+        current_id = pending.pop(0)
+        for edge in graph.edges:
+            if edge.relationship_type != "heading" or edge.source != current_id or edge.target in visited:
+                continue
+            visited.add(edge.target)
+            target = graph.characters.get(edge.target)
+            if not is_markdown_heading_node(target):
+                continue
+            if edge.target in visible_nodes:
+                descendants.append(edge.target)
+            pending.append(edge.target)
+    return list(dict.fromkeys(descendants))
+
+
+def visible_boundary_nodes(
+    graph: CombinedCharacterGraph,
+    hidden_id: str,
+    hidden_ids: set[str],
+    *,
+    direction: str,
+) -> list[str]:
+    pending = [hidden_id]
+    visited = {hidden_id}
+    boundary: list[str] = []
+    while pending:
+        current_id = pending.pop(0)
+        for edge in graph.edges:
+            next_id = ""
+            if direction == "incoming" and edge.target == current_id:
+                next_id = edge.source
+            elif direction == "outgoing" and edge.source == current_id:
+                next_id = edge.target
+            if not next_id or next_id in visited:
+                continue
+            visited.add(next_id)
+            if next_id in hidden_ids:
+                pending.append(next_id)
+            else:
+                boundary.append(next_id)
+    return list(dict.fromkeys(boundary))
+
+
+def direct_visible_non_heading_children(
+    graph: CombinedCharacterGraph,
+    heading_id: str,
+    visible_nodes: dict[str, CombinedCharacterNode],
+) -> list[str]:
+    children: list[str] = []
+    children.extend(semantic_visible_nodes_for_hidden_heading(graph, heading_id, visible_nodes))
+    for edge in graph.edges:
+        if edge.source != heading_id or edge.target not in visible_nodes:
+            continue
+        if is_markdown_heading_node(visible_nodes.get(edge.target)):
+            continue
+        children.append(edge.target)
+    return list(dict.fromkeys(children))
+
+
+def semantic_visible_nodes_for_hidden_heading(
+    graph: CombinedCharacterGraph,
+    heading_id: str,
+    visible_nodes: dict[str, CombinedCharacterNode],
+) -> list[str]:
+    heading = graph.characters.get(heading_id)
+    semantic_type = semantic_heading_entity_type(heading)
+    if heading is None or semantic_type is None:
+        return []
+    heading_key = compact(heading.name)
+    return [
+        node_id
+        for node_id, node in visible_nodes.items()
+        if node.node_type == semantic_type and compact(node.name) == heading_key
+    ]
+
+
+def contextual_heading_child_pairs(
+    nodes: dict[str, CombinedCharacterNode],
+    child_ids: list[str],
+) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    for source_id in child_ids:
+        source = nodes.get(source_id)
+        if source is None or source.node_type not in {"place", "group"}:
+            continue
+        for target_id in child_ids:
+            target = nodes.get(target_id)
+            if (
+                target_id == source_id
+                or target is None
+                or target.node_type not in {"character", "place", "group", "family"}
+            ):
+                continue
+            pairs.append((source_id, target_id))
+    return pairs
 
 
 def deduplicate_source_document_nodes(graph: CombinedCharacterGraph) -> None:

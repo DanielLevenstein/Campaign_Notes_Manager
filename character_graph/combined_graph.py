@@ -28,7 +28,7 @@ CANONICAL_SESSION_NAME_VARIANTS = {
 }
 MAX_FOCUSED_GRAPH_CONNECTIONS = 6
 EvidenceRewriteClient = Callable[[list[dict[str, str]]], str]
-SERVER_TAG_EVIDENCE_RE = re.compile(r"\bServer Tag:\s*TABLEKEEPER\s*[-\u2013\u2014]")
+
 
 
 @dataclass(frozen=True)
@@ -264,7 +264,7 @@ def combined_primary_display_name(graph: CharacterGraph, session_note_graph: boo
 
 
 def combined_primary_node_type(graph: CharacterGraph, session_note_graph: bool) -> str:
-    if session_note_graph and is_named_session_source(graph.primary_character.name, graph.primary_character.source_file):
+    if session_note_graph:
         return "source_document"
     if is_named_place_source(graph.primary_character.name, graph.primary_character.source_file):
         return "source_document"
@@ -274,7 +274,7 @@ def combined_primary_node_type(graph: CharacterGraph, session_note_graph: bool) 
 def combined_lore_node_type(name: str, source_file: str, fallback_type: str) -> str:
     if fallback_type == "source_document":
         return "source_document"
-    if is_named_session_source(name, source_file):
+    if is_session_source_document_name(name, source_file):
         return "source_document"
     return fallback_type
 
@@ -291,6 +291,15 @@ def is_named_session_source(name: str, source_file: str) -> bool:
         return False
     source_key = compact(source_name)
     return source_key not in {"sessionnote", "sessionnotes"} and compact(name) == source_key
+
+
+def is_session_source_document_name(name: str, source_file: str) -> bool:
+    normalized_source = source_file.replace("\\", "/").lower()
+    if "/session_notes/" not in normalized_source and not normalized_source.endswith("/session_notes.md"):
+        return False
+    source_key = compact(normalized_source.rsplit("/", 1)[-1].rsplit(".", 1)[0])
+    name_key = compact(name)
+    return name_key in {"sessionnote", "sessionnotes"} or name_key == source_key
 
 
 def is_named_place_source(name: str, source_file: str) -> bool:
@@ -452,12 +461,7 @@ def relationship_row_evidence(evidence: list[str]) -> list[str]:
     return [
         item
         for item in evidence
-        if not is_server_tag_tablekeeper_evidence(item)
     ]
-
-
-def is_server_tag_tablekeeper_evidence(value: str) -> bool:
-    return bool(SERVER_TAG_EVIDENCE_RE.search(value))
 
 
 def combined_attribute_rows(graphs: list[CharacterGraph]) -> list[dict[str, str]]:
@@ -937,10 +941,15 @@ def node_name_refs(name: str) -> set[str]:
 def is_session_notes_node(node: CombinedCharacterNode | None) -> bool:
     if node is None:
         return False
-    if node.node_type == "source_document":
-        return False
     source_file = node.source_file.replace("\\", "/").lower()
     source_name = source_file.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    if node.node_type.startswith("source_heading"):
+        return False
+    if node.node_type == "source_document":
+        return compact(node.name) in {"sessionnotes", "sessionnote"} or compact(source_name) in {
+            "sessionnotes",
+            "sessionnote",
+        }
     return (
         compact(node.name) in {"sessionnotes", "sessionnote"}
         or (
@@ -1386,7 +1395,7 @@ def markdown_lore_column_0_name(column_layout: str) -> str:
     if column_layout == "place_lore_directory":
         return "column_0_source_documents"
     if column_layout in {"session_note_lore", "session_note_lore_directory"}:
-        return "column_0_source_documents_groups"
+        return "column_0_source_documents"
     return "column_0_source_documents_places"
 
 
@@ -1407,7 +1416,7 @@ def markdown_lore_column_group(node: CombinedCharacterNode, column_layout: str) 
         return "column_4_character_connections"
     if column_layout == "session_note_lore_directory":
         if node.node_type == "group":
-            return "column_0_source_documents_groups"
+            return "column_2_markdown_heading_2"
         if node.node_type == "place":
             return "column_1_markdown_heading_1"
         heading_level = source_heading_level(node.node_type)
@@ -1422,9 +1431,9 @@ def markdown_lore_column_group(node: CombinedCharacterNode, column_layout: str) 
     if column_layout == "place_lore" and node.node_type == "group":
         return "column_0_source_documents_places"
     if column_layout == "session_note_lore" and node.node_type == "place":
-        return "column_0_source_documents_groups"
+        return "column_0_source_documents"
     if column_layout == "session_note_lore" and node.node_type == "group":
-        return "column_0_source_documents_groups"
+        return "column_2_markdown_heading_2"
     heading_level = source_heading_level(node.node_type)
     if heading_level is not None:
         heading_level = min(3, heading_level)

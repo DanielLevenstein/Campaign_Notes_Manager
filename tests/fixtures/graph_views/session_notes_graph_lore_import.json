@@ -4,7 +4,7 @@
   "graph_family": "Session Notes Graph",
   "view": "Session Notes",
   "top_level_tab": "Session Notes",
-  "screenshot": "Session_Notes_Graph_Place_Lore.png",
+  "screenshot": "Session_Notes_Lore_Fixture.png",
   "columns": [
     "Source Documents",
     "Markdown Heading 1",
@@ -14,7 +14,7 @@
   ],
   "source_fixtures": [
     "tests/fixtures/character_sheets",
-    "tests/fixtures/session_notes/Family_Tree.md"
+    "tests/fixtures/session_notes/Session_Notes_Fixture.md"
   ],
   "connection_table": {
     "only_connection_type": "Character",
@@ -23,8 +23,7 @@
       "Neal Lovington"
     ],
     "disallowed_connection_types": [
-      "Source_Document",
-      "Group"
+      "Source_Document"
     ]
   }
 }

@@ -791,7 +791,7 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
         expect(place_graph_panel.get_by_text("Stone", exact=True)).not_to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_text("Students", exact=True)).not_to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_text("Family Tree", exact=True)).not_to_be_visible(timeout=10000)
-        expect(place_graph_panel.get_by_text("Ignis Cult", exact=True)).not_to_be_visible(timeout=10000)
+        expect(place_graph_panel.get_by_text("Indigo Cult", exact=True)).not_to_be_visible(timeout=10000)
 
         browser.close()
 

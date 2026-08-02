@@ -1,4 +1,3 @@
-Archivist [TABLE], Server Tag: TABLEKEEPER - 7/10/26, 11:36 PMFriday, July 10, 2026 at 11:36 PM
 These notes are attempting to match the format of a raw chat log or player-managed markdown file.
 # Session 1:
 
@@ -28,7 +27,6 @@ These notes are attempting to match the format of a raw chat log or player-manag
 - Ask the local guide about the flooded stair.
 - Keep the silver key separated from the iron token.
 
-Archivist [TABLE], Server Tag: TABLEKEEPER - 7/17/26, 10:04 PMFriday, July 17, 2026 at 10:04 PM
 # Session 3:
 
 ## Market Arrival
@@ -65,7 +63,6 @@ The apprentice remembered hearing bells from the old tower.
 - Why did the bells ring below ground?
 - Which symbol belongs to the masked vendor?
 
-Archivist [TABLE], Server Tag: TABLEKEEPER - 7/24/26, 9:42 PMSaturday, July 24, 2026 at 9:42 PM
 # Session 5:
 
 ## Tower Return

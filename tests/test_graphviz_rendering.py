@@ -1,3 +1,5 @@
+import pytest
+
 from character_graph.combined_graph import (
     CombinedCharacterGraph,
     CombinedCharacterNode,
@@ -18,6 +20,8 @@ from graphviz_rendering import (
     lore_information_rows,
     session_note_graph,
     markdown_header_lore_graph,
+    graph_without_source_document_roots,
+    graph_without_markdown_heading_levels,
     render_lore_graph,
 )
 
@@ -105,7 +109,7 @@ def test_place_lore_graph_keeps_source_place_and_character_connections(tmp_path)
             ),
             "ignis_cult": CombinedCharacterNode(
                 id="ignis_cult",
-                name="Ignis Cult",
+                name="Indigo Cult",
                 source_file=str(place_lore_path),
                 node_type="group",
             ),
@@ -524,7 +528,7 @@ def test_directory_place_lore_dot_keeps_source_documents_in_column_zero():
     assert '"source_heading__atlantia__harbor" [label="Harbor", fillcolor="#dcfce7", color="#94a3b8", shape="component"' in dot
 
 
-def test_directory_session_lore_dot_keeps_groups_in_column_zero_and_places_in_heading_one():
+def test_directory_session_lore_dot_keeps_groups_with_sub_places_and_places_in_heading_one():
     graph = CombinedCharacterGraph(
         characters={
             "session_1": CombinedCharacterNode(
@@ -592,14 +596,724 @@ def test_directory_session_lore_dot_keeps_groups_in_column_zero_and_places_in_he
         graphviz_config={"column_layout": "session_note_lore_directory"},
     )
 
-    source_column = dot[dot.index('subgraph "cluster_column_0_source_documents_groups"') :]
+    source_column = dot[dot.index('subgraph "cluster_column_0_source_documents"') :]
     heading_1_column = dot[dot.index('subgraph "cluster_column_1_markdown_heading_1"') :]
     heading_2_column = dot[dot.index('subgraph "cluster_column_2_markdown_heading_2"') :]
 
     assert source_column.index('"session_1"') < source_column.index('subgraph "cluster_column_1_markdown_heading_1"')
-    assert source_column.index('"ravenmark_family"') < source_column.index('subgraph "cluster_column_1_markdown_heading_1"')
     assert heading_1_column.index('"atlantia"') < heading_1_column.index('subgraph "cluster_column_2_markdown_heading_2"')
+    assert heading_2_column.index('"ravenmark_family"') < heading_2_column.index('subgraph "cluster_column_3_markdown_heading_3"')
     assert heading_2_column.index('"source_heading__session_1__harbor"') < heading_2_column.index('subgraph "cluster_column_3_markdown_heading_3"')
+    labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in graph.edges
+    }
+    assert labels_by_edge[("session_1", "ravenmark_family")] == ""
+
+
+def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_path):
+    session_dir = tmp_path / "session_notes"
+    session_dir.mkdir()
+    session_path = session_dir / "Session_Notes_Fixture.md"
+    session_path.write_text(
+        "\n".join(
+            [
+                "# Session 4",
+                "Tharevon traveled through the Pixi Kingdom.",
+                "## Pixi Kingdom",
+                "Tharevon met the court.",
+                "Mira Vale mapped the Pixi Kingdom roads.",
+                "## Indigo Cult",
+                "Jory Ravenmark and Neal Lovington investigated the Indigo Cult.",
+                "They traced the Indigo Cult to the Moon Gate.",
+                "## Empty Cult",
+                "The empty cult was named but had no visible character connection.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    graph = CombinedCharacterGraph(
+        characters={
+            "session_notes_fixture": CombinedCharacterNode(
+                id="session_notes_fixture",
+                name="Session Notes Fixture",
+                source_file=str(session_path),
+                node_type="source_document",
+            ),
+            "tharevon": CombinedCharacterNode(
+                id="tharevon",
+                name="Tharevon",
+                source_file="world_building/lore/character_sheets/Tharevon.md",
+                node_type="character",
+            ),
+            "mira_vale": CombinedCharacterNode(
+                id="mira_vale",
+                name="Mira Vale",
+                source_file="world_building/lore/character_sheets/Mira_Vale.md",
+                node_type="character",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+            "neal_lovington": CombinedCharacterNode(
+                id="neal_lovington",
+                name="Neal Lovington",
+                source_file="world_building/lore/character_sheets/Neal_Lovington.md",
+                node_type="character",
+            ),
+            "pixi_kingdom": CombinedCharacterNode(
+                id="pixi_kingdom",
+                name="Pixi Kingdom",
+                source_file="world_building/lore/places/Pixi_Kingdom.md",
+                node_type="place",
+            ),
+            "ignis_cult": CombinedCharacterNode(
+                id="ignis_cult",
+                name="Indigo Cult",
+                source_file="world_building/lore/session_notes/Session_Notes_Fixture.md",
+                node_type="group",
+            ),
+            "moon_gate": CombinedCharacterNode(
+                id="moon_gate",
+                name="Moon Gate",
+                source_file="world_building/lore/places/Moon_Gate.md",
+                node_type="place",
+            ),
+            "empty_cult": CombinedCharacterNode(
+                id="empty_cult",
+                name="Empty Cult",
+                source_file="world_building/lore/session_notes/Session_Notes_Fixture.md",
+                node_type="group",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="tharevon",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Tharevon traveled through the Pixi Kingdom."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="pixi_kingdom",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["Tharevon traveled through the Pixi Kingdom."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="mira_vale",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Mira Vale mapped the Pixi Kingdom roads."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="ignis_cult",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Neal Lovington investigated the Indigo Cult."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Neal Lovington investigated the Indigo Cult."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="neal_lovington",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Neal Lovington investigated the Indigo Cult."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="moon_gate",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["They traced the Indigo Cult to the Moon Gate."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="empty_cult",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["The empty cult was named but had no visible character connection."],
+            ),
+        ],
+    )
+
+    projected = markdown_header_lore_graph(
+        graph,
+        source_file=str(session_path),
+        fanout_linked_characters=True,
+        hide_source_document_roots=True,
+        hidden_heading_levels={1},
+    )
+
+    session_heading_id = "source_heading__sessionnotesfixture__line_1__session4"
+    labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in projected.edges
+    }
+
+    assert session_heading_id not in projected.characters
+    assert "pixi_kingdom" in projected.characters
+    assert "tharevon" in projected.characters
+    assert labels_by_edge[("pixi_kingdom", "tharevon")] == "Session 4"
+
+    all_headings_hidden = markdown_header_lore_graph(
+        graph,
+        source_file=str(session_path),
+        fanout_linked_characters=True,
+        hide_source_document_roots=True,
+        hidden_heading_levels={1, 2, 3},
+    )
+    all_hidden_labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in all_headings_hidden.edges
+    }
+
+    assert session_heading_id not in all_headings_hidden.characters
+    assert "pixi_kingdom" in all_headings_hidden.characters
+    assert "tharevon" in all_headings_hidden.characters
+    assert "ignis_cult" in all_headings_hidden.characters
+    assert "empty_cult" not in all_headings_hidden.characters
+    assert all_hidden_labels_by_edge[("pixi_kingdom", "tharevon")] == "Session 4"
+    assert all_hidden_labels_by_edge[("pixi_kingdom", "mira_vale")] == "Pixi Kingdom"
+    assert all_hidden_labels_by_edge[("ignis_cult", "jory_ravenmark")] == "Indigo Cult"
+    assert all_hidden_labels_by_edge[("ignis_cult", "neal_lovington")] == "Indigo Cult"
+    assert all_hidden_labels_by_edge[("ignis_cult", "moon_gate")] == "Indigo Cult"
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Knowledge graph migration should merge structural group headings with "
+        "their semantic group entities instead of rendering duplicate nodes."
+    ),
+)
+def test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nodes(tmp_path):
+    session_dir = tmp_path / "session_notes"
+    session_dir.mkdir()
+    session_path = session_dir / "Session_Notes_Fixture.md"
+    session_path.write_text(
+        "\n".join(
+            [
+                "# Session 4",
+                "The party tracked a faction lead.",
+                "## Indigo Cult",
+                "Jory Ravenmark and Neal Lovington investigated the Indigo Cult.",
+                "They traced the Indigo Cult to the Moon Gate.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    graph = CombinedCharacterGraph(
+        characters={
+            "session_notes_fixture": CombinedCharacterNode(
+                id="session_notes_fixture",
+                name="Session Notes Fixture",
+                source_file=str(session_path),
+                node_type="source_document",
+            ),
+            "indigo_cult": CombinedCharacterNode(
+                id="indigo_cult",
+                name="Indigo Cult",
+                source_file=str(session_path),
+                node_type="group",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+            "neal_lovington": CombinedCharacterNode(
+                id="neal_lovington",
+                name="Neal Lovington",
+                source_file="world_building/lore/character_sheets/Neal_Lovington.md",
+                node_type="character",
+            ),
+            "moon_gate": CombinedCharacterNode(
+                id="moon_gate",
+                name="Moon Gate",
+                source_file="world_building/lore/places/Moon_Gate.md",
+                node_type="place",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="indigo_cult",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Neal Lovington investigated the Indigo Cult."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Neal Lovington investigated the Indigo Cult."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="neal_lovington",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Neal Lovington investigated the Indigo Cult."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="moon_gate",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["They traced the Indigo Cult to the Moon Gate."],
+            ),
+        ],
+    )
+
+    projected = markdown_header_lore_graph(
+        graph,
+        source_file=str(session_path),
+        fanout_linked_characters=True,
+        hide_source_document_roots=True,
+        hidden_heading_levels={1},
+    )
+    indigo_nodes = [
+        node_id
+        for node_id, node in projected.characters.items()
+        if node.name == "Indigo Cult"
+    ]
+    edge_pairs = {(edge.source, edge.target) for edge in projected.edges}
+
+    assert indigo_nodes == ["indigo_cult"]
+    assert ("indigo_cult", "jory_ravenmark") in edge_pairs
+    assert ("indigo_cult", "neal_lovington") in edge_pairs
+    assert ("indigo_cult", "moon_gate") in edge_pairs
+
+
+def test_directory_session_lore_hide_file_name_preserves_source_bridge_connections():
+    graph = CombinedCharacterGraph(
+        characters={
+            "atlantia_bandits": CombinedCharacterNode(
+                id="atlantia_bandits",
+                name="Atlantia Bandits",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="group",
+            ),
+            "session_notes": CombinedCharacterNode(
+                id="session_notes",
+                name="Session Notes",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_document",
+            ),
+            "source_heading__session_notes__session_1": CombinedCharacterNode(
+                id="source_heading__session_notes__session_1",
+                name="Session 1",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_1",
+            ),
+            "source_heading__session_notes__session_2": CombinedCharacterNode(
+                id="source_heading__session_notes__session_2",
+                name="Session 2",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_1",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+            "orin_nightbloom": CombinedCharacterNode(
+                id="orin_nightbloom",
+                name="Orin Nightbloom",
+                source_file="world_building/lore/character_sheets/Orin_Nightbloom.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="atlantia_bandits",
+                target="session_notes",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes",
+                target="source_heading__session_notes__session_1",
+                relationship_type="heading",
+                relationship_label="",
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__session_1",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes",
+                target="source_heading__session_notes__session_2",
+                relationship_type="heading",
+                relationship_label="",
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__session_2",
+                target="orin_nightbloom",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+        ],
+    )
+
+    projected = graph_without_source_document_roots(graph)
+    labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in projected.edges
+    }
+
+    assert "session_notes" not in projected.characters
+    assert labels_by_edge[("atlantia_bandits", "source_heading__session_notes__session_1")] == "Session Notes"
+    assert labels_by_edge[("atlantia_bandits", "source_heading__session_notes__session_2")] == "Session Notes"
+    assert labels_by_edge[("source_heading__session_notes__session_1", "jory_ravenmark")] == "Mentions"
+    assert labels_by_edge[("source_heading__session_notes__session_2", "orin_nightbloom")] == "Mentions"
+
+    headings_hidden = graph_without_markdown_heading_levels(projected, {1, 2, 3})
+    hidden_labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in headings_hidden.edges
+    }
+
+    assert "source_heading__session_notes__session_1" not in headings_hidden.characters
+    assert "source_heading__session_notes__session_2" not in headings_hidden.characters
+    assert hidden_labels_by_edge[("atlantia_bandits", "jory_ravenmark")] == "Session 1"
+    assert hidden_labels_by_edge[("atlantia_bandits", "orin_nightbloom")] == "Session 2"
+
+
+def test_hiding_h1_preserves_edges_to_visible_h2_and_h3_descendants():
+    graph = CombinedCharacterGraph(
+        characters={
+            "session_notes": CombinedCharacterNode(
+                id="session_notes",
+                name="Session Notes",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_document",
+            ),
+            "source_heading__session_notes__session_1": CombinedCharacterNode(
+                id="source_heading__session_notes__session_1",
+                name="Session 1",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_1",
+            ),
+            "source_heading__session_notes__bandits": CombinedCharacterNode(
+                id="source_heading__session_notes__bandits",
+                name="Atlantia Bandits",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_group_2",
+            ),
+            "source_heading__session_notes__ambush": CombinedCharacterNode(
+                id="source_heading__session_notes__ambush",
+                name="Harbor Ambush",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_3",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="session_notes",
+                target="source_heading__session_notes__session_1",
+                relationship_type="heading",
+                relationship_label="",
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__session_1",
+                target="source_heading__session_notes__bandits",
+                relationship_type="heading",
+                relationship_label="",
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__bandits",
+                target="source_heading__session_notes__ambush",
+                relationship_type="heading",
+                relationship_label="",
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__ambush",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+        ],
+    )
+
+    projected = graph_without_markdown_heading_levels(graph, {1})
+    labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in projected.edges
+    }
+
+    assert "source_heading__session_notes__session_1" not in projected.characters
+    assert "source_heading__session_notes__bandits" in projected.characters
+    assert "source_heading__session_notes__ambush" in projected.characters
+    assert labels_by_edge[("session_notes", "source_heading__session_notes__bandits")] == "Session 1"
+    assert labels_by_edge[("session_notes", "source_heading__session_notes__ambush")] == "Session 1"
+    assert labels_by_edge[("source_heading__session_notes__ambush", "jory_ravenmark")] == "Mentions"
+
+
+def test_hiding_file_name_and_h1_preserves_all_direct_h1_connections():
+    graph = CombinedCharacterGraph(
+        characters={
+            "atlantia_bandits": CombinedCharacterNode(
+                id="atlantia_bandits",
+                name="Atlantia Bandits",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="group",
+            ),
+            "session_notes": CombinedCharacterNode(
+                id="session_notes",
+                name="Session Notes",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_document",
+            ),
+            "source_heading__session_notes__session_1": CombinedCharacterNode(
+                id="source_heading__session_notes__session_1",
+                name="Session 1",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_1",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+            "orin_nightbloom": CombinedCharacterNode(
+                id="orin_nightbloom",
+                name="Orin Nightbloom",
+                source_file="world_building/lore/character_sheets/Orin_Nightbloom.md",
+                node_type="character",
+            ),
+            "neal_lovington": CombinedCharacterNode(
+                id="neal_lovington",
+                name="Neal Lovington",
+                source_file="world_building/lore/character_sheets/Neal_Lovington.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="atlantia_bandits",
+                target="session_notes",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes",
+                target="source_heading__session_notes__session_1",
+                relationship_type="heading",
+                relationship_label="",
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__session_1",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__session_1",
+                target="orin_nightbloom",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__session_1",
+                target="neal_lovington",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            ),
+        ],
+    )
+
+    file_hidden = graph_without_source_document_roots(graph)
+    projected = graph_without_markdown_heading_levels(file_hidden, {1})
+    labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in projected.edges
+    }
+
+    assert "session_notes" not in projected.characters
+    assert "source_heading__session_notes__session_1" not in projected.characters
+    assert labels_by_edge[("atlantia_bandits", "jory_ravenmark")] == "Session 1"
+    assert labels_by_edge[("atlantia_bandits", "orin_nightbloom")] == "Session 1"
+    assert labels_by_edge[("atlantia_bandits", "neal_lovington")] == "Session 1"
+
+
+def test_selected_h1_filter_still_preserves_all_edges_when_h1_is_hidden(tmp_path):
+    session_dir = tmp_path / "session_notes"
+    session_dir.mkdir()
+    session_path = session_dir / "Session_Notes.md"
+    session_path.write_text(
+        "\n".join(
+            [
+                "# Session 1",
+                "Jory Ravenmark met Orin Nightbloom and Neal Lovington.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    graph = CombinedCharacterGraph(
+        characters={
+            "atlantia_bandits": CombinedCharacterNode(
+                id="atlantia_bandits",
+                name="Atlantia Bandits",
+                source_file=str(session_path),
+                node_type="group",
+            ),
+            "session_notes": CombinedCharacterNode(
+                id="session_notes",
+                name="Session Notes",
+                source_file=str(session_path),
+                node_type="source_document",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+            "orin_nightbloom": CombinedCharacterNode(
+                id="orin_nightbloom",
+                name="Orin Nightbloom",
+                source_file="world_building/lore/character_sheets/Orin_Nightbloom.md",
+                node_type="character",
+            ),
+            "neal_lovington": CombinedCharacterNode(
+                id="neal_lovington",
+                name="Neal Lovington",
+                source_file="world_building/lore/character_sheets/Neal_Lovington.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="atlantia_bandits",
+                target="session_notes",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark met Orin Nightbloom and Neal Lovington."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark met Orin Nightbloom and Neal Lovington."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes",
+                target="orin_nightbloom",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark met Orin Nightbloom and Neal Lovington."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes",
+                target="neal_lovington",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark met Orin Nightbloom and Neal Lovington."],
+            ),
+        ],
+    )
+    selected_h1_id = "source_heading__sessionnotes__line_1__session1"
+
+    projected = markdown_header_lore_graph(
+        graph,
+        source_file=str(session_path),
+        heading_id=selected_h1_id,
+        fanout_linked_characters=True,
+        hide_source_document_roots=True,
+        hidden_heading_levels={1},
+    )
+    labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in projected.edges
+    }
+
+    assert selected_h1_id not in projected.characters
+    assert labels_by_edge[("atlantia_bandits", "jory_ravenmark")] == "Session 1"
+    assert labels_by_edge[("atlantia_bandits", "orin_nightbloom")] == "Session 1"
+    assert labels_by_edge[("atlantia_bandits", "neal_lovington")] == "Session 1"
+
+
+def test_directory_session_lore_hide_file_name_removes_misclassified_session_notes_source(tmp_path):
+    session_dir = tmp_path / "session_notes"
+    session_dir.mkdir()
+    session_path = session_dir / "Session_Notes.md"
+    session_path.write_text("# Session Notes\n\nTharevon traveled through the Pixi Kingdom.", encoding="utf-8")
+    graph = CombinedCharacterGraph(
+        characters={
+            "session_notes": CombinedCharacterNode(
+                id="session_notes",
+                name="Session Notes",
+                source_file=str(session_path),
+                node_type="character",
+            ),
+            "tharevon": CombinedCharacterNode(
+                id="tharevon",
+                name="Tharevon",
+                source_file="world_building/lore/character_sheets/Tharevon.md",
+                node_type="character",
+            ),
+            "pixi_kingdom": CombinedCharacterNode(
+                id="pixi_kingdom",
+                name="Pixi Kingdom",
+                source_file="world_building/lore/places/Pixi_Kingdom.md",
+                node_type="place",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="session_notes",
+                target="tharevon",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Tharevon traveled through the Pixi Kingdom."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes",
+                target="pixi_kingdom",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["Tharevon traveled through the Pixi Kingdom."],
+            ),
+        ],
+    )
+
+    projected = markdown_header_lore_graph(
+        graph,
+        source_file=str(session_path),
+        fanout_linked_characters=True,
+        hide_source_document_roots=True,
+    )
+
+    assert "session_notes" not in projected.characters
+    assert "tharevon" in projected.characters
+    assert "pixi_kingdom" in projected.characters
 
 
 def test_session_note_lore_graph_uses_headings_groups_characters_and_places(tmp_path):
@@ -729,13 +1443,16 @@ def test_session_note_lore_graph_uses_headings_groups_characters_and_places(tmp_
         main_character_ids=set(lore_graph.characters),
         graphviz_config={"column_layout": "session_note_lore"},
     )
-    assert 'subgraph "cluster_column_0_source_documents_groups"' in dot
+    assert 'subgraph "cluster_column_0_source_documents"' in dot
+    assert 'subgraph "cluster_column_2_markdown_heading_2"' in dot
     assert 'subgraph "cluster_column_4_character_connections"' in dot
     assert '"family_tree" [' not in dot
     assert '"side_notes" [' not in dot
     assert f'"{family_heading_id}" [' in dot
     assert '"jory_ravenmark"' in dot
     assert '"atlantia"' in dot
+    heading_2_column = dot[dot.index('subgraph "cluster_column_2_markdown_heading_2"') :]
+    assert heading_2_column.index('"ravenmark_family"') < heading_2_column.index('subgraph "cluster_column_3_markdown_heading_3"')
     assert "mary_ravenmark" not in lore_graph.characters
 
     file_view_graph = markdown_header_lore_graph(

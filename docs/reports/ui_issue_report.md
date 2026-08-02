@@ -23,6 +23,22 @@ This report captures the current Streamlit UI issue state for the repository. Th
 
 ## Findings
 
+## 0. Open Knowledge Graph Redesign Issue: Duplicate Group Heading And Entity Nodes
+
+Status: open, documented for the knowledge graph migration.
+
+Session-note directory graphs can render the same group twice when a Markdown group heading matches an extracted semantic group entity. For example, a `## Indigo Cult` subsection and an `Indigo Cult` group entity currently appear as separate nodes after the H1 file/session heading is hidden. This makes it unclear whether connected characters and places belong to the structural subsection or the semantic group.
+
+Expected redesign behavior:
+
+- Structural group headings should be merged with, or projected through, their matching semantic group entities.
+- The visible group entity should preserve source-file and subsection provenance.
+- Related character/place edges should remain attached to the visible group entity instead of splitting across a duplicate heading node.
+
+Regression guard:
+
+- `tests/test_graphviz_rendering.py::test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nodes` is marked `xfail(strict=True)` until the migration resolves the projection model.
+
 ## 1. Streamlit UI state areas with high bug risk
 
 The app contains many `st.expander`, `st.tabs`, and `st.session_state` interactions that are common sources of reload/rerun bugs:
@@ -88,9 +104,9 @@ Status: fixed and covered by `tests/e2e/test_character_sheet_roundtrip_ui.py::te
 - Relationship/evidence tables now keep repeated evidence as separate rows instead of joining evidence into one cell.
 - Evidence columns now strip Markdown bullet/list markers before display.
 - Named session-note source nodes such as `Family Tree` are typed as `source_document` and appear in the Family Names column with a distinct graph shape instead of being promoted as secondary characters.
-- Family-name nodes are labeled as `{Name} Family`, and extracted group names such as `Ignis Cult` appear in the Family Names column with a distinct group shape.
+- Family-name nodes are labeled as `{Name} Family`, and extracted group names such as `Indigo Cult` appear in the Family Names column with a distinct group shape.
 - Character, place, and session-note saves now write graph JSON immediately, so newly created lore does not wait for a later graph regeneration before appearing in the Combined Knowledge Graph.
-- Imported session notes now write graph JSON during import and retain their `source_document` graph type even when duplicate loose import-source files exist, so related entities such as `Ignis Cult` remain visible from the associated character graph.
+- Imported session notes now write graph JSON during import and retain their `source_document` graph type even when duplicate loose import-source files exist, so related entities such as `Indigo Cult` remain visible from the associated character graph.
 - Character Race and Class are optional in the create/save UI; only Name and Backstory are required for new characters.
 - Character display names are editable in the character editor and continue to update the visible Markdown title/profile name without renaming the underlying file.
 - Character undo now remounts the editor after restoring a previous snapshot, preventing stale form widget values from overwriting the restored profile on a follow-up undo.

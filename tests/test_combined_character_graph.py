@@ -411,10 +411,10 @@ def test_full_structured_graph_groups_places_groups_and_families_in_column_zero(
             "source_type": "character",
             "source_file": "tests/fixtures/character_sheets/Jory_Ravenmark.md",
             "target_id": "ignis_cult",
-            "target_name": "Ignis Cult",
+            "target_name": "Indigo Cult",
             "target_type": "group",
             "relationship": "Enemy",
-            "evidence": "Jory opposed the Ignis Cult.",
+            "evidence": "Jory opposed the Indigo Cult.",
         },
         {
             "source_id": "jory_ravenmark",
@@ -605,6 +605,7 @@ There were fires in the town. Did the town recover?
     )
     combined = build_combined_character_graph([], lore_relationships=relationships)
 
+    assert combined.characters["session_notes"].node_type == "source_document"
     assert {
         "vivit",
         "morningstar",
@@ -808,6 +809,31 @@ def test_full_character_connection_graph_places_source_document_in_family_column
     assert "Family Tree" in combined_relationship_dot(focused_graph, "neal_lovington")
 
 
+def test_session_notes_markdown_primary_is_source_document():
+    graph = CharacterGraph(
+        schema_version="0.3.0",
+        primary_character=PrimaryCharacterRef(
+            id="session_notes",
+            name="Session Notes",
+            source_file="world_building/lore/session_notes/Session_Notes.md",
+        ),
+        places={"pixi_kingdom": PlaceNode(name="Pixi Kingdom", place_type="Kingdom")},
+        relationships=[
+            RelationshipEdge(
+                source="session_notes",
+                target="pixi_kingdom",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["The party traveled through the Pixi Kingdom."],
+            )
+        ],
+    )
+
+    combined = build_combined_character_graph([graph])
+
+    assert combined.characters["session_notes"].node_type == "source_document"
+
+
 def test_family_tree_source_document_links_through_character_family_nodes():
     family_tree_text = """# Family Tree
 
@@ -885,7 +911,7 @@ def test_session_note_entity_extraction_prioritizes_known_character_names():
 
 
 def test_session_note_entity_extraction_promotes_group_names_to_family_column():
-    text = "The party learned about the Cult of Ignis. Later the Ignis cult attacked the carnival."
+    text = "The party learned about the Cult of Ignis. Later the Indigo Cult attacked the carnival."
     relationships = derived_lore_entity_relationships(
         source_id="session_notes",
         source_name="Session Notes",
@@ -901,12 +927,12 @@ def test_session_note_entity_extraction_promotes_group_names_to_family_column():
         dot.index('subgraph "cluster_column_1_main_characters"')
     ]
 
-    assert combined.characters["igniscult"].name == "Ignis Cult"
+    assert combined.characters["igniscult"].name == "Indigo Cult"
     assert combined.characters["igniscult"].node_type == "group"
     assert ("session_notes", "igniscult", "mentioned") in {
         (edge.source, edge.target, edge.relationship_type) for edge in combined.edges
     }
-    assert '"igniscult" [label="Ignis Cult", fillcolor="#e9d5ff"' in dot
+    assert '"igniscult" [label="Indigo Cult", fillcolor="#e9d5ff"' in dot
     assert 'shape="trapezium"' in dot
     assert '"igniscult"' in family_column
 
@@ -1848,7 +1874,7 @@ def test_combined_graph_keeps_session_source_type_when_duplicate_lore_graph_foll
             "source_type": "character",
             "source_file": "external/session_notes/Uploaded_Graph_Notes.md",
             "target_id": "ignis_cult",
-            "target_name": "Ignis Cult",
+            "target_name": "Indigo Cult",
             "target_type": "group",
             "relationship": "Mentioned",
             "evidence": "Neal Lovington warned the party about the Cult of Ignis.",
@@ -1858,7 +1884,7 @@ def test_combined_graph_keeps_session_source_type_when_duplicate_lore_graph_foll
     combined = build_combined_character_graph([session_graph, loose_graph], lore_relationships=relationships)
 
     assert combined.characters["uploaded_graph_notes"].node_type == "source_document"
-    assert any(row["Connection"] == "Ignis Cult" for row in other_connection_rows(combined, "neal_lovington"))
+    assert any(row["Connection"] == "Indigo Cult" for row in other_connection_rows(combined, "neal_lovington"))
 
 
 def test_combined_relationship_rows_split_edge_evidence_into_rows():
