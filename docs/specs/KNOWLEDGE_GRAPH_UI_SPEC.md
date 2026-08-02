@@ -42,6 +42,11 @@ Sort all connections within each column by the number of connections with the ed
 Display all graph connections as a straight line and enforce that columns are maintained.
 Table of connections should only show edges with character connections
 
+## Heading View
+Views [Places, Session Notes]
+Uses the same UI as session Notes Graph but allows the user to select what sub heading they would like to see in the UI. 
+Currently only available in party tab.
+
 ## Full Structured Graph
 Views [Places, Session Notes]
 - Column 0: Places, groups, and family names
