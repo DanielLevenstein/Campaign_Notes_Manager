@@ -33,6 +33,8 @@ The existing app exposes the following main views and subviews:
 - Views should take two parameters ("View Name", "Source File", "Heading Selected") Streamlit should handle code determining what files are present in dropdowns.
 - Streamlit should handle filtering based on files while graph projection should handle filtering based on heading. Only nodes from the selected source file should be sent to projection module.
 - In streamlit heading filters should be displayed as a separate dropdown from the "Source File" dropdown. 
+
+## Document View Improvement
 - UI buttons should be added to the Directory view to hide elements with a checkbox next to each node element which we support hiding. 
 - When heading elements are hidden new graph connections should be created from the hidden node to all it's children with h1-h3 being the inital connection label. 
 - language model should be used to update the derived connection labels values.
