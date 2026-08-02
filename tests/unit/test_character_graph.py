@@ -6,11 +6,11 @@ from character_graph.extraction import extract_character_graph
 from character_graph.graph_view import attribute_rows, evidence_rows, place_rows, relationship_dot, relationship_rows
 from character_graph.ingest import load_backstory
 from character_graph.schema import CharacterGraph, CharacterNode, PrimaryCharacterRef, RelationshipEdge
-from character_graph.storage import load_graph, save_graph
+from src.persistence.storage import load_graph, save_graph
 from character_graph.validation import validate_graph
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 CHARACTER_GRAPH_LORE_FIXTURE_ENV = "LOCAL_CHATBOT_CHARACTER_GRAPH_TEST_LORE_DIR"
 
 

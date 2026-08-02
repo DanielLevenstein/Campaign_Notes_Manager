@@ -3,10 +3,10 @@ import shutil
 from dataclasses import replace
 from pathlib import Path
 
-import language_model.storage as storage
+import language_model.lore_documents as storage
 from language_model.character_generator import RandomCharacterGenerator
 from language_model.paths import CHARACTER_METADATA_DIR, CHARACTERS_DIR, ROOT_DIR
-from language_model.storage import (
+from language_model.lore_documents import (
     Character,
     CharacterProfile,
     PlaceProfile,
@@ -20,7 +20,7 @@ from language_model.storage import (
 )
 
 
-FIXTURE_CHARACTER_SHEETS_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "character_sheets"
+FIXTURE_CHARACTER_SHEETS_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "character_sheets"
 
 
 def test_render_backstory_matches_character_template_shape():

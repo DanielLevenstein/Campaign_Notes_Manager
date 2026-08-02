@@ -1,4 +1,15 @@
 
+# feature/knowledge_graph3
+
+## 2026-08-02
+
+### Feature Implementation
+- Added the Phase 0 persistence layer for mirrored graph metadata paths, centralized Markdown/JSON/bytes file writes, and graph serialization that excludes synthetic edges.
+- Routed character, place, and session-note Markdown save/delete flows through the persistence helpers so lore edits update the corresponding graph JSON.
+- Copied the persistence module into the new `src/persistence` source root with matching `tests/persistence` coverage for mirrored paths, file helpers, deletes, and synthetic-edge filtering.
+- Added `run_unit_tests.sh` and `run_e2e_tests.sh` wrappers for the top-level unit and e2e suites.
+- Renamed the legacy `language_model.storage` domain module to `language_model.lore_documents`, removed the duplicate `character_graph.storage` module, and documented the path toward one canonical persistence implementation.
+
 # feature/knowledge_graph
 
 ## 2026-07-18
@@ -126,4 +137,3 @@
 ## 2026-08-02
 ### Feature Implementation
 - Fixed session-note directory graphs so `Session_Notes.md` imports are treated as document roots, added a [File_Name] heading selector option, and added H1-H3 hide controls that preserve labeled child/context connections.
-

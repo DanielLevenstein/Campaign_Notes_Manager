@@ -1,9 +1,9 @@
 from datetime import date
 
 import language_model.session_notes as session_notes
-import language_model.storage as storage
-from character_graph.storage import load_graph
-from language_model.storage import (
+import language_model.lore_documents as storage
+from src.persistence.storage import load_graph
+from language_model.lore_documents import (
     CharacterProfile,
     PlaceProfile,
     create_character,

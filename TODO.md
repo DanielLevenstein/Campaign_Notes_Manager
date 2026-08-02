@@ -24,3 +24,13 @@ H3 Feature Implementation
   - "Session Notes" should be saved as a document heading, not a character.
 
 ## Current Behavior
+
+## Completed
+
+### 2026-08-02
+- Implemented Phase 0 persistence layer helpers for Markdown, JSON, bytes, graph paths, graph deletes, and graph serialization.
+- Routed character, place, and session-note Markdown saves through the persistence layer so graph metadata updates with lore edits.
+- Stored graph metadata under a mirrored `world_building/meta_data` tree and filtered synthetic edges out of persisted graph JSON.
+- Copied the persistence module into the new `src/persistence` source root with focused `tests/persistence` unit tests.
+- Added helper scripts for running unit and e2e test suites.
+- Renamed legacy lore document behavior, routed low-level persistence through `src.persistence.storage`, removed duplicate graph storage, and documented the migration path.

@@ -4,7 +4,7 @@ from character_graph.extraction import extract_character_graph
 from character_graph.ingest import load_backstory
 from language_model.character_rewrites import graph_generated_summary, model_rewrite_quality_issues, rewrite_sentence_quality_score
 from language_model.rewrite_quality import TARGET_SENTENCE_WORD_COUNT, sentence_length_distribution, writing_quality_score
-from language_model.storage import Character, read_character_profile
+from language_model.lore_documents import Character, read_character_profile
 from scripts.generate_single_character_backstory_rewrite_report import (
     build_report,
     normalized_score,

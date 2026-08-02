@@ -16,11 +16,11 @@ from language_model.character_rewrites import (
     split_overloaded_summary_sentence,
 )
 from language_model.rewrite_quality import writing_quality_score
-from language_model.storage import Character, read_character_profile
+from language_model.lore_documents import Character, read_character_profile
 from scripts.generate_single_character_backstory_rewrite_report import summary_length_score
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 JORY_PATH = ROOT_DIR / "tests" / "fixtures" / "character_sheets" / "Jory_Ravenmark.md"
 
 GOOD_JORY_SUMMARY = (

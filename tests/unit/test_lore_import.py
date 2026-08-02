@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from character_graph.storage import load_graph
+from src.persistence.storage import load_graph
 import language_model.lore_import as lore_import
 from language_model.lore_import import (
     BACKUP_KIND_BACKUP,
@@ -19,7 +19,7 @@ from language_model.lore_import import (
 )
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = ROOT_DIR / "tests" / "fixtures"
 
 

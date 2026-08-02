@@ -28,10 +28,10 @@ from language_model.rewrite_model import (
     parse_llama_timing,
     run_worker_process,
 )
-from language_model.storage import Character, CharacterProfile, read_character_profile
+from language_model.lore_documents import Character, CharacterProfile, read_character_profile
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 FIXTURE_CHARACTER_SHEETS_DIR = ROOT_DIR / "tests" / "fixtures" / "character_sheets"
 REPETITIVE_REWRITE_TEXT = (
     "Jory follows every storm track and every rumor she can find. "
