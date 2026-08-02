@@ -1,12 +1,12 @@
 # Release Notes
 
 | Version | Summary                                                                                    |
-| --- |--------------------------------------------------------------------------------------------|
-| v2.0.0 | Add local character rewrite tuning, rewrite quality reports, summary and backstory rewrite |
-| v1.1.1 | Enable knowledge graph feature and partial code cleanup                                    |
-| v1.1.0 | Implemented distinct knowledge graph views for character, place and sesison tab            |
-| v1.0.0 | This release adds a dedicated Knowledge Graph UI using graphviz.                           |
-| v0.1.0 | Packaged as a Streamlit app for local character sheets, campaign lore management.          |
+|---------|--------------------------------------------------------------------------------------------|
+| v1.2.0  | Add local character rewrite tuning, rewrite quality reports, summary and backstory rewrite |
+| v1.1.1  | Enable knowledge graph feature and partial code cleanup                                    |
+| v1.1.0  | Implemented distinct knowledge graph views for character, place and session tab            |
+| v1.0.0  | This release adds a dedicated Knowledge Graph UI using graphviz.                           |
+| v0.1.0  | Packaged as a Streamlit app for local character sheets, campaign lore management.          |
 
 ## v2.0.0 - Character Rewrite Tuning
 

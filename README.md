@@ -61,8 +61,8 @@ Note: Character Rewrite feature is only enabled if the user has llama.cpp instal
 
 
 | Version | Summary                                                                                       |
-| ------- | --------------------------------------------------------------------------------------------- |
-| v2.0.0  | Adds local character rewrite tuning, rewrite quality reports, and safer generated-text saves. |
+|---------| --------------------------------------------------------------------------------------------- |
+| v1.2.0  | Adds local character rewrite tuning, rewrite quality reports, and safer generated-text saves. |
 | v1.1.0  | Implemented distinct knowledge graph views for character, place and sesison tab               |
 | v1.0.0  | This release adds a dedicated Knowledge Graph UI using graphviz.                              |
 | v0.1.0  | Packaged as a Streamlit app for local character sheets, campaign lore management.             |
@@ -116,12 +116,12 @@ world_building/meta_data/character_graph/*.graph.json
 
 Everything under `world_building/` is local campaign material, runtime data, or generated output and should not be committed.
 
-## Specs
+## Design Documents
 
-- [Knowledge Graph Design](docs/specs/KNOWLEDGE_GRAPH_DESIGN.md): Tabular Knowledge Extraction
-- [Combined Knowledge Graph](docs/specs/KNOWLEDGE_GRAPH_DESIGN2.md): Multi Source Knowledge Graph
-- [Graphviz UI Issues](docs/specs/KNOWLEDGE_GRAPH_DESIGN3.md): Knowledge Graph Rendering with Graphviz
-- [Knowledge Graph Views](docs/specs/KNOWLEDGE_GRAPH_DESIGN4.md): Multi View Knowledge Graphs
+- [Knowledge Graph Design](docs/design/KNOWLEDGE_GRAPH_DESIGN.md): Tabular Knowledge Extraction
+- [Combined Knowledge Graph](docs/design/KNOWLEDGE_GRAPH_DESIGN2.md): Multi Source Knowledge Graph
+- [Graphviz UI Issues](docs/design/KNOWLEDGE_GRAPH_DESIGN3.md): Knowledge Graph Rendering with Graphviz
+- [Knowledge Graph Views](docs/design/KNOWLEDGE_GRAPH_DESIGN4.md): Multi View Knowledge Graphs
 
 ### Backstory and Summary Rewrites
 
