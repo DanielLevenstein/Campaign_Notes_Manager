@@ -425,15 +425,38 @@ def render_session_file_view_tab(
         key=key,
         default_source_file=pending_import_source_file,
     )
-    session_graph = markdown_header_lore_graph(
+    if selected_source_file is None:
+        st.info("Add Session Notes To Use File View.")
+        return
+    hide_source_document_roots = st.checkbox(
+        "Hide document root nodes",
+        value=hide_source_document_roots,
+        key=f"{key}_hide_source_doc_roots",
+    )
+    source_graph = markdown_header_lore_graph(
         combined,
         source_file=selected_source_file,
         fanout_linked_characters=True,
         hide_source_document_roots=hide_source_document_roots,
     )
-    if selected_source_file is None:
-        st.info("Add Session Notes To Use File View.")
-        return
+    selected_heading_id = render_lore_heading_filter(
+        combined,
+        source_predicate=is_session_note_node,
+        label="Session Note Heading",
+        key=f"{key}_heading",
+        projected_graph=source_graph,
+    )
+    session_graph = (
+        markdown_header_lore_graph(
+            combined,
+            source_file=selected_source_file,
+            heading_id=selected_heading_id,
+            fanout_linked_characters=True,
+            hide_source_document_roots=hide_source_document_roots,
+        )
+        if selected_heading_id is not None
+        else source_graph
+    )
     if not session_graph.characters:
         st.info("No Session Note Connections Were Found For This File.")
         return
@@ -457,22 +480,38 @@ def render_session_heading_view_tab(
     hide_source_document_roots: bool = True,
 ) -> None:
     st.subheader(title)
-    projected_graph = markdown_header_lore_graph(
+    selected_source_file = render_lore_file_filter(
         combined,
+        source_predicate=is_session_note_node,
+        label="Session Note File",
+        key=f"{key}_source_file",
+    )
+    if selected_source_file is None:
+        st.info("Add Session Notes To Use Section View.")
+        return
+    hide_source_document_roots = st.checkbox(
+        "Hide document root nodes",
+        value=hide_source_document_roots,
+        key=f"{key}_hide_source_doc_roots",
+    )
+    source_graph = markdown_header_lore_graph(
+        combined,
+        source_file=selected_source_file,
         hide_source_document_roots=hide_source_document_roots,
     )
     selected_heading_id = render_lore_heading_filter(
         combined,
         source_predicate=is_session_note_node,
         label="Session Note Heading",
-        key=key,
-        projected_graph=projected_graph,
+        key=f"{key}_heading",
+        projected_graph=source_graph,
     )
     if selected_heading_id is None:
         st.info("Add Markdown Headings To Session Notes To Use Section View.")
         return
     session_graph = markdown_header_lore_graph(
         combined,
+        source_file=selected_source_file,
         heading_id=selected_heading_id,
         hide_source_document_roots=hide_source_document_roots,
     )
