@@ -1,3 +1,5 @@
+import pytest
+
 from character_graph.combined_graph import (
     CombinedCharacterGraph,
     CombinedCharacterNode,
@@ -788,6 +790,114 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
     assert all_hidden_labels_by_edge[("ignis_cult", "jory_ravenmark")] == "Indigo Cult"
     assert all_hidden_labels_by_edge[("ignis_cult", "neal_lovington")] == "Indigo Cult"
     assert all_hidden_labels_by_edge[("ignis_cult", "moon_gate")] == "Indigo Cult"
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Knowledge graph migration should merge structural group headings with "
+        "their semantic group entities instead of rendering duplicate nodes."
+    ),
+)
+def test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nodes(tmp_path):
+    session_dir = tmp_path / "session_notes"
+    session_dir.mkdir()
+    session_path = session_dir / "Session_Notes_Fixture.md"
+    session_path.write_text(
+        "\n".join(
+            [
+                "# Session 4",
+                "The party tracked a faction lead.",
+                "## Indigo Cult",
+                "Jory Ravenmark and Neal Lovington investigated the Indigo Cult.",
+                "They traced the Indigo Cult to the Moon Gate.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    graph = CombinedCharacterGraph(
+        characters={
+            "session_notes_fixture": CombinedCharacterNode(
+                id="session_notes_fixture",
+                name="Session Notes Fixture",
+                source_file=str(session_path),
+                node_type="source_document",
+            ),
+            "indigo_cult": CombinedCharacterNode(
+                id="indigo_cult",
+                name="Indigo Cult",
+                source_file=str(session_path),
+                node_type="group",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+            "neal_lovington": CombinedCharacterNode(
+                id="neal_lovington",
+                name="Neal Lovington",
+                source_file="world_building/lore/character_sheets/Neal_Lovington.md",
+                node_type="character",
+            ),
+            "moon_gate": CombinedCharacterNode(
+                id="moon_gate",
+                name="Moon Gate",
+                source_file="world_building/lore/places/Moon_Gate.md",
+                node_type="place",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="indigo_cult",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Neal Lovington investigated the Indigo Cult."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Neal Lovington investigated the Indigo Cult."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="neal_lovington",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Neal Lovington investigated the Indigo Cult."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="moon_gate",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["They traced the Indigo Cult to the Moon Gate."],
+            ),
+        ],
+    )
+
+    projected = markdown_header_lore_graph(
+        graph,
+        source_file=str(session_path),
+        fanout_linked_characters=True,
+        hide_source_document_roots=True,
+        hidden_heading_levels={1},
+    )
+    indigo_nodes = [
+        node_id
+        for node_id, node in projected.characters.items()
+        if node.name == "Indigo Cult"
+    ]
+    edge_pairs = {(edge.source, edge.target) for edge in projected.edges}
+
+    assert indigo_nodes == ["indigo_cult"]
+    assert ("indigo_cult", "jory_ravenmark") in edge_pairs
+    assert ("indigo_cult", "neal_lovington") in edge_pairs
+    assert ("indigo_cult", "moon_gate") in edge_pairs
 
 
 def test_directory_session_lore_hide_file_name_preserves_source_bridge_connections():
