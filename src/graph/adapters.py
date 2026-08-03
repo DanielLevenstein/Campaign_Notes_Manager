@@ -14,6 +14,8 @@ LEGACY_TYPE_MAP = {
     "place": "place",
     "family": "family",
     "group": "group",
+    "artifact": "artifact",
+    "note": "note",
     "source_document": "source_document",
 }
 
@@ -25,7 +27,7 @@ def canonical_type_for_legacy_node(node_type: str, source_file: str = "", displa
     if cleaned in LEGACY_TYPE_MAP:
         return LEGACY_TYPE_MAP[cleaned]
     if canonical_source_kind(source_file) == "session_note" and display_name.strip().lower().startswith("session"):
-        return "source_document"
+        return "note"
     return "entity"
 
 
@@ -150,7 +152,7 @@ def canonical_graph_from_character_graph(graph: Any, *, root: str | Path | None 
         nodes[node_id] = canonical_node_from_character_graph(
             node_id,
             node,
-            node_type="character",
+            node_type=getattr(node, "node_type", "character"),
             source_file=source_file,
             root=root,
         )

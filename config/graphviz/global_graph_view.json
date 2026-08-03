@@ -38,6 +38,10 @@
       "shape": "trapezium",
       "fillcolor": "#e9d5ff"
     },
+    "artifact": {
+      "shape": "hexagon",
+      "fillcolor": "#fce7f3"
+    },
     "family": {
       "shape": "ellipse",
       "fillcolor": "#fef3c7",
@@ -46,6 +50,13 @@
       "margin": "0.14,0.06"
     },
     "source_document": {
+      "shape": "folder",
+      "fillcolor": "#fde68a",
+      "width": 1.65,
+      "height": 0.7,
+      "margin": "0.12,0.06"
+    },
+    "note": {
       "shape": "folder",
       "fillcolor": "#fde68a",
       "width": 1.65,

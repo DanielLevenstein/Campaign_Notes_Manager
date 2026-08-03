@@ -389,6 +389,44 @@ Mara is careful.
     assert any(edge.relationship_type == "place" and edge.target == "royal_tittles" for edge in graph.relationships)
 
 
+def test_extract_character_graph_splits_compound_connection_type_into_edge_and_node(tmp_path):
+    source = tmp_path / "mara.md"
+    source.write_text(
+        """# Mara Voss
+
+## Character Stats
+
+| Name | Race | Class |
+| ---- | ---- | ----- |
+| Mara | Elf | Wizard |
+
+## Character Backstory
+
+Mara keeps careful notes.
+
+## Character Summary
+
+Mara is careful.
+
+## Character Connections
+
+| Source | Relationship | Name | Evidence |
+| ------ | ------------ | ---- | -------- |
+| Character Sheet | Investigate Cult |  | Mara investigated the cult beneath the harbor. |
+""",
+        encoding="utf-8",
+    )
+
+    graph = extract_character_graph(load_backstory(source, character_id="mara_voss"))
+
+    cult = graph.characters["cult"]
+    edge = next(edge for edge in graph.relationships if edge.target == "cult")
+    assert cult.name == "Cult"
+    assert edge.relationship_type == "investigate"
+    assert edge.relationship_label == "Investigate"
+    assert edge.evidence == ["Mara investigated the cult beneath the harbor."]
+
+
 def test_extract_character_graph_loads_legacy_character_connections_table_and_limits_evidence(tmp_path):
     source = tmp_path / "orin.md"
     long_evidence = (
@@ -646,6 +684,36 @@ def test_validation_warns_on_missing_relationship_target(tmp_path):
     warnings = validate_graph(graph)
 
     assert "Relationship target `missing` is missing from graph nodes." in warnings
+
+
+def test_validation_accepts_configured_artifact_edges(tmp_path):
+    source = tmp_path / "arlen.md"
+    source.write_text(BACKSTORY, encoding="utf-8")
+    graph = extract_character_graph(load_backstory(source, character_id="arlen_voss"))
+    graph.relationships.append(
+        RelationshipEdge(
+            source=graph.primary_character.id,
+            target=graph.primary_character.id,
+            relationship_type="artifact",
+            relationship_label="Artifact",
+            evidence=["Arlen keeps a silver key."],
+        )
+    )
+
+    warnings = validate_graph(graph)
+
+    assert not any("artifact" in warning.lower() for warning in warnings)
+
+
+def test_validation_warns_on_unconfigured_relationship_type(tmp_path):
+    source = tmp_path / "arlen.md"
+    source.write_text(BACKSTORY, encoding="utf-8")
+    graph = extract_character_graph(load_backstory(source, character_id="arlen_voss"))
+    graph.relationships[0].relationship_type = "not_configured"
+
+    warnings = validate_graph(graph)
+
+    assert "Relationship type `not_configured` is not configured." in warnings
 
 
 def test_graph_view_helpers_format_relationships_and_dot(tmp_path):

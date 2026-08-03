@@ -294,12 +294,20 @@ def test_place_lore_graph_keeps_source_place_and_character_connections(tmp_path)
         "Mrs Nightbloom",
     }
     assert {row["Relationship"] for row in table_rows} == {"Home", "Studied", "Mentions"}
-    assert place_graph.characters[atlantia_heading_id].node_type == "source_heading_1"
-    assert place_graph.characters[harbor_heading_id].node_type == "source_heading_place_2"
+    assert place_graph.characters[atlantia_heading_id].node_type == "note"
+    assert place_graph.characters[atlantia_heading_id].is_heading is True
+    assert place_graph.characters[atlantia_heading_id].heading_level == 1
+    assert place_graph.characters[harbor_heading_id].node_type == "place"
+    assert place_graph.characters[harbor_heading_id].is_heading is True
+    assert place_graph.characters[harbor_heading_id].heading_level == 2
     assert place_graph.characters[harbor_heading_id].name == "Harbor"
-    assert place_graph.characters[watch_tower_heading_id].node_type == "source_heading_place_2"
+    assert place_graph.characters[watch_tower_heading_id].node_type == "place"
+    assert place_graph.characters[watch_tower_heading_id].is_heading is True
+    assert place_graph.characters[watch_tower_heading_id].heading_level == 2
     assert place_graph.characters[watch_tower_heading_id].name == "Watch Tower"
-    assert place_graph.characters[college_heading_id].node_type == "source_heading_place_2"
+    assert place_graph.characters[college_heading_id].node_type == "place"
+    assert place_graph.characters[college_heading_id].is_heading is True
+    assert place_graph.characters[college_heading_id].heading_level == 2
     note_rows = lore_information_rows(place_graph)
     assert {
         (row["Heading"], row["Summary"])
@@ -625,6 +633,9 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
                 "## Indigo Cult",
                 "Jory Ravenmark and Neal Lovington investigated the Indigo Cult.",
                 "They traced the Indigo Cult to the Moon Gate.",
+                "## Moon Blade",
+                "Arlen Voss recovered the Moon Blade.",
+                "Neal Lovington identified the Moon Blade.",
                 "## Empty Cult",
                 "The empty cult was named but had no visible character connection.",
             ]
@@ -680,6 +691,18 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
                 name="Moon Gate",
                 source_file="world_building/lore/places/Moon_Gate.md",
                 node_type="place",
+            ),
+            "moon_blade": CombinedCharacterNode(
+                id="moon_blade",
+                name="Moon Blade",
+                source_file="world_building/lore/session_notes/Session_Notes_Fixture.md",
+                node_type="artifact",
+            ),
+            "arlen_voss": CombinedCharacterNode(
+                id="arlen_voss",
+                name="Arlen Voss",
+                source_file="world_building/lore/character_sheets/Arlen_Voss.md",
+                node_type="character",
             ),
             "empty_cult": CombinedCharacterNode(
                 id="empty_cult",
@@ -745,6 +768,27 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
                 relationship_label="Mentions",
                 evidence=["The empty cult was named but had no visible character connection."],
             ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="moon_blade",
+                relationship_type="artifact",
+                relationship_label="Artifact",
+                evidence=["Arlen Voss recovered the Moon Blade."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="arlen_voss",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Arlen Voss recovered the Moon Blade."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="neal_lovington",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Neal Lovington identified the Moon Blade."],
+            ),
         ],
     )
 
@@ -783,12 +827,15 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
     assert "pixi_kingdom" in all_headings_hidden.characters
     assert "tharevon" in all_headings_hidden.characters
     assert "ignis_cult" in all_headings_hidden.characters
+    assert "moon_blade" in all_headings_hidden.characters
+    assert all_headings_hidden.characters["moon_blade"].node_type == "artifact"
     assert "empty_cult" not in all_headings_hidden.characters
     assert all_hidden_labels_by_edge[("pixi_kingdom", "tharevon")] == "Session 4"
     assert all_hidden_labels_by_edge[("pixi_kingdom", "mira_vale")] == "Pixi Kingdom"
     assert all_hidden_labels_by_edge[("ignis_cult", "jory_ravenmark")] == "Indigo Cult"
     assert all_hidden_labels_by_edge[("ignis_cult", "neal_lovington")] == "Indigo Cult"
     assert all_hidden_labels_by_edge[("ignis_cult", "moon_gate")] == "Indigo Cult"
+    assert all_hidden_labels_by_edge[("moon_blade", "arlen_voss")] == "Moon Blade"
 
 
 def test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nodes(tmp_path):
@@ -1126,6 +1173,40 @@ def test_hiding_h1_preserves_edges_to_visible_h2_and_h3_descendants():
     assert labels_by_edge[("session_notes", "source_heading__session_notes__bandits")] == "Session 1"
     assert labels_by_edge[("session_notes", "source_heading__session_notes__ambush")] == "Session 1"
     assert labels_by_edge[("source_heading__session_notes__ambush", "jory_ravenmark")] == "Mentions"
+
+
+def test_source_heading_artifact_nodes_use_artifact_shape():
+    graph = CombinedCharacterGraph(
+        characters={
+            "source_heading__session_notes__relics": CombinedCharacterNode(
+                id="source_heading__session_notes__relics",
+                name="Recovered Relics",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_artifact_2",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__relics",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentioned",
+            ),
+        ],
+    )
+
+    dot = combined_relationship_dot(graph)
+
+    assert (
+        '"source_heading__session_notes__relics" [label="Recovered Relics", '
+        'fillcolor="#fce7f3", color="#94a3b8", shape="hexagon"'
+    ) in dot
 
 
 def test_hiding_file_name_and_h1_preserves_all_direct_h1_connections():

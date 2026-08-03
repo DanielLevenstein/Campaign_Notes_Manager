@@ -32,16 +32,20 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Kept legacy Graphviz tab behavior in place for non-Party views while creating a stable vertical slice for the new architecture, so later work can migrate one view at a time instead of rewriting every tab at once.
 - [x] Preserved tab-specific behavior for the current UI while narrowing the intended Phase 3 finish line to a single stable view backed by projection and presentation data.
 
-### Phase 2.2 File Path Fixes
-- Move all code under the character_graph directory into the new source directory using modules extract, ingest, and deduplication.
-- Move the world_building folder out of source code. Let user choose the local directory they want to save their project files.
-- Change the import test lore UI to a proper file picker which defaults to the test fixtures directory.
+### Phase 2.2 Graph Artifact
+- [x] Add e2e test coverage for the directory and heading view.
+- [x] Add artifact to valid graph-edge types.
+- [x] Ensure that artifacts show up in test fixture e2e tests.
+
+### Phase 2.3 Update Connection Types
+- [x] Split compound connection types such as `Investigate Cult` into a target node named `Cult` and an `Investigate` edge.
+- [x] Moved graph node and edge allow-lists into split config files under `config/nodes` and `config/edges`.
+- [x] Derived lore edge values from the combined evidence block for the two connected nodes, while preserving configured and dominant relationship labels.
 
 ## Phase 3.1 – Decouple UI rendering from graph internals
 - [x] Replace direct graph reads in graphviz_rendering.py and streamlit_app.py with projection API calls.
 - [ ] Make the UI consume projection results rather than infer behavior from internal node-type heuristics.
 - [ ] Unify the rendering behavior for Characters Graph, Places Graph, Session Notes Graph, and Full Structured Graph so they share the same layout and routing rules.
-- [ ] Preserve the tab-specific view semantics while moving the common logic into a shared rendering pipeline.
 
 ### Phase 3.2 Graph UI Improvements
 - [ ] Graphviz views must not change depending on what tab they are displayed under.
@@ -73,3 +77,8 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [ ] Ensure projections can answer view requests without relying on fragile node-type string checks.
 - [ ] Introduce an event-driven update path so graph ingestion can notify the UI when new files or projections are available.
 - [ ] Add projection versioning or etags so the UI can cache results safely and refresh only when needed.
+
+### File Path Fixes
+- [ ] Move all code under the character_graph directory into the new source directory using modules extract, ingest, and deduplication.
+- [ ] Move the world_building folder out of source code. Let user choose the local directory they want to save their project files.
+- [ ] Change the import test lore UI to a proper file picker which defaults to the test fixtures directory.

@@ -76,7 +76,7 @@ def build_combined_graph_projection(
         character_sheet_detail_rows=combined_attribute_rows(character_sheet_graphs),
         character_nodes=character_nodes,
         main_character_ids={node.id for node in character_nodes if node.node_type == "character"},
-        main_place_ids={node.id for node in character_nodes if node.node_type == "place"},
+        main_place_ids={node.id for node in character_nodes if node.node_type == "place" and not node.is_source},
     )
 
 
@@ -102,7 +102,7 @@ def character_sheet_lore_graphs(graphs: list[CharacterGraph]) -> list[CharacterG
 
 def place_source_rows(places: list[Place]) -> list[tuple[str, str, str, str]]:
     return [
-        (lore_source_document_id(place.path), display_place_name(place), str(place.path), "source_document")
+        (lore_source_document_id(place.path), display_place_name(place), str(place.path), "place")
         for place in places
     ]
 
@@ -127,7 +127,7 @@ def derived_lore_relationships(
         graph = graph_sources.get(path.resolve())
         source_id = graph.primary_character.id if graph and not path_is_place_lore(path) else lore_source_document_id(path)
         source_name = combined_lore_source_name(path, graph)
-        source_type = "source_document" if path_is_place_lore(path) else "character"
+        source_type = source_node_type_for_path(path)
         try:
             text = read_text(path)
         except OSError:
@@ -182,6 +182,17 @@ def source_title_without_lore_suffix(name: str) -> str:
 
 def lore_source_document_id(path: Path) -> str:
     return f"source_document__{compact(path.stem)}"
+
+
+def source_node_type_for_path(path: Path) -> str:
+    normalized = str(path).replace("\\", "/").lower()
+    if "/places/" in normalized:
+        return "place"
+    if "/session_notes/" in normalized:
+        return "note"
+    if "/character_sheets/" in normalized:
+        return "character"
+    return "note"
 
 
 def is_character_lore_path(path: Path) -> bool:

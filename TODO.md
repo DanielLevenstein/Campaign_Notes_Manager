@@ -3,6 +3,7 @@
 - Dates and section headings are still showing up as characters in the UI.
 
 - Worldbuilding directory got moved in the source directory move.
+- 
 ## Phase 2-3 Remaining Work
 
 - Move file-list, heading-list, and file/heading subgraph helpers out of `graphviz_rendering.py` and behind projection APIs.
@@ -11,6 +12,11 @@
 - Add an event/update flow so graph regeneration can notify the UI when files, headings, or projections change.
 - Migrate one additional graph view through the presentation layer after Party View, preferably a file/heading view that exercises source and heading selection.
 - Keep legacy Graphviz rendering available until the migrated view has parity tests and a stable screenshot or contract test.
+
+### Phase 2.3 Update Connection Types
+- Connection types like "Investigate Cult" should be split into two entities a node named "Cult" with an edge with the label "Investigate"
+- Information about what connection types are allowed for each graph node and edge should be moved to a config file under `config/edges`, and `config/nodes`
+- Edge values should be determined from the data present in the combined evidence block from the two connected nodes. 
 
 ## Graph View Improvements
 

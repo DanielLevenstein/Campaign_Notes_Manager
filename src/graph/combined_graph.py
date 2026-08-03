@@ -6,7 +6,8 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Callable
 
-from src.graph.schema import CharacterGraph
+from src.graph.config import CharacterGraphConfig, load_character_graph_config
+from src.graph.schema import CharacterGraph, infer_source_node_type
 
 
 PRESERVED_RELATIONSHIP_TYPES = {
@@ -37,6 +38,9 @@ class CombinedCharacterNode:
     name: str
     source_file: str
     node_type: str = "character"
+    is_source: bool = False
+    is_heading: bool = False
+    heading_level: int | None = None
 
 
 @dataclass
@@ -71,6 +75,7 @@ def build_combined_character_graph(
     lore_relationships: list[dict[str, str]] | None = None,
 ) -> CombinedCharacterGraph:
     combined = CombinedCharacterGraph()
+    graph_config = load_character_graph_config()
     for graph in graphs:
         session_note_graph = is_session_note_graph(graph)
         set_combined_node(
@@ -80,6 +85,7 @@ def build_combined_character_graph(
                 name=combined_primary_display_name(graph, session_note_graph),
                 source_file=graph.primary_character.source_file,
                 node_type=combined_primary_node_type(graph, session_note_graph),
+                is_source=combined_primary_is_source(graph, session_note_graph),
             ),
         )
         if not session_note_graph:
@@ -124,6 +130,7 @@ def build_combined_character_graph(
             name=display_name(place_name),
             source_file=source_file,
             node_type=node_type,
+            is_source=True,
         )
     for relationship in lore_relationships or []:
         source_id = relationship.get("source_id", "")
@@ -137,6 +144,11 @@ def build_combined_character_graph(
                 name=display_name(relationship.get("source_name", source_id)),
                 source_file=relationship.get("source_file", ""),
                 node_type=combined_lore_node_type(
+                    relationship.get("source_name", source_id),
+                    relationship.get("source_file", ""),
+                    relationship.get("source_type", "place"),
+                ),
+                is_source=combined_lore_is_source_node(
                     relationship.get("source_name", source_id),
                     relationship.get("source_file", ""),
                     relationship.get("source_type", "place"),
@@ -203,13 +215,15 @@ def build_combined_character_graph(
                 if evidence and evidence not in edge.evidence:
                     edge.evidence.append(evidence)
 
-    for relationship in lore_relationships or []:
-        source_id = relationship.get("source_id", "")
-        target_id = relationship.get("target_id", "")
+    for relationship_group in grouped_lore_relationships(lore_relationships or []):
+        source_id = relationship_group.get("source_id", "")
+        target_id = relationship_group.get("target_id", "")
         if not source_id or not target_id or source_id == target_id:
             continue
-        relationship_type = one_word_relationship(relationship.get("relationship", "reference"))
-        relationship_label = relationship_display_label(relationship_type)
+        relationship_type, relationship_label = combined_lore_relationship_type_and_label(
+            relationship_group,
+            graph_config,
+        )
         key = (source_id, target_id, relationship_type)
         edge = by_key.get(key)
         if edge is None:
@@ -222,9 +236,9 @@ def build_combined_character_graph(
             )
             by_key[key] = edge
             combined.edges.append(edge)
-        evidence = relationship.get("evidence", "")
-        if evidence and evidence not in edge.evidence:
-            edge.evidence.append(evidence)
+        for evidence in relationship_group.get("evidence_items", []):
+            if evidence and evidence not in edge.evidence:
+                edge.evidence.append(evidence)
 
     merge_duplicate_nodes(combined)
     prune_disconnected_nodes(combined)
@@ -234,7 +248,7 @@ def build_combined_character_graph(
 
 def set_combined_node(graph: CombinedCharacterGraph, node: CombinedCharacterNode) -> None:
     existing = graph.characters.get(node.id)
-    if existing is not None and existing.node_type == "source_document" and node.node_type != "source_document":
+    if existing is not None and is_source_root_node(existing) and not is_source_root_node(node):
         return
     graph.characters[node.id] = node
 
@@ -265,18 +279,29 @@ def combined_primary_display_name(graph: CharacterGraph, session_note_graph: boo
 
 def combined_primary_node_type(graph: CharacterGraph, session_note_graph: bool) -> str:
     if session_note_graph:
-        return "source_document"
+        return "note"
     if is_named_place_source(graph.primary_character.name, graph.primary_character.source_file):
-        return "source_document"
-    return "character"
+        return "place"
+    primary_node = graph.characters.get(graph.primary_character.id)
+    if graph.primary_character.node_type == "note" and primary_node is not None:
+        return primary_node.node_type
+    return graph.primary_character.node_type or infer_source_node_type(graph.primary_character.source_file)
+
+
+def combined_primary_is_source(graph: CharacterGraph, session_note_graph: bool) -> bool:
+    return session_note_graph or is_named_place_source(graph.primary_character.name, graph.primary_character.source_file)
 
 
 def combined_lore_node_type(name: str, source_file: str, fallback_type: str) -> str:
     if fallback_type == "source_document":
-        return "source_document"
+        return infer_source_node_type(source_file)
     if is_session_source_document_name(name, source_file):
-        return "source_document"
-    return fallback_type
+        return "note"
+    return fallback_type or "note"
+
+
+def combined_lore_is_source_node(name: str, source_file: str, fallback_type: str) -> bool:
+    return fallback_type in {"source_document", "note", "place"} or is_session_source_document_name(name, source_file)
 
 
 def family_display_name(value: str) -> str:
@@ -314,7 +339,7 @@ def merge_duplicate_nodes(graph: CombinedCharacterGraph) -> None:
     canonical_by_key: dict[tuple[str, str], str] = {}
     remapped_ids: dict[str, str] = {}
     for node_id, node in graph.characters.items():
-        key = (node.node_type, compact(node.name))
+        key = (node.node_type, compact(node.name), "source" if node.is_source else "node")
         canonical_id = canonical_by_key.setdefault(key, node_id)
         if canonical_id != node_id:
             remapped_ids[node_id] = canonical_id
@@ -421,6 +446,64 @@ def combined_relationship_type(relationship_type: str) -> tuple[str, str]:
     if relationship_type == "place":
         return "place", "Place"
     return "reference", "Referenced"
+
+
+def combined_lore_relationship_type_and_label(
+    relationship: dict[str, str],
+    graph_config: CharacterGraphConfig,
+) -> tuple[str, str]:
+    raw_relationship = relationship.get("relationship", "reference")
+    evidence = relationship.get("evidence", "")
+    relationship_type = graph_config.infer_edge_type_from_evidence(evidence, raw_relationship)
+    if relationship_type == "reference":
+        relationship_type = graph_config.canonical_edge_type(raw_relationship) or one_word_relationship(raw_relationship)
+    return relationship_type, graph_config.edge_label(relationship_type)
+
+
+def grouped_lore_relationships(relationships: list[dict[str, str]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str], dict[str, Any]] = {}
+    for relationship in relationships:
+        source_id = relationship.get("source_id", "")
+        target_id = relationship.get("target_id", "")
+        if not source_id or not target_id:
+            continue
+        key = (source_id, target_id)
+        current = grouped.setdefault(
+            key,
+            {
+                **relationship,
+                "relationship_values": [],
+                "evidence_items": [],
+            },
+        )
+        raw_relationship = relationship.get("relationship", "")
+        if raw_relationship:
+            current["relationship_values"].append(raw_relationship)
+        evidence = relationship.get("evidence", "")
+        if evidence:
+            current["evidence_items"].append(evidence)
+    for current in grouped.values():
+        relationship_values = current.get("relationship_values", [])
+        current["relationship"] = most_common_relationship_value(relationship_values) or current.get("relationship", "")
+        current["evidence"] = " ".join(current.get("evidence_items", []))
+    return list(grouped.values())
+
+
+def most_common_relationship_value(values: list[str]) -> str:
+    if not values:
+        return ""
+    counts: dict[str, int] = {}
+    first_seen: dict[str, str] = {}
+    for value in values:
+        key = compact(value)
+        if not key:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+        first_seen.setdefault(key, value)
+    if not counts:
+        return ""
+    best_key = max(counts, key=counts.get)
+    return first_seen[best_key]
 
 
 def relationship_display_label(relationship_type: str) -> str:
@@ -566,7 +649,11 @@ def graph_view_root_nodes(
 ) -> list[CombinedCharacterNode]:
     main_character_ids = {compact(name) for name in main_character_names or []}
     main_place_ids = {compact(name) for name in main_place_names or []}
-    nodes = [node for node in graph.characters.values() if node.node_type in {"character", "place"}]
+    nodes = [
+        node
+        for node in graph.characters.values()
+        if node.node_type in {"character", "place"} and not node.is_source
+    ]
     main_nodes = [
         node
         for node in nodes
@@ -789,7 +876,8 @@ def associated_connection_items(
         graph.characters[associated_id]
         for associated_id in associated_ids
         if associated_id in graph.characters
-        and graph.characters[associated_id].node_type in {"character", "place", "family", "group", "source_document"}
+        and graph.characters[associated_id].node_type
+        in {"character", "place", "family", "group", "artifact", "source_document", "note"}
         and not is_session_notes_node(graph.characters[associated_id])
     ]
     items: list[tuple[CombinedCharacterNode, list[str]]] = []
@@ -804,7 +892,7 @@ def associated_connection_items(
     protected_items = [
         item
         for item in items
-        if item[0].node_type in {"family", "group", "source_document"}
+        if item[0].node_type in {"family", "group", "artifact", "source_document", "note"}
     ]
     remaining_items = [item for item in items if item not in protected_items]
     return protected_items + remaining_items[: max(max_items - len(protected_items), 0)]
@@ -821,10 +909,12 @@ def association_sort_key(
     type_rank = {
         "family": 0,
         "source_document": 1,
+        "note": 1,
         "character": 2,
         "place": 3,
         "group": 4,
-    }.get(associated_node.node_type, 5)
+        "artifact": 5,
+    }.get(associated_node.node_type, 6)
     return (
         0 if direct else 1,
         relationship_prominence_rank(relationship_type),
@@ -954,9 +1044,9 @@ def is_session_notes_node(node: CombinedCharacterNode | None) -> bool:
         return False
     source_file = node.source_file.replace("\\", "/").lower()
     source_name = source_file.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-    if node.node_type.startswith("source_heading"):
+    if is_heading_node(node):
         return False
-    if node.node_type == "source_document":
+    if node.node_type in {"source_document", "note"}:
         return compact(node.name) in {"sessionnotes", "sessionnote"} or compact(source_name) in {
             "sessionnotes",
             "sessionnote",
@@ -971,7 +1061,21 @@ def is_session_notes_node(node: CombinedCharacterNode | None) -> bool:
 
 
 def is_lore_source_node(node: CombinedCharacterNode | None) -> bool:
-    return node is not None and (node.node_type == "source_document" or is_session_notes_node(node))
+    return is_source_root_node(node)
+
+
+def is_source_root_node(node: CombinedCharacterNode | None) -> bool:
+    if node is None:
+        return False
+    if is_heading_node(node):
+        return False
+    if node.is_source:
+        return True
+    if node.node_type in {"source_document", "note"}:
+        return True
+    if is_session_notes_node(node):
+        return True
+    return node.node_type == "place" and node.id.startswith("source_document__")
 
 
 def graph_clarity_metric(graph: CombinedCharacterGraph) -> GraphClarityMetric:
@@ -1088,7 +1192,7 @@ def combined_relationship_dot(
     column_by_node = graph_column_by_node(column_groups)
     for character_id, character in display_characters.items():
         node_attributes = graphviz_node_attributes(
-            character.node_type,
+            character,
             focused=character_id == focus_node_id,
             graphviz_config=graphviz_config,
         )
@@ -1131,7 +1235,7 @@ def relationship_dot_display_characters(
         hidden_ids.update(
             node_id
             for node_id, node in graph.characters.items()
-            if node.node_type == "source_document"
+            if is_source_root_node(node)
         )
     return {
         node_id: node
@@ -1145,7 +1249,7 @@ def duplicate_source_document_root_ids(graph: CombinedCharacterGraph) -> set[str
     source_document_ids = {
         node_id
         for node_id, node in graph.characters.items()
-        if node.node_type == "source_document"
+        if is_source_root_node(node)
     }
     for edge in graph.edges:
         if edge.source not in source_document_ids:
@@ -1154,7 +1258,7 @@ def duplicate_source_document_root_ids(graph: CombinedCharacterGraph) -> set[str
         heading = graph.characters.get(edge.target)
         if source is None or heading is None:
             continue
-        if source_heading_level(heading.node_type) != 1:
+        if source_heading_level_for_node(heading) != 1:
             continue
         source_labels = {compact(source.name)}
         if source.source_file:
@@ -1189,6 +1293,7 @@ def default_graphviz_config() -> dict[str, Any]:
             "character": {"fillcolor": "#dbeafe", "shape": "box"},
             "place": {"fillcolor": "#dcfce7", "shape": "component"},
             "group": {"fillcolor": "#e9d5ff", "shape": "trapezium"},
+            "artifact": {"fillcolor": "#fce7f3", "shape": "hexagon"},
             "family": {
                 "fillcolor": "#fef3c7",
                 "shape": "ellipse",
@@ -1197,6 +1302,13 @@ def default_graphviz_config() -> dict[str, Any]:
                 "margin": "0.14,0.06",
             },
             "source_document": {
+                "fillcolor": "#fde68a",
+                "shape": "folder",
+                "width": 1.65,
+                "height": 0.7,
+                "margin": "0.12,0.06",
+            },
+            "note": {
                 "fillcolor": "#fde68a",
                 "shape": "folder",
                 "width": 1.65,
@@ -1226,19 +1338,26 @@ def edge_graphviz_attributes(graphviz_config: dict[str, Any], label_font_color: 
 
 
 def graphviz_node_attributes(
-    node_type: str,
+    node: CombinedCharacterNode | str,
     *,
     focused: bool,
     graphviz_config: dict[str, Any],
 ) -> dict[str, Any]:
+    node_type = node.node_type if isinstance(node, CombinedCharacterNode) else node
     default_node = graphviz_config.get("node", {})
     attributes = {
         "fillcolor": default_node.get("fillcolor", "#dbeafe"),
         "color": default_node.get("color", "#94a3b8"),
     }
     overrides = graphviz_config.get("node_type_overrides", {}).get(node_type, {})
-    if source_heading_level(node_type) is not None:
-        overrides = {**source_heading_node_attributes(node_type), **overrides}
+    heading_level = source_heading_level_for_node(node) if isinstance(node, CombinedCharacterNode) else source_heading_level(node_type)
+    if heading_level is not None:
+        heading_entity_type = (
+            source_heading_entity_type_for_node(node)
+            if isinstance(node, CombinedCharacterNode)
+            else source_heading_entity_type(node_type)
+        )
+        overrides = {**source_heading_node_attributes_for(heading_level, heading_entity_type), **overrides}
     attributes.update(overrides)
     if focused:
         attributes.update(graphviz_config.get("focus_node", {}))
@@ -1248,8 +1367,10 @@ def graphviz_node_attributes(
 
 
 def source_heading_node_attributes(node_type: str) -> dict[str, Any]:
-    level = source_heading_level(node_type) or 1
-    entity_type = source_heading_entity_type(node_type)
+    return source_heading_node_attributes_for(source_heading_level(node_type) or 1, source_heading_entity_type(node_type))
+
+
+def source_heading_node_attributes_for(level: int, entity_type: str | None = None) -> dict[str, Any]:
     sizes = {
         1: {"width": 1.45, "height": 0.58, "fontsize": 11, "margin": "0.10,0.05"},
         2: {"width": 1.25, "height": 0.5, "fontsize": 10, "margin": "0.08,0.04"},
@@ -1264,19 +1385,41 @@ def source_heading_node_attributes(node_type: str) -> dict[str, Any]:
         attributes.update({"shape": "component", "fillcolor": "#dcfce7"})
     elif entity_type == "group":
         attributes.update({"shape": "trapezium", "fillcolor": "#e9d5ff"})
+    elif entity_type == "artifact":
+        attributes.update({"shape": "hexagon", "fillcolor": "#fce7f3"})
     return attributes
 
 
 def source_heading_level(node_type: str) -> int | None:
-    match = re.fullmatch(r"source_heading(?:_(?:place|group))?(?:_(?P<level>[1-6]))?", node_type)
+    match = re.fullmatch(r"source_heading(?:_(?:place|group|artifact))?(?:_(?P<level>[1-6]))?", node_type)
     if match is None:
         return None
     return int(match.group("level") or 1)
 
 
 def source_heading_entity_type(node_type: str) -> str | None:
-    match = re.fullmatch(r"source_heading_(?P<entity>place|group)(?:_[1-6])?", node_type)
+    match = re.fullmatch(r"source_heading_(?P<entity>place|group|artifact)(?:_[1-6])?", node_type)
     return match.group("entity") if match else None
+
+
+def is_heading_node(node: CombinedCharacterNode | None) -> bool:
+    return node is not None and (node.is_heading or source_heading_level(node.node_type) is not None)
+
+
+def source_heading_level_for_node(node: CombinedCharacterNode | None) -> int | None:
+    if node is None:
+        return None
+    if node.is_heading:
+        return node.heading_level or 1
+    return source_heading_level(node.node_type)
+
+
+def source_heading_entity_type_for_node(node: CombinedCharacterNode | None) -> str | None:
+    if node is None:
+        return None
+    if node.is_heading:
+        return node.node_type if node.node_type in {"place", "group", "artifact"} else None
+    return source_heading_entity_type(node.node_type)
 
 
 def dot_attributes(attributes: dict[str, Any]) -> str:
@@ -1352,9 +1495,9 @@ def graph_column_groups(
         key = compact(node.name)
         if node.node_type == "family":
             groups["column_0_family_names"].append(node_id)
-        elif node.node_type == "group":
+        elif node.node_type in {"group", "artifact"}:
             groups["column_0_family_names"].append(node_id)
-        elif node.node_type == "source_document":
+        elif is_source_root_node(node):
             groups["column_0_family_names"].append(node_id)
         elif node.node_type == "place" and main_place_keys:
             groups["column_3_places"].append(node_id)
@@ -1411,29 +1554,32 @@ def markdown_lore_column_0_name(column_layout: str) -> str:
 
 
 def markdown_lore_column_group(node: CombinedCharacterNode, column_layout: str) -> str:
-    if node.node_type == "source_document":
+    if is_source_root_node(node):
         return markdown_lore_column_0_name(column_layout)
+    heading_level = source_heading_level_for_node(node)
     if column_layout == "place_lore_directory":
+        if heading_level is not None:
+            heading_level = min(3, heading_level)
+            return f"column_{heading_level}_markdown_heading_{heading_level}"
         if node.node_type == "place":
             return "column_1_markdown_heading_1"
         if node.node_type == "group":
             return "column_4_character_connections"
-        heading_level = source_heading_level(node.node_type)
-        if heading_level is not None:
-            heading_level = min(3, heading_level)
-            return f"column_{heading_level}_markdown_heading_{heading_level}"
+        if node.node_type == "artifact":
+            return "column_4_character_connections"
         if node.node_type == "character":
             return "column_4_character_connections"
         return "column_4_character_connections"
     if column_layout == "session_note_lore_directory":
-        if node.node_type == "group":
-            return "column_2_markdown_heading_2"
-        if node.node_type == "place":
-            return "column_1_markdown_heading_1"
-        heading_level = source_heading_level(node.node_type)
         if heading_level is not None:
             heading_level = min(3, heading_level)
             return f"column_{heading_level}_markdown_heading_{heading_level}"
+        if node.node_type == "group":
+            return "column_2_markdown_heading_2"
+        if node.node_type == "artifact":
+            return "column_2_markdown_heading_2"
+        if node.node_type == "place":
+            return "column_1_markdown_heading_1"
         if node.node_type == "character":
             return "column_4_character_connections"
         return "column_4_character_connections"
@@ -1441,11 +1587,14 @@ def markdown_lore_column_group(node: CombinedCharacterNode, column_layout: str) 
         return "column_0_source_documents_places"
     if column_layout == "place_lore" and node.node_type == "group":
         return "column_0_source_documents_places"
+    if column_layout == "place_lore" and node.node_type == "artifact":
+        return "column_0_source_documents_places"
     if column_layout == "session_note_lore" and node.node_type == "place":
         return "column_0_source_documents"
     if column_layout == "session_note_lore" and node.node_type == "group":
         return "column_2_markdown_heading_2"
-    heading_level = source_heading_level(node.node_type)
+    if column_layout == "session_note_lore" and node.node_type == "artifact":
+        return "column_2_markdown_heading_2"
     if heading_level is not None:
         heading_level = min(3, heading_level)
         return f"column_{heading_level}_markdown_heading_{heading_level}"
@@ -1459,8 +1608,10 @@ def graph_column_node_type_rank(group_name: str, node_type: str) -> int:
         entity_type = source_heading_entity_type(node_type)
         return {
             "source_document": 0,
+            "note": 0,
             "place": 1,
             "group": 1,
+            "artifact": 1,
             "family": 2,
         }.get(entity_type or node_type, 3)
     if group_name in {

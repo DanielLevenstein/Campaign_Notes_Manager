@@ -29,6 +29,11 @@ Sunstone Mage College sits along the rocky outcrop beyond town, close enough to 
 
 Atlantia depends on the college more than it always admits. The college buys food, hires local labor, commissions repairs, and occasionally asks the town to tolerate experiments best discussed after the fact. In return, the town offers the college a human scale: gossip, errands, debts, music, and weathered common sense.
 
+## Moon Blade
+
+Arlen Voss recovered the Moon Blade from an old watch tower cache.
+Neal Lovington identified the Moon Blade as a relic tied to Atlantia's coastal wards.
+
 ## Surrounding Roads
 
 The inland road climbs toward the college and then breaks into smaller routes through farms, scrub woods, and old stone markers. The coast road is harsher, but it carries travelers who prefer the sea air or need to avoid attention.

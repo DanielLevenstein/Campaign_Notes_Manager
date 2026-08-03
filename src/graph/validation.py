@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+from src.graph.config import CharacterGraphConfig, load_character_graph_config
 from src.graph.schema import SCHEMA_VERSION, CharacterGraph
 
 
-def validate_graph(graph: CharacterGraph, expected_source_hash: str | None = None) -> list[str]:
+def validate_graph(
+    graph: CharacterGraph,
+    expected_source_hash: str | None = None,
+    *,
+    config: CharacterGraphConfig | None = None,
+) -> list[str]:
     warnings: list[str] = []
+    config = config or load_character_graph_config()
+    valid_edge_types = config.valid_edge_types
     graph_node_ids = set(graph.characters) | set(graph.attributes) | set(graph.places)
     if graph.schema_version != SCHEMA_VERSION:
         warnings.append(f"Schema version mismatch: expected {SCHEMA_VERSION}, found {graph.schema_version}.")
@@ -28,6 +36,9 @@ def validate_graph(graph: CharacterGraph, expected_source_hash: str | None = Non
         if place_id not in graph.embeddings:
             warnings.append(f"Place `{place_id}` has no embedding record.")
     for relationship in graph.relationships:
+        relationship_type = relationship.relationship_type.strip().lower()
+        if relationship_type not in valid_edge_types:
+            warnings.append(f"Relationship type `{relationship.relationship_type}` is not configured.")
         if relationship.source not in graph_node_ids:
             warnings.append(f"Relationship source `{relationship.source}` is missing from graph nodes.")
         if relationship.target not in graph_node_ids:

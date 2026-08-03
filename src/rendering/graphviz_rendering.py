@@ -16,6 +16,7 @@ from src.graph.combined_graph import (
     combined_relationship_rows,
     compact,
     dedupe_combined_edges,
+    is_heading_node,
     is_lore_source_node,
     is_session_notes_node,
     other_connection_rows,
@@ -120,6 +121,27 @@ GROUP_HEADING_SUFFIXES = {
     "Guild",
     "Order",
 }
+ARTIFACT_HEADING_SUFFIXES = {
+    "Amulet",
+    "Blade",
+    "Book",
+    "Crown",
+    "Gem",
+    "Key",
+    "Lantern",
+    "Map",
+    "Mask",
+    "Orb",
+    "Relic",
+    "Ring",
+    "Scroll",
+    "Shard",
+    "Sigil",
+    "Staff",
+    "Stone",
+    "Sword",
+}
+SEMANTIC_LORE_NODE_TYPES = {"place", "group", "artifact"}
 
 
 def render_knowledge_graph_tabs(
@@ -204,15 +226,14 @@ def render_knowledge_graph_tabs(
                         title=SESSION_FILE_VIEW_TAB,
                         key="place_lore_directory_file_view_source_file",
                     )
-            elif tab_name == SESSION_HEADING_VIEW_TAB:
-                if active_main_tab == "Places":
-                    render_session_file_view_tab(
-                        combined=combined,
-                        label_font_color=label_font_color,
-                        column_layout="place_lore_directory",
-                        title=SESSION_HEADING_VIEW_TAB,
-                        key="places_directory_file_view_source_file",
-                    )
+            elif tab_name == SESSION_HEADING_VIEW_TAB and active_main_tab == "Session Notes":
+                render_session_file_view_tab(
+                    combined=combined,
+                    label_font_color=label_font_color,
+                    column_layout="place_lore_directory",
+                    title=SESSION_HEADING_VIEW_TAB,
+                    key="places_directory_file_view_source_file",
+                )
             elif tab_name == PLACES_FILE_VIEW_TAB:
                 if active_main_tab == "Places":
                     render_place_file_view_tab(
@@ -339,9 +360,10 @@ def render_place_heading_view_tab(
     hide_source_document_roots=True,
 ) -> None:
     st.subheader(title)
-    projected_graph = markdown_header_lore_graph(
+    projected_graph = place_lore_graph(
         combined,
         hide_source_document_roots=hide_source_document_roots,
+        fanout_linked_characters=True,
     )
     selected_heading_id = render_lore_heading_filter(
         combined,
@@ -353,10 +375,11 @@ def render_place_heading_view_tab(
     if selected_heading_id is None:
         st.info("Add Markdown Headings To Place Lore To Use Section View.")
         return
-    place_graph = markdown_header_lore_graph(
+    place_graph = place_lore_graph(
         combined,
         heading_id=selected_heading_id,
         hide_source_document_roots=hide_source_document_roots,
+        fanout_linked_characters=True,
     )
     if not place_graph.characters:
         st.info("No Place Lore Connections Were Found For This Heading.")
@@ -774,7 +797,18 @@ def lore_heading_options(
         source_label = Path(source.source_file).name or source.name
         for heading in headings:
             if allowed_heading_ids is not None and heading.id not in allowed_heading_ids:
-                continue
+                semantic_type = markdown_heading_entity_type(heading.text, graph)
+                display_name = semantic_heading_display_name(heading.text) if semantic_type else heading.text
+                semantic_replacement_visible = (
+                    semantic_type is not None
+                    and projected_graph is not None
+                    and any(
+                        node.node_type == semantic_type and compact(node.name) == compact(display_name)
+                        for node in projected_graph.characters.values()
+                    )
+                )
+                if not semantic_replacement_visible:
+                    continue
             options.append((f"{source_label} / H{heading.level}: {heading.text}", heading.id))
     return sorted(options, key=lambda item: item[0].lower())
 
@@ -790,7 +824,7 @@ def place_lore_graph(
     place_ids = {
         node_id
         for node_id, node in graph.characters.items()
-        if node.node_type == "place"
+        if node.node_type == "place" and not is_lore_source_node(node)
     }
     if not place_ids:
         return CombinedCharacterGraph()
@@ -803,7 +837,7 @@ def place_lore_graph(
     source_document_ids = {
         node_id
         for node_id, node in graph.characters.items()
-        if node_id in place_document_ids and node.node_type == "source_document"
+        if node_id in place_document_ids and is_lore_source_node(node)
     }
     if source_file is not None:
         source_document_ids = filter_source_document_ids_by_file(graph, source_document_ids, source_file)
@@ -828,9 +862,11 @@ def place_lore_graph(
                 id=heading.id,
                 name=display_name,
                 source_file=source.source_file,
-                node_type=markdown_heading_node_type(heading.level, semantic_type),
+                node_type=semantic_type or "note",
+                is_heading=True,
+                heading_level=heading.level,
             )
-            if semantic_type in {"place", "group"}:
+            if semantic_type in SEMANTIC_LORE_NODE_TYPES:
                 semantic_heading_ids_by_source.setdefault(source_id, set()).add(heading.id)
                 if semantic_type == "place":
                     root_place_ids.add(heading.id)
@@ -858,7 +894,7 @@ def place_lore_graph(
         source_id = edge.source if edge.source in place_document_ids else edge.target
         place_id = edge.target if edge.source in place_document_ids else edge.source
         source = graph.characters.get(source_id)
-        if source is not None and source.node_type == "source_document":
+        if is_lore_source_node(source):
             place = graph.characters.get(place_id)
             heading = markdown_subheading_for_edge(source, source_headings.get(source_id, []), edge, place)
             edge_source = heading.id if heading is not None else source_id
@@ -891,9 +927,9 @@ def place_lore_graph(
         if edge.source in place_ids or edge.target in place_ids:
             source = graph.characters.get(edge.source)
             target = graph.characters.get(edge.target)
-            if source is not None and source.node_type == "source_document":
+            if is_lore_source_node(source):
                 continue
-            if target is not None and target.node_type == "source_document":
+            if is_lore_source_node(target):
                 continue
             place_id = edge.source if edge.source in place_ids else edge.target
             if source_file is not None and place_id not in root_place_ids:
@@ -916,8 +952,6 @@ def place_lore_graph(
             continue
         if is_disallowed_place_graph_character(adjacent):
             continue
-        if not source_to_place_ids.get(source_id, set()):
-            continue
         heading = markdown_subheading_for_edge(
             graph.characters[source_id],
             source_headings.get(source_id, []),
@@ -929,6 +963,8 @@ def place_lore_graph(
         else:
             semantic_heading_id = nearest_semantic_heading_id(heading, projected_nodes, source_headings.get(source_id, []))
             character_source_ids = {semantic_heading_id or heading.id}
+        if not character_source_ids:
+            continue
         connected_ids.add(adjacent_id)
         for character_source_id in character_source_ids:
             append_projected_edge(
@@ -954,7 +990,7 @@ def place_lore_graph(
             **{
                 node_id: node
                 for node_id, node in graph.characters.items()
-                if node_id in connected_ids and node.node_type in {"source_document", "place", "group", "character"}
+                if node_id in connected_ids and node.node_type in {"source_document", "note", "place", "group", "artifact", "character"}
             },
             **projected_nodes,
         },
@@ -986,7 +1022,7 @@ def markdown_header_lore_graph(
     source_document_ids = {
         node_id
         for node_id, node in graph.characters.items()
-        if node.source_file and is_session_note_node(node)
+        if node.source_file and (is_session_note_node(node) or is_place_source_document_node(node))
     }
     if source_file is not None:
         source_document_ids = filter_source_document_ids_by_file(graph, source_document_ids, source_file)
@@ -1014,9 +1050,11 @@ def markdown_header_lore_graph(
                     id=heading.id,
                     name=display_name,
                     source_file=source.source_file,
-                    node_type=markdown_heading_node_type(heading.level, semantic_type),
+                    node_type=semantic_type or "note",
+                    is_heading=True,
+                    heading_level=heading.level,
                 )
-                if semantic_type in {"place", "group"}:
+                if semantic_type in SEMANTIC_LORE_NODE_TYPES:
                     root_lore_ids.add(heading.id)
                 connected_ids.add(heading.id)
             append_projected_edge(
@@ -1034,9 +1072,9 @@ def markdown_header_lore_graph(
         source_id = edge.source if edge.source in source_document_ids else edge.target
         adjacent_id = edge.target if edge.source in source_document_ids else edge.source
         adjacent = graph.characters.get(adjacent_id)
-        if adjacent is None or adjacent.node_type not in {"character", "place", "group"}:
+        if adjacent is None or adjacent.node_type not in {"character", "place", "group", "artifact"}:
             continue
-        if adjacent.node_type in {"place", "group"}:
+        if adjacent.node_type in SEMANTIC_LORE_NODE_TYPES:
             root_lore_ids.add(adjacent_id)
         heading = markdown_subheading_for_edge(
             graph.characters[source_id],
@@ -1056,7 +1094,7 @@ def markdown_header_lore_graph(
             )
         if edge_source == adjacent_id:
             continue
-        relationship_label = edge.relationship_label if adjacent.node_type in {"character", "place"} else ""
+        relationship_label = edge.relationship_label if adjacent.node_type in {"character", "place", "artifact"} else ""
         if (
             heading is not None
             and heading.id in semantic_entity_id_by_heading_id
@@ -1099,7 +1137,7 @@ def markdown_header_lore_graph(
             **{
                 node_id: node
                 for node_id, node in graph.characters.items()
-                if node_id in connected_ids and node.node_type in {"source_document", "group", "place", "character"}
+                if node_id in connected_ids and node.node_type in {"source_document", "note", "group", "place", "artifact", "character"}
             },
             **projected_nodes,
         },
@@ -1408,14 +1446,14 @@ def contextual_heading_child_pairs(
     pairs: list[tuple[str, str]] = []
     for source_id in child_ids:
         source = nodes.get(source_id)
-        if source is None or source.node_type not in {"place", "group"}:
+        if source is None or source.node_type not in SEMANTIC_LORE_NODE_TYPES:
             continue
         for target_id in child_ids:
             target = nodes.get(target_id)
             if (
                 target_id == source_id
                 or target is None
-                or target.node_type not in {"character", "place", "group", "family"}
+                or target.node_type not in {"character", "place", "group", "artifact", "family"}
             ):
                 continue
             pairs.append((source_id, target_id))
@@ -1463,7 +1501,9 @@ def deduplicate_source_document_nodes(graph: CombinedCharacterGraph) -> None:
 def markdown_heading_level(node: CombinedCharacterNode | None) -> int | None:
     if node is None:
         return None
-    match = re.fullmatch(r"source_heading(?:_(?:place|group))?_(?P<level>\d+)", node.node_type)
+    if node.is_heading:
+        return node.heading_level or 1
+    match = re.fullmatch(r"source_heading(?:_(?:place|group|artifact))?_(?P<level>\d+)", node.node_type)
     return int(match.group("level")) if match else None
 
 
@@ -1672,7 +1712,7 @@ def source_heading_node_id(source_id: str, line_index: int, text: str) -> str:
 
 
 def markdown_heading_node_type(level: int, semantic_type: str | None = None) -> str:
-    if semantic_type in {"place", "group"}:
+    if semantic_type in SEMANTIC_LORE_NODE_TYPES:
         return f"source_heading_{semantic_type}_{level}"
     return f"source_heading_{level}"
 
@@ -1681,8 +1721,10 @@ def markdown_heading_entity_type(text: str, graph: CombinedCharacterGraph) -> st
     display_name = semantic_heading_display_name(text)
     display_key = compact(display_name)
     for node in graph.characters.values():
-        if compact(node.name) == display_key and node.node_type in {"place", "group"}:
+        if compact(node.name) == display_key and node.node_type in SEMANTIC_LORE_NODE_TYPES:
             return node.node_type
+    if looks_like_artifact_heading(display_name):
+        return "artifact"
     if looks_like_group_heading(display_name):
         return "group"
     if looks_like_place_heading(display_name):
@@ -1696,7 +1738,7 @@ def matching_semantic_entity_id(
     semantic_type: str | None,
     source_file: str,
 ) -> str | None:
-    if semantic_type not in {"place", "group"}:
+    if semantic_type not in SEMANTIC_LORE_NODE_TYPES:
         return None
     display_key = compact(display_name)
     matches = [
@@ -1736,6 +1778,14 @@ def looks_like_group_heading(text: str) -> bool:
     )
 
 
+def looks_like_artifact_heading(text: str) -> bool:
+    lowered = text.lower()
+    return any(
+        lowered == suffix.lower() or lowered.endswith(f" {suffix.lower()}")
+        for suffix in ARTIFACT_HEADING_SUFFIXES
+    )
+
+
 def semantic_heading_for_node(
     node: CombinedCharacterNode | None,
     heading: MarkdownSubheading | None,
@@ -1762,7 +1812,7 @@ def nearest_semantic_heading_id(
     current_id = heading.id
     while current_id:
         node = projected_nodes.get(current_id)
-        if semantic_heading_entity_type(node) in {"place", "group"}:
+        if semantic_heading_entity_type(node) in SEMANTIC_LORE_NODE_TYPES:
             return current_id
         current_heading = heading_by_id.get(current_id)
         current_id = current_heading.parent_id if current_heading is not None else ""
@@ -1772,7 +1822,9 @@ def nearest_semantic_heading_id(
 def semantic_heading_entity_type(node: CombinedCharacterNode | None) -> str | None:
     if node is None:
         return None
-    match = re.fullmatch(r"source_heading_(?P<entity>place|group)_\d+", node.node_type)
+    if node.is_heading:
+        return node.node_type if node.node_type in SEMANTIC_LORE_NODE_TYPES else None
+    match = re.fullmatch(r"source_heading_(?P<entity>place|group|artifact)_\d+", node.node_type)
     return match.group("entity") if match else None
 
 
@@ -2002,7 +2054,7 @@ def edge_has_character_connection(edge: CombinedRelationshipEdge, graph: Combine
 
 
 def is_markdown_heading_node(node: CombinedCharacterNode | None) -> bool:
-    return node is not None and node.node_type.startswith("source_heading")
+    return is_heading_node(node)
 
 
 def prune_unassociated_markdown_headings(
@@ -2068,7 +2120,7 @@ def prune_unassociated_semantic_heading_entities(
             if entity_id not in semantic_entity_ids:
                 continue
             adjacent = all_nodes.get(adjacent_id)
-            if adjacent is not None and adjacent.node_type in {"character", "place"}:
+            if adjacent is not None and adjacent.node_type in {"character", "place", "artifact"}:
                 associated_entity_ids.add(entity_id)
     removed_entity_ids = semantic_entity_ids - associated_entity_ids
     for entity_id in removed_entity_ids:
@@ -2194,7 +2246,7 @@ def graph_for_sources(
         characters={
             node_id: node
             for node_id, node in graph.characters.items()
-            if node_id in visible_ids and node.node_type in {"character", "place", "source_document"}
+            if node_id in visible_ids and node.node_type in {"character", "place", "artifact", "source_document"}
         },
         edges=[
             edge
@@ -2282,14 +2334,12 @@ def is_hidden_full_knowledge_source_node(node: CombinedCharacterNode | None) -> 
 
 def is_place_lore_node(node: CombinedCharacterNode) -> bool:
     source_file = node.source_file.replace("\\", "/")
-    return is_place_lore_path(Path(source_file)) or (
-        node.node_type == "source_document" and "/places/" in source_file.lower()
-    )
+    return is_place_lore_path(Path(source_file)) or (is_lore_source_node(node) and "/places/" in source_file.lower())
 
 
 def is_place_source_document_node(node: CombinedCharacterNode) -> bool:
     source_file = node.source_file.replace("\\", "/")
-    return node.node_type == "source_document" and is_place_lore_path(Path(source_file))
+    return is_lore_source_node(node) and is_place_lore_path(Path(source_file))
 
 
 def edge_connects(edge, left_ids: set[str], right_ids: set[str]) -> bool:
@@ -2299,7 +2349,7 @@ def edge_connects(edge, left_ids: set[str], right_ids: set[str]) -> bool:
 
 
 def is_session_note_node(node: CombinedCharacterNode) -> bool:
-    if node.node_type == "source_document":
+    if is_lore_source_node(node) or node.node_type == "character":
         source_file = node.source_file.replace("\\", "/").lower()
         return (
             "/session_notes/" in source_file

@@ -219,6 +219,11 @@ def knowledge_graph_view_specs() -> list[dict[str, object]]:
             "screenshot": "Places_Graph_Heading_View.png",
         },
         {
+            "graph_family": "Places Graph",
+            "view": "Directory File View",
+            "screenshot": "Places_Graph_Directory_File_View.png",
+        },
+        {
             "graph_family": "Session Notes Graph",
             "view": "Location View",
             "screenshot": "Session_Notes_Graph_Location_View.png",
@@ -227,7 +232,7 @@ def knowledge_graph_view_specs() -> list[dict[str, object]]:
             "graph_family": "Session Notes Graph",
             "view": "Directory File View",
             "screenshot": "Session_Notes_Graph_Directory_File_View.png",
-        }
+        },
     ]
 
 
@@ -250,6 +255,36 @@ def capture_graph_view_screenshot(page, graph_expander, view_name: str, screensh
     expect(graph_expander.get_by_role("img").first).to_be_visible(timeout=10000)
     graph_expander.scroll_into_view_if_needed()
     page.screenshot(path=str(screenshot_path), full_page=True)
+
+
+def graphviz_node_polygon_point_count(graph_panel, label: str) -> int:
+    return graph_panel.evaluate(
+        """(root, label) => {
+            const svg = [...root.querySelectorAll("svg")]
+                .find((candidate) => candidate.querySelector("g.node"));
+            if (!svg) {
+                throw new Error("Graphviz SVG was not rendered.");
+            }
+            const node = [...svg.querySelectorAll("g.node")]
+                .find((candidate) => [...candidate.querySelectorAll("text")]
+                    .some((text) => (text.textContent || "").trim() === label));
+            if (!node) {
+                throw new Error(`Graphviz node label was not rendered: ${label}`);
+            }
+            const polygon = node.querySelector("polygon");
+            if (polygon) {
+                return (polygon.getAttribute("points") || "")
+                    .trim()
+                    .split(/\\s+/)
+                    .filter(Boolean)
+                    .length;
+            }
+            const artifactPath = [...node.querySelectorAll("path")]
+                .find((path) => (path.getAttribute("fill") || "").toLowerCase() === "#fce7f3");
+            return artifactPath ? 6 : 0;
+        }""",
+        label,
+    )
 
 
 def visible_connection_table_rows(graph_expander) -> list[list[str]]:
@@ -292,6 +327,7 @@ def assert_graph_view_spec_set(fixtures: list[dict[str, object]]) -> None:
         ("Characters Graph", "Party View"),
         ("Places Graph", "Location View"),
         ("Places Graph", "Heading View"),
+        ("Places Graph", "Directory File View"),
         ("Session Notes Graph", "Location View"),
         ("Session Notes Graph", "Directory File View"),
     }
@@ -810,6 +846,18 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
         expect(place_graph_panel.get_by_text("Family Tree", exact=True)).not_to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_text("Indigo Cult", exact=True)).not_to_be_visible(timeout=10000)
 
+        heading_tab = graph_expander.get_by_role("tab", name="Heading View", exact=True)
+        heading_tab.click()
+        heading_panel = graph_expander.get_by_role("tabpanel", name="Heading View")
+        heading_select = heading_panel.get_by_role("combobox", name="Place Lore Heading", exact=True)
+        expect(heading_select).to_be_visible(timeout=10000)
+        heading_select.click()
+        page.keyboard.type("Moon Blade")
+        page.keyboard.press("Enter")
+        expect(heading_panel.get_by_role("img").first).to_be_visible(timeout=10000)
+        expect(heading_panel.get_by_text("Moon Blade", exact=True).first).to_be_visible(timeout=10000)
+        assert graphviz_node_polygon_point_count(heading_panel, "Moon Blade") >= 6
+
         browser.close()
 
 
@@ -925,6 +973,59 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
 
     assert STRUCTURED_KNOWLEDGE_GRAPH_FULL_SCREENSHOT.exists()
     assert STRUCTURED_KNOWLEDGE_GRAPH_FULL_SCREENSHOT.stat().st_size > 0
+
+
+def test_session_note_directory_file_view_can_hide_headings_and_keep_context_edges(isolated_character_app):
+    app_url, _docs_lore_dir, _characters_dir, _places_dir, session_notes_dir, _data_dir = isolated_character_app
+    shutil.copy2(
+        ROOT_DIR / "tests" / "fixtures" / "session_notes" / "complex_session_graph.md",
+        session_notes_dir / "complex_session_graph.md",
+    )
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 1000})
+        page.goto(app_url, wait_until="networkidle")
+        page.get_by_role("tab", name="Session Notes", exact=True).click()
+        expect(page.get_by_role("heading", name="Session Notes", exact=True)).to_be_visible(timeout=10000)
+
+        graph_expander = open_combined_graph_expander(page)
+        directory_tab = graph_expander.get_by_role("tab", name="Directory File View", exact=True)
+        expect(directory_tab).to_be_visible(timeout=10000)
+        directory_tab.click()
+        directory_panel = graph_expander.get_by_role("tabpanel", name="Directory File View")
+
+        file_select = directory_panel.get_by_role("combobox", name="Session Note File", exact=True)
+        expect(file_select).to_be_visible(timeout=10000)
+        expect(file_select).to_have_value("complex_session_graph.md", timeout=10000)
+
+        for label in ("Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
+            checkbox = directory_panel.get_by_label(label, exact=True)
+            expect(checkbox).to_be_visible(timeout=10000)
+            if not checkbox.is_checked():
+                checkbox.click(force=True)
+
+        expect(directory_panel.get_by_role("img").first).to_be_visible(timeout=10000)
+        for expected_name in (
+            "Pixi Kingdom",
+            "Tharevon",
+            "Mira Vale",
+            "Indigo Cult",
+            "Jory Ravenmark",
+            "Neal Lovington",
+            "Arlen Voss",
+            "Moon Gate",
+            "Moon Blade",
+        ):
+            expect(directory_panel.get_by_text(expected_name, exact=True).first).to_be_visible(timeout=10000)
+        assert graphviz_node_polygon_point_count(directory_panel, "Moon Blade") >= 6
+
+        table_text = " ".join(" ".join(row) for row in visible_connection_table_rows(directory_panel))
+        assert "Tharevon traveled through the Pixi Kingdom." in table_text
+        assert "Jory Ravenmark and Neal Lovington investigated the Indigo Cult." in table_text
+        assert "They traced the Indigo Cult to the Moon Gate." in table_text
+        assert "Arlen Voss recovered the Moon Blade." in table_text
+        browser.close()
 
 
 def test_ui_fills_only_visible_character_editor_fields_and_saves(isolated_character_app):

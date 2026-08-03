@@ -21,12 +21,15 @@
 - Added the first presentation-layer graph view by routing Party View through a render-ready presentation contract, keeping the Phase 3 target focused on one stable working view rather than perfecting every graph tab.
 - Finished the manual source-root split by replacing stale `src.character_graph` imports with concrete `src.graph`, `src.extraction`, `src.ingest`, and `src.persistence` module imports, fixing Graphviz config path resolution after the move, and preserving hidden-heading evidence rows for character-only session sections.
 
-### Phase 2-3 Projection And Presentation Layer
+### Phase 2 Projection And Presentation Layer
 - Established the first projection-read model for combined graph rendering, including lore graph loading, source scanning, place source rows, derived lore relationships, character-sheet graph filtering, and root-node selection outside the Streamlit entry point.
 - Added projection tests that verify combined graph contracts, character-sheet filtering, graph loading through the projection layer, and guardrails that prevent `streamlit_app.py` from reintroducing direct graph assembly calls.
 - Introduced a render-ready presentation contract for relationship graph views and routed Party View through it as the first working end-to-end presentation-layer graph view.
 - Kept legacy Graphviz tab behavior in place for non-Party views while creating a stable vertical slice for the new architecture, so later work can migrate one view at a time instead of rewriting every tab at once.
 - Preserved tab-specific behavior for the current UI while narrowing the intended Phase 3 finish line to a single stable view backed by projection and presentation data.
+- Added artifact node styling to the Graphviz UI with a distinct hexagon border and matching heading-node support.
+- Completed Phase 2.2 by adding artifact graph-edge configuration, artifact extraction/projection support, and Playwright coverage for artifact nodes in Places heading view and Session Notes directory view fixtures.
+- Completed Phase 2.3 by moving graph node and edge allow-lists into split `config/nodes` and `config/edges` files, splitting compound connection labels into edge/node pairs, and deriving lore edge labels from combined evidence between connected nodes.
 
 # feature/knowledge_graph
 

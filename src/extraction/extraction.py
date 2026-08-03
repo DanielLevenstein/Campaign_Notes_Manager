@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 
 from src.graph.embeddings import build_embedding_record
+from src.graph.config import CharacterGraphConfig, load_character_graph_config
 from src.ingest.ingest import BackstoryDocument
 from src.graph.schema import (
     SCHEMA_VERSION,
@@ -15,6 +16,7 @@ from src.graph.schema import (
     PlaceNode,
     PrimaryCharacterRef,
     RelationshipEdge,
+    infer_source_node_type,
 )
 
 
@@ -136,12 +138,15 @@ def extract_character_graph(
     now = datetime.now().isoformat(timespec="seconds")
     sentences = split_sentences(document.raw_text)
     connection_rows = character_connection_rows(document.raw_text)
+    graph_config = load_character_graph_config()
     place_mentions = find_place_mentions(document.raw_text)
     mentioned_names = find_mentioned_names(document.raw_text, primary_name, stats)
 
+    primary_node_type = infer_document_node_type(document.raw_text, document.source_file, primary_name)
     characters: dict[str, CharacterNode] = {
         primary_id: CharacterNode(
             name=primary_name,
+            node_type=primary_node_type,
             aliases=[],
             role="primary character",
             summary=extract_primary_summary(document.raw_text, primary_name),
@@ -226,13 +231,18 @@ def extract_character_graph(
     for connection in connection_rows:
         connection_kind = (connection.get("table") or connection.get("source") or "").lower()
         relationship_label = connection.get("relationship") or connection.get("item") or "Referenced"
-        relationship_type = slugify(relationship_label) or "reference"
         value = connection.get("name") or connection.get("value") or connection.get("connection") or ""
-        if relationship_type == "family" and value.lower() in {"mother", "father", "parent"}:
-            value = f"{primary_name}'s {value}"
         evidence = limit_generated_evidence(
             connection.get("evidence") or f"{value} is listed in the Character Connections table."
         )
+        relationship_type, relationship_label, value = normalized_connection_edge(
+            relationship_label,
+            value,
+            evidence,
+            graph_config,
+        )
+        if relationship_type == "family" and value.lower() in {"mother", "father", "parent"}:
+            value = f"{primary_name}'s {value}"
         if not value:
             continue
         if connection_kind == "attributes":
@@ -261,12 +271,14 @@ def extract_character_graph(
             node_id = unique_character_id(characters, slugify(value))
             if node_id == primary_id:
                 continue
+            target_node_type = connection_target_node_type(value, relationship_type)
             characters.setdefault(
                 node_id,
                 CharacterNode(
                     name=value,
+                    node_type=target_node_type,
                     aliases=[],
-                    role=relationship_label.lower(),
+                    role=target_node_type if target_node_type != "character" else relationship_label.lower(),
                     summary=f"{value} is listed in {primary_name}'s Character Connections as {relationship_label.lower()}.",
                     source_spans=[evidence],
                 ),
@@ -316,6 +328,7 @@ def extract_character_graph(
             id=primary_id,
             name=primary_name,
             source_file=document.source_file,
+            node_type=primary_node_type,
         ),
         characters=characters,
         attributes=attributes,
@@ -482,6 +495,71 @@ def normalize_connection_header(value: str) -> str:
         "evidence": "evidence",
     }
     return aliases.get(key, key)
+
+
+def normalized_connection_edge(
+    relationship_label: str,
+    value: str,
+    evidence: str,
+    graph_config: CharacterGraphConfig,
+) -> tuple[str, str, str]:
+    label, target_value = split_connection_label_target(relationship_label, value, graph_config)
+    inferred_type = graph_config.infer_edge_type_from_evidence(evidence, label)
+    if inferred_type == "reference":
+        inferred_type = graph_config.canonical_edge_type(label) or slugify(label) or "reference"
+    return inferred_type, graph_config.edge_label(inferred_type), target_value
+
+
+def split_connection_label_target(
+    relationship_label: str,
+    value: str,
+    graph_config: CharacterGraphConfig,
+) -> tuple[str, str]:
+    cleaned_label = " ".join(relationship_label.split()).strip()
+    cleaned_value = value.strip()
+    words = cleaned_label.split()
+    if len(words) < 2:
+        return cleaned_label or "Referenced", cleaned_value
+    first_word = words[0]
+    remainder = " ".join(words[1:]).strip()
+    first_type = graph_config.canonical_edge_type(first_word)
+    if first_type is None:
+        return cleaned_label, cleaned_value
+    if not cleaned_value:
+        return graph_config.edge_label(first_type), remainder
+    if compact_key(remainder) and compact_key(remainder) in compact_key(cleaned_value):
+        return graph_config.edge_label(first_type), cleaned_value
+    return cleaned_label, cleaned_value
+
+
+def connection_target_node_type(value: str, relationship_type: str) -> str:
+    if relationship_type == "artifact":
+        return "artifact"
+    if likely_group_name(value):
+        return "group"
+    return "character"
+
+
+def infer_document_node_type(text: str, source_file: str, primary_name: str) -> str:
+    source_type = infer_source_node_type(source_file)
+    if source_type != "note":
+        return source_type
+    normalized_name = compact_key(primary_name)
+    if normalized_name in {"sessionnote", "sessionnotes"}:
+        return "note"
+    if re.search(r"^#{1,3}\s+Place\s+Summary\b", text, flags=re.MULTILINE | re.IGNORECASE):
+        return "place"
+    if extract_character_stats(text):
+        return "character"
+    return "character"
+
+
+def likely_group_name(value: str) -> bool:
+    normalized = value.strip().lower()
+    return any(
+        token in normalized.split() or normalized.endswith(f" {token}")
+        for token in {"cult", "guild", "order", "family", "clan", "council", "kingdom"}
+    )
 
 
 def normalize_detail_key(value: str) -> str:

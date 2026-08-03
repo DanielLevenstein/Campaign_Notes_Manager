@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 MAX_DERIVED_CHARACTERS = 18
 MAX_DERIVED_PLACES = 9
 MAX_DERIVED_GROUPS = 6
+MAX_DERIVED_ARTIFACTS = 6
 
 ENTITY_PATTERN = re.compile(
     r"\b(?:(?:Mr|Mrs|Ms|Mx|Dr)\.?\s+)?[A-Z][A-Za-z]+(?:\s+(?:the\s+)?[A-Z][A-Za-z]+){0,3}\b"
@@ -149,6 +150,26 @@ PLACE_WORDS = {
     "underdark",
     "village",
 }
+ARTIFACT_WORDS = {
+    "amulet",
+    "blade",
+    "book",
+    "crown",
+    "gem",
+    "key",
+    "lantern",
+    "map",
+    "mask",
+    "orb",
+    "relic",
+    "ring",
+    "scroll",
+    "shard",
+    "sigil",
+    "staff",
+    "stone",
+    "sword",
+}
 CANONICAL_NAMES = {
     "dizelvad": "Dizlevad",
     "moningstar": "Morningstar",
@@ -186,6 +207,7 @@ def derived_lore_entity_relationships(
     max_characters: int = MAX_DERIVED_CHARACTERS,
     max_places: int = MAX_DERIVED_PLACES,
     max_groups: int = MAX_DERIVED_GROUPS,
+    max_artifacts: int = MAX_DERIVED_ARTIFACTS,
 ) -> list[dict[str, str]]:
     candidates = extract_lore_entity_candidates(
         text,
@@ -204,13 +226,18 @@ def derived_lore_entity_relationships(
         [candidate for candidate in candidates if candidate.entity_type == "group"],
         key=lambda candidate: (-candidate.score, candidate.name.lower()),
     )[:max_groups]
+    artifacts = sorted(
+        [candidate for candidate in candidates if candidate.entity_type == "artifact"],
+        key=lambda candidate: (-candidate.score, candidate.name.lower()),
+    )[:max_artifacts]
 
     relationships = family_heading_relationships(source_id, source_name, source_type, source_file, text)
-    for candidate in [*characters, *places, *groups]:
+    for candidate in [*characters, *places, *groups, *artifacts]:
         relationship = {
             "character": "Mentioned",
             "place": "Location",
             "group": "Mentioned",
+            "artifact": "Artifact",
         }.get(candidate.entity_type, "Mentioned")
         evidence_items = candidate.evidence or [""]
         for evidence in evidence_items:
@@ -296,7 +323,7 @@ def extract_lore_entity_candidates(
         aliases_by_key.setdefault(key, set()).update({raw_name, candidate, display_names[key]})
         counts[key] += 1
 
-    sentences = split_sentences(text)
+    sentences = split_sentences(candidate_text)
     candidates: list[EntityCandidate] = []
     for key, count in group_counts.items():
         name = group_display_names[key]
@@ -311,14 +338,24 @@ def extract_lore_entity_candidates(
         )
     for key, count in counts.items():
         name = display_names[key]
-        entity_type = "place" if key in known_places or looks_like_place(name) else "character"
+        if key in known_places or looks_like_place(name):
+            entity_type = "place"
+        elif looks_like_artifact(name):
+            entity_type = "artifact"
+        else:
+            entity_type = "character"
         if entity_type == "character" and key not in known_characters and count < minimum_character_mentions(name):
             continue
         candidate = EntityCandidate(
             name=name,
             entity_type=entity_type,
             count=count,
-            evidence=evidence_for_entity(sentences, name, aliases_by_key.get(key, set())),
+            evidence=evidence_for_entity(
+                sentences,
+                name,
+                aliases_by_key.get(key, set()),
+                include_short_aliases=entity_type != "artifact",
+            ),
             known=key in known_characters or key in known_places,
         )
         candidates.append(candidate)
@@ -392,12 +429,24 @@ def looks_like_place(name: str) -> bool:
     return any(word in lowered for word in PLACE_WORDS)
 
 
-def evidence_for_entity(sentences: list[str], name: str, aliases: set[str] | None = None) -> list[str]:
+def looks_like_artifact(name: str) -> bool:
+    lowered = name.lower()
+    return any(lowered == word or lowered.endswith(f" {word}") for word in ARTIFACT_WORDS)
+
+
+def evidence_for_entity(
+    sentences: list[str],
+    name: str,
+    aliases: set[str] | None = None,
+    *,
+    include_short_aliases: bool = True,
+) -> list[str]:
     refs = {name, *(aliases or set())}
-    for alias in list(refs):
-        parts = alias.split()
-        if len(parts) > 1 and parts[0].lower().rstrip(".") not in {"mr", "mrs", "ms", "mx", "dr"}:
-            refs.add(parts[0])
+    if include_short_aliases:
+        for alias in list(refs):
+            parts = alias.split()
+            if len(parts) > 1 and parts[0].lower().rstrip(".") not in {"mr", "mrs", "ms", "mx", "dr"}:
+                refs.add(parts[0])
     return [
         sentence
         for sentence in sentences

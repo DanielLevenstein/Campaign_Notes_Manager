@@ -12,6 +12,7 @@ class PrimaryCharacterRef:
     id: str
     name: str
     source_file: str
+    node_type: str = "note"
 
 
 @dataclass
@@ -25,6 +26,7 @@ class Alignment:
 @dataclass
 class CharacterNode:
     name: str
+    node_type: str = "character"
     aliases: list[str] = field(default_factory=list)
     role: str = "unknown"
     summary: str = ""
@@ -38,6 +40,7 @@ class CharacterNode:
 class AttributeNode:
     value: str
     attribute_type: str
+    node_type: str = "attribute"
     aliases: list[str] = field(default_factory=list)
     summary: str = ""
     source_spans: list[str] = field(default_factory=list)
@@ -46,6 +49,7 @@ class AttributeNode:
 @dataclass
 class PlaceNode:
     name: str
+    node_type: str = "place"
     place_type: str = "place"
     aliases: list[str] = field(default_factory=list)
     summary: str = ""
@@ -96,7 +100,7 @@ class CharacterGraph:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> CharacterGraph:
-        primary = PrimaryCharacterRef(**payload["primary_character"])
+        primary = _primary_character_ref_from_dict(payload["primary_character"])
         characters = {
             character_id: _character_node_from_dict(node)
             for character_id, node in payload.get("characters", {}).items()
@@ -131,11 +135,21 @@ class CharacterGraph:
         )
 
 
+def _primary_character_ref_from_dict(payload: dict[str, Any]) -> PrimaryCharacterRef:
+    return PrimaryCharacterRef(
+        id=payload["id"],
+        name=payload["name"],
+        source_file=payload["source_file"],
+        node_type=payload.get("node_type") or infer_source_node_type(payload.get("source_file", "")),
+    )
+
+
 def _character_node_from_dict(payload: dict[str, Any]) -> CharacterNode:
     alignment_payload = payload.get("alignment")
     alignment = Alignment(**alignment_payload) if isinstance(alignment_payload, dict) else Alignment()
     return CharacterNode(
         name=payload.get("name", ""),
+        node_type=payload.get("node_type", "character"),
         aliases=list(payload.get("aliases", [])),
         role=payload.get("role", "unknown"),
         summary=payload.get("summary", ""),
@@ -150,6 +164,7 @@ def _attribute_node_from_dict(payload: dict[str, Any]) -> AttributeNode:
     return AttributeNode(
         value=payload.get("value", payload.get("name", "")),
         attribute_type=payload.get("attribute_type", payload.get("role", "unknown")),
+        node_type=payload.get("node_type", "attribute"),
         aliases=list(payload.get("aliases", [])),
         summary=payload.get("summary", ""),
         source_spans=list(payload.get("source_spans", [])),
@@ -159,6 +174,7 @@ def _attribute_node_from_dict(payload: dict[str, Any]) -> AttributeNode:
 def _place_node_from_dict(payload: dict[str, Any]) -> PlaceNode:
     return PlaceNode(
         name=payload.get("name", payload.get("value", "")),
+        node_type=payload.get("node_type", "place"),
         place_type=payload.get("place_type", payload.get("role", "place")),
         aliases=list(payload.get("aliases", [])),
         summary=payload.get("summary", ""),
@@ -188,8 +204,21 @@ def _migrate_legacy_attribute_nodes(
             migrated_attributes[node_id] = AttributeNode(
                 value=node.name,
                 attribute_type=node.role,
+                node_type="attribute",
                 aliases=node.aliases,
                 summary=node.summary,
                 source_spans=node.source_spans,
             )
     return migrated_characters, migrated_attributes
+
+
+def infer_source_node_type(source_file: str) -> str:
+    normalized = source_file.replace("\\", "/").lower()
+    parts = [part for part in normalized.split("/") if part]
+    if "character_sheets" in parts:
+        return "character"
+    if "places" in parts:
+        return "place"
+    if "session_notes" in parts:
+        return "note"
+    return "note"

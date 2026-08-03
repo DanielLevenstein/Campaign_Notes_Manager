@@ -518,7 +518,9 @@ def test_party_view_fixture_handles_missing_family_names_without_toggle():
     )
 
     assert all(node.node_type != "family" for node in focused.characters.values())
-    assert 'subgraph "cluster_column_0_family_names" { rank=same; style=invis; "graph_column_0"; }' in dot
+    assert focused.characters["atlantia_lore"].node_type == "place"
+    assert focused.characters["atlantia_lore"].is_source is True
+    assert 'subgraph "cluster_column_0_family_names" { rank=same; style=invis; "graph_column_0"; "atlantia_lore"; }' in dot
     assert "Atlantia_Lore.md" not in dot
     assert combined_node_detail_rows(combined, "atlantia_lore")[0]["Evidence"] == "Source: Atlantia_Lore.md"
 
@@ -605,7 +607,7 @@ There were fires in the town. Did the town recover?
     )
     combined = build_combined_character_graph([], lore_relationships=relationships)
 
-    assert combined.characters["session_notes"].node_type == "source_document"
+    assert combined.characters["session_notes"].node_type == "note"
     assert {
         "vivit",
         "morningstar",
@@ -619,6 +621,29 @@ There were fires in the town. Did the town recover?
     assert "there" not in combined.characters
     assert "did" not in combined.characters
     assert len(combined.characters) <= 28
+
+
+def test_session_note_entity_extraction_promotes_likely_artifacts():
+    text = """# Session Notes
+
+Jory Ravenmark recovered the Moon Blade from the ruined tower.
+Neal Lovington identified the Moon Blade after the battle.
+"""
+
+    relationships = derived_lore_entity_relationships(
+        source_id="session_notes",
+        source_name="Session Notes",
+        source_type="character",
+        source_file="world_building/lore/session_notes/Session_Notes.md",
+        text=text,
+    )
+    combined = build_combined_character_graph([], lore_relationships=relationships)
+
+    assert combined.characters["moonblade"].name == "Moon Blade"
+    assert combined.characters["moonblade"].node_type == "artifact"
+    assert ("session_notes", "moonblade", "artifact") in {
+        (edge.source, edge.target, edge.relationship_type) for edge in combined.edges
+    }
 
 
 def test_graph_view_roots_are_only_main_characters_and_places():
@@ -755,7 +780,7 @@ def test_full_character_connection_graph_excludes_session_notes_node():
     assert [(edge.source, edge.target) for edge in full_graph.edges] == [("jory_ravenmark", "neal_lovington")]
 
 
-def test_full_character_connection_graph_places_source_document_in_family_column():
+def test_full_character_connection_graph_places_note_in_family_column():
     graph = CharacterGraph(
         schema_version="0.3.0",
         primary_character=PrimaryCharacterRef(
@@ -800,7 +825,7 @@ def test_full_character_connection_graph_places_source_document_in_family_column
         dot.index('subgraph "cluster_column_1_main_characters"')
     ]
 
-    assert combined.characters["family_tree"].node_type == "source_document"
+    assert combined.characters["family_tree"].node_type == "note"
     assert "family_tree" in full_graph.characters
     assert '"family_tree" [label="Family Tree", fillcolor="#fde68a"' in dot
     assert 'shape="folder", width=1.65, height=0.7, margin="0.12,0.06"' in dot
@@ -809,7 +834,7 @@ def test_full_character_connection_graph_places_source_document_in_family_column
     assert "Family Tree" in combined_relationship_dot(focused_graph, "neal_lovington")
 
 
-def test_session_notes_markdown_primary_is_source_document():
+def test_session_notes_markdown_primary_is_note():
     graph = CharacterGraph(
         schema_version="0.3.0",
         primary_character=PrimaryCharacterRef(
@@ -831,7 +856,7 @@ def test_session_notes_markdown_primary_is_source_document():
 
     combined = build_combined_character_graph([graph])
 
-    assert combined.characters["session_notes"].node_type == "source_document"
+    assert combined.characters["session_notes"].node_type == "note"
 
 
 def test_family_tree_source_document_links_through_character_family_nodes():
@@ -997,11 +1022,11 @@ def test_other_connections_graph_summarizes_session_note_relationships():
                 "source_name": "Character 3",
                 "source_type": "character",
                 "source_file": "world_building/lore/session_notes/Session_Notes.md",
-                "target_id": "mentor",
-                "target_name": "Mentor",
+                "target_id": "guide",
+                "target_name": "Guide",
                 "target_type": "character",
                 "relationship": "Mentioned",
-                "evidence": "Character 3 met Mentor.",
+                "evidence": "Character 3 met Guide.",
             },
         ]
     )
@@ -1010,17 +1035,17 @@ def test_other_connections_graph_summarizes_session_note_relationships():
     focused = other_connections_graph(combined, "character_3")
     rows = other_connection_rows(combined, "character_3")
 
-    assert set(focused.characters) == {"character_3", "mentor", "pixie_kingdom"}
+    assert set(focused.characters) == {"character_3", "guide", "pixie_kingdom"}
     assert [(edge.source, edge.relationship_label, edge.target) for edge in focused.edges] == [
         ("character_3", "Location", "pixie_kingdom"),
-        ("character_3", "Mentioned", "mentor"),
+        ("character_3", "Mentioned", "guide"),
     ]
     assert "session_notes" not in focused.characters
     assert "Session Notes" not in combined_relationship_dot(focused, "character_3")
     assert "Other Connections" not in combined_relationship_dot(focused, "character_3")
     assert "Character 4" not in {row["Connection"] for row in rows}
     assert {"Connection": "Pixie Kingdom", "Type": "Place", "Evidence": "Character 3 visited the Pixie Kingdom."} in rows
-    assert {"Connection": "Mentor", "Type": "Character", "Evidence": "Character 3 met Mentor."} in rows
+    assert {"Connection": "Guide", "Type": "Character", "Evidence": "Character 3 met Guide."} in rows
     assert graph_clarity_metric(focused).score > graph_clarity_metric(combined).score
     assert graph_clarity_rows(combined, focused)[0]["View"] == "Before Selection"
     assert graph_clarity_rows(combined, focused)[1]["View"] == "Selected View"
@@ -1584,6 +1609,30 @@ Neal is a performer.
     assert 'shape="folder", width=1.9, height=0.8, margin="0.14,0.06"' in dot
 
 
+def test_combined_relationship_dot_styles_artifact_nodes():
+    combined = build_combined_character_graph(
+        [],
+        lore_relationships=[
+            {
+                "source_id": "jory_ravenmark",
+                "source_name": "Jory Ravenmark",
+                "source_type": "character",
+                "source_file": "tests/fixtures/character_sheets/Jory_Ravenmark.md",
+                "target_id": "moon_blade",
+                "target_name": "Moon Blade",
+                "target_type": "artifact",
+                "relationship": "Carries",
+                "evidence": "Jory carries the Moon Blade.",
+            }
+        ],
+    )
+
+    dot = combined_relationship_dot(combined)
+
+    assert combined.characters["moon_blade"].node_type == "artifact"
+    assert '"moon_blade" [label="Moon Blade", fillcolor="#fce7f3", color="#94a3b8", shape="hexagon"' in dot
+
+
 def test_combined_graph_handles_family_attribute_id_collision():
     graph = CharacterGraph(
         schema_version="0.3.0",
@@ -1756,14 +1805,14 @@ def test_combined_graph_can_keep_place_source_separate_from_extracted_place():
                 "source_document__atlantia",
                 "Atlantia",
                 "world_building/lore/places/Atlantia.md",
-                "source_document",
+                "place",
             )
         ],
         lore_relationships=[
             {
                 "source_id": "source_document__atlantia",
                 "source_name": "Atlantia",
-                "source_type": "source_document",
+                "source_type": "place",
                 "source_file": "world_building/lore/places/Atlantia.md",
                 "target_id": "atlantia",
                 "target_name": "Atlantia",
@@ -1774,8 +1823,10 @@ def test_combined_graph_can_keep_place_source_separate_from_extracted_place():
         ],
     )
 
-    assert combined.characters["source_document__atlantia"].node_type == "source_document"
+    assert combined.characters["source_document__atlantia"].node_type == "place"
+    assert combined.characters["source_document__atlantia"].is_source is True
     assert combined.characters["atlantia"].node_type == "place"
+    assert combined.characters["atlantia"].is_source is False
 
 
 def test_place_lore_source_keeps_atlantia_as_place_and_family_extraction():
@@ -1788,14 +1839,14 @@ def test_place_lore_source_keeps_atlantia_as_place_and_family_extraction():
                 "source_document__atlantia_lore",
                 "Atlantia Lore",
                 str(place_path),
-                "source_document",
+                "place",
             )
         ],
         lore_relationships=[
             {
                 "source_id": "source_document__atlantia_lore",
                 "source_name": "Atlantia Lore",
-                "source_type": "source_document",
+                "source_type": "place",
                 "source_file": str(place_path),
                 "target_id": "atlantia",
                 "target_name": "Atlantia",
@@ -1806,7 +1857,10 @@ def test_place_lore_source_keeps_atlantia_as_place_and_family_extraction():
         ],
     )
 
-    assert any(node.name == "Atlantia Lore" and node.node_type == "source_document" for node in combined.characters.values())
+    assert any(
+        node.name == "Atlantia Lore" and node.node_type == "place" and node.is_source
+        for node in combined.characters.values()
+    )
     assert combined.characters["atlantia"].node_type == "place"
     assert not any(node.name == "Atlantia" and node.node_type == "character" for node in combined.characters.values())
     assert any(node.node_type == "family" for node in combined.characters.values())
@@ -1839,7 +1893,7 @@ def test_combined_graph_includes_lore_relationships_without_character_sheets():
     assert rows[0]["Connection"] == "Neal Lovington"
 
 
-def test_combined_graph_keeps_session_source_type_when_duplicate_lore_graph_follows():
+def test_combined_graph_keeps_session_note_type_when_duplicate_lore_graph_follows():
     session_graph = CharacterGraph(
         schema_version="0.3.0",
         primary_character=PrimaryCharacterRef(
@@ -1883,7 +1937,7 @@ def test_combined_graph_keeps_session_source_type_when_duplicate_lore_graph_foll
 
     combined = build_combined_character_graph([session_graph, loose_graph], lore_relationships=relationships)
 
-    assert combined.characters["uploaded_graph_notes"].node_type == "source_document"
+    assert combined.characters["uploaded_graph_notes"].node_type == "note"
     assert any(row["Connection"] == "Indigo Cult" for row in other_connection_rows(combined, "neal_lovington"))
 
 
@@ -1957,6 +2011,42 @@ def test_combined_graph_evidence_rows_strip_markdown_bullets():
         "Neal helped Jory.",
         "Neal visited Atlantia.",
     }
+
+
+def test_combined_graph_derives_edge_label_from_combined_evidence_between_nodes():
+    combined = build_combined_character_graph(
+        [],
+        lore_relationships=[
+            {
+                "source_id": "session_1",
+                "source_name": "Session 1",
+                "source_type": "source_document",
+                "target_id": "cult",
+                "target_name": "Cult",
+                "target_type": "group",
+                "relationship": "Mentioned",
+                "evidence": "The party heard rumors about the cult.",
+            },
+            {
+                "source_id": "session_1",
+                "source_name": "Session 1",
+                "source_type": "source_document",
+                "target_id": "cult",
+                "target_name": "Cult",
+                "target_type": "group",
+                "relationship": "Mentioned",
+                "evidence": "Jory investigated the cult beneath the harbor.",
+            },
+        ],
+    )
+
+    edge = next(edge for edge in combined.edges if edge.target == "cult")
+    assert edge.relationship_type == "investigate"
+    assert edge.relationship_label == "Investigate"
+    assert edge.evidence == [
+        "The party heard rumors about the cult.",
+        "Jory investigated the cult beneath the harbor.",
+    ]
 
 
 def test_combined_graph_evidence_rows_humanize_session_note_fragments():

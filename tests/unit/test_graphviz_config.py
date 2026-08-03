@@ -53,3 +53,12 @@ def test_load_graphviz_config_merges_global_then_view_override(tmp_path):
         "shape": "component",
         "fillcolor": "#dcfce7",
     }
+
+
+def test_global_graphviz_config_includes_artifact_node_override():
+    config = load_graphviz_config("character_view")
+
+    assert config["node_type_overrides"]["artifact"] == {
+        "shape": "hexagon",
+        "fillcolor": "#fce7f3",
+    }

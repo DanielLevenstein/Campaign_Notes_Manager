@@ -1,0 +1,23 @@
+{
+  "schema_version": "0.3.0",
+  "edges": [
+    {"type": "ally", "label": "Ally", "category": "relationships", "aliases": ["alliance", "allied"]},
+    {"type": "artifact", "label": "Artifact", "category": "relationships", "aliases": ["relic", "item"]},
+    {"type": "betrayer", "label": "Betrayer", "category": "relationships", "aliases": ["betray", "betrayed"]},
+    {"type": "client", "label": "Client", "category": "relationships", "aliases": ["patron"]},
+    {"type": "enemy", "label": "Enemy", "category": "relationships", "aliases": ["foe", "opposed"]},
+    {"type": "family", "label": "Family", "category": "relationships", "aliases": ["parent", "mother", "father"]},
+    {"type": "former_mentor", "label": "Former Mentor", "category": "relationships", "aliases": ["former mentor", "mentor"]},
+    {"type": "investigate", "label": "Investigate", "category": "relationships", "aliases": ["investigates", "investigated", "investigating", "investigation"]},
+    {"type": "lover", "label": "Lover", "category": "relationships", "aliases": ["love", "romance"]},
+    {"type": "mentioned", "label": "Mentioned", "category": "relationships", "aliases": []},
+    {"type": "rival", "label": "Rivals", "category": "relationships", "aliases": ["rivals", "rivalry"]},
+    {"type": "class", "label": "Class", "category": "attributes", "aliases": []},
+    {"type": "drive", "label": "Drive", "category": "attributes", "aliases": ["motivation"]},
+    {"type": "pronouns", "label": "Pronouns", "category": "attributes", "aliases": []},
+    {"type": "race", "label": "Race", "category": "attributes", "aliases": []},
+    {"type": "home", "label": "Home", "category": "places", "aliases": []},
+    {"type": "location", "label": "Location", "category": "places", "aliases": ["located", "visited", "visits"]},
+    {"type": "place", "label": "Place", "category": "places", "aliases": []}
+  ]
+}

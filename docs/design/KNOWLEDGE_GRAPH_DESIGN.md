@@ -103,20 +103,35 @@ The source hash is a SHA-256 hash of the raw markdown and is used by validation 
 
 ### `config.py`
 
-`config/character_graph.json` defines the valid graph connection types. The config is intentionally ontology-shaped instead of extractor-shaped: it contains three root-level lists named `relationships`, `attributes`, and `places`.
+`config/edges/character_graph.json` and `config/nodes/character_graph.json` define the valid graph connection and node types. The config is intentionally ontology-shaped instead of extractor-shaped: edge entries declare a stable type, display label, category, and aliases, while node entries map graph node types to storage buckets.
 
-Current config shape:
+Current edge config shape:
 
 ```json
 {
-  "schema_version": "0.2.0",
-  "relationships": ["family", "drive", "alliance", "enemy"],
-  "attributes": ["race", "class", "pronouns"],
-  "places": ["home", "family", "enemies", "allies"]
+  "schema_version": "0.3.0",
+  "edges": [
+    {"type": "ally", "label": "Ally", "category": "relationships", "aliases": ["alliance"]},
+    {"type": "race", "label": "Race", "category": "attributes", "aliases": []},
+    {"type": "location", "label": "Location", "category": "places", "aliases": ["visited"]}
+  ]
 }
 ```
 
-The extractor currently auto-populates only `family`, `race`, and `class` when those connection types are enabled in the config. Other configured types are valid for future extraction or manual graph editing, but they are not assumed to exist in markdown. The config loader rejects malformed config files, missing root lists, and duplicate connection types.
+Current node config shape:
+
+```json
+{
+  "schema_version": "0.3.0",
+  "nodes": [
+    {"type": "character", "bucket": "characters", "labels": ["Character"]},
+    {"type": "entity", "bucket": "characters", "labels": ["Entity", "Group"]},
+    {"type": "place", "bucket": "places", "labels": ["Place", "Location"]}
+  ]
+}
+```
+
+The extractor currently auto-populates `family`, `race`, `class`, place mentions, configured prose relationships, and manually authored Character Connections rows. Compound connection labels such as `Investigate Cult` are split into an edge label (`Investigate`) and target node (`Cult`) when the leading word is a configured edge type. The config loader rejects malformed config files, missing root lists, duplicate edge types, and unknown edge categories.
 
 ### `schema.py`
 
@@ -164,17 +179,19 @@ The extractor currently uses:
 - A small trait vocabulary for lightweight trait extraction.
 - Metadata summaries that identify the source evidence for each attribute.
 
-Only connection types declared in `config/character_graph.json` are valid. The default config includes:
+Only connection types declared in `config/edges/character_graph.json` are valid. The default config includes:
 
 - `family`
 - `race`
 - `class`
 - `pronouns`
 - `drive`
-- `alliance`
+- `ally`
 - `enemy`
+- `artifact`
+- `investigate`
 
-Only `family`, `race`, and `class` are generated automatically from markdown today. Generated metadata edges use `sentiment="metadata"`, `trust_level=1.0`, `conflict_level=0.0`, and `emotional_weight=0.3`.
+Generated metadata edges use `sentiment="metadata"`, `trust_level=1.0`, `conflict_level=0.0`, and `emotional_weight=0.3`. Lore relationship edges are derived from the combined evidence block for the connected nodes so evidence such as "Jory investigated the cult" can produce an `Investigate` edge even when the source relationship row only says `Mentioned`.
 
 ### `embeddings.py`
 

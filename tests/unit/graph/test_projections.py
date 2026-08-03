@@ -73,7 +73,7 @@ def test_combined_graph_projection_builds_stable_render_contract(tmp_path):
 
     assert projection.has_lore
     assert projection.place_sources == [
-        (lore_source_document_id(place_path), "Atlantia Lore", str(place_path), "source_document")
+        (lore_source_document_id(place_path), "Atlantia Lore", str(place_path), "place")
     ]
     assert lore_source_document_id(place_path) in projection.combined.characters
     assert "jory_ravenmark" in projection.character_sheet_combined.characters
