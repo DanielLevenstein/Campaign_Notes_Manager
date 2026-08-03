@@ -19,6 +19,7 @@
 - Fixed the default test lore import directory so it resolves to `tests/fixtures` from the project root instead of the `src` tree, with regression coverage for the path constant.
 - Began Phase 3 by introducing a pure combined-graph projection read model, moving lore graph loading and combined graph assembly out of `streamlit_app.py`, and adding guardrail tests so the Streamlit entry point consumes the projection API instead of direct graph internals.
 - Added the first presentation-layer graph view by routing Party View through a render-ready presentation contract, keeping the Phase 3 target focused on one stable working view rather than perfecting every graph tab.
+- Finished the manual source-root split by replacing stale `src.character_graph` imports with concrete `src.graph`, `src.extraction`, `src.ingest`, and `src.persistence` module imports, fixing Graphviz config path resolution after the move, and preserving hidden-heading evidence rows for character-only session sections.
 
 ### Phase 2-3 Projection And Presentation Layer
 - Established the first projection-read model for combined graph rendering, including lore graph loading, source scanning, place source rows, derived lore relationships, character-sheet graph filtering, and root-node selection outside the Streamlit entry point.

@@ -4,7 +4,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from .schema import SCHEMA_VERSION
+from src.graph.schema import SCHEMA_VERSION
 from src.persistence.storage import read_markdown
 
 

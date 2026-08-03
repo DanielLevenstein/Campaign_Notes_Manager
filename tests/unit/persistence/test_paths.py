@@ -1,7 +1,7 @@
 from pathlib import Path
 
-import src.persistence.paths as paths
-from src.persistence.paths import ROOT_DIR, TEST_FIXTURES_DIRECTORY
+import paths as paths
+from paths import ROOT_DIR, TEST_FIXTURES_DIRECTORY
 
 
 def test_default_test_lore_import_directory_points_to_project_fixtures():

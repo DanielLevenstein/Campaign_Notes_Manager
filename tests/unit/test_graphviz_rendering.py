@@ -1,12 +1,10 @@
-import pytest
-
-from character_graph.combined_graph import (
+from src.graph.combined_graph import (
     CombinedCharacterGraph,
     CombinedCharacterNode,
     CombinedRelationshipEdge,
     combined_relationship_dot,
 )
-from graphviz_rendering import (
+from src.rendering.graphviz_rendering import (
     DIRECTORY_FILE_VIEW_TAB,
     PARTY_VIEW_TAB,
     PLACES_HEADING_VIEW_TAB,
@@ -16,6 +14,7 @@ from graphviz_rendering import (
     graph_without_lore_source_knots,
     graph_tab_names,
     place_lore_connection_rows,
+    lore_graph_connection_rows,
     place_lore_graph,
     lore_information_rows,
     session_note_graph,
@@ -792,13 +791,6 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
     assert all_hidden_labels_by_edge[("ignis_cult", "moon_gate")] == "Indigo Cult"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Knowledge graph migration should merge structural group headings with "
-        "their semantic group entities instead of rendering duplicate nodes."
-    ),
-)
 def test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nodes(tmp_path):
     session_dir = tmp_path / "session_notes"
     session_dir.mkdir()
@@ -996,6 +988,68 @@ def test_directory_session_lore_hide_file_name_preserves_source_bridge_connectio
     assert "source_heading__session_notes__session_2" not in headings_hidden.characters
     assert hidden_labels_by_edge[("atlantia_bandits", "jory_ravenmark")] == "Session 1"
     assert hidden_labels_by_edge[("atlantia_bandits", "orin_nightbloom")] == "Session 2"
+
+
+def test_hidden_session_headings_preserve_connection_table_evidence():
+    graph = CombinedCharacterGraph(
+        characters={
+            "source_heading__session_notes__july_2024": CombinedCharacterNode(
+                id="source_heading__session_notes__july_2024",
+                name="July 2024",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_1",
+            ),
+            "source_heading__session_notes__orchard": CombinedCharacterNode(
+                id="source_heading__session_notes__orchard",
+                name="Feasting Orchard",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_2",
+            ),
+            "mog": CombinedCharacterNode(
+                id="mog",
+                name="Mog",
+                source_file="world_building/lore/character_sheets/Mog.md",
+                node_type="character",
+            ),
+            "morningstar": CombinedCharacterNode(
+                id="morningstar",
+                name="Morningstar",
+                source_file="world_building/lore/character_sheets/Morningstar.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__july_2024",
+                target="source_heading__session_notes__orchard",
+                relationship_type="heading",
+                relationship_label="",
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__orchard",
+                target="mog",
+                relationship_type="mentions",
+                relationship_label="Mentioned",
+                evidence=["Mog went to the Feasting Orchard to participate and win the First Fairycake Eating Competition."],
+            ),
+            CombinedRelationshipEdge(
+                source="source_heading__session_notes__orchard",
+                target="morningstar",
+                relationship_type="mentions",
+                relationship_label="Mentioned",
+                evidence=["Morningstar joined Mog at the Feasting Orchard."],
+            ),
+        ],
+    )
+
+    projected = graph_without_markdown_heading_levels(graph, {1, 2, 3})
+    rows = lore_graph_connection_rows(projected)
+
+    assert rows
+    assert {row["Character"] for row in rows} == {"Mog", "Morningstar"}
+    assert "July 2024" not in {row["Character"] for row in rows}
+    assert "Feasting Orchard" not in {row["Character"] for row in rows}
+    assert any("First Fairycake Eating Competition" in row["Evidence"] for row in rows)
 
 
 def test_hiding_h1_preserves_edges_to_visible_h2_and_h3_descendants():

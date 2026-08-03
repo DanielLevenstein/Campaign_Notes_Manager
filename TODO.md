@@ -1,5 +1,8 @@
-# TODO
+# Bugs Found
+- In the session notes tab, when hiding all headings, the detailed graph edge notes table is removed from the UI.
+- Dates and section headings are still showing up as characters in the UI.
 
+- Worldbuilding directory got moved in the source directory move.
 ## Phase 2-3 Remaining Work
 
 - Move file-list, heading-list, and file/heading subgraph helpers out of `graphviz_rendering.py` and behind projection APIs.

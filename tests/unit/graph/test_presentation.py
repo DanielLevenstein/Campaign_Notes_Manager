@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from character_graph.schema import CharacterGraph, CharacterNode, EmbeddingRecord, PrimaryCharacterRef, RelationshipEdge
+from src.graph.schema import CharacterGraph, CharacterNode, EmbeddingRecord, PrimaryCharacterRef, RelationshipEdge
 from src.graph.presentation import party_view_presentation
 from src.graph.projections import build_combined_graph_projection
 
@@ -71,7 +71,7 @@ def test_party_view_presentation_returns_render_ready_contract(tmp_path):
 
 def test_party_view_is_wired_through_presentation_layer():
     app_source = (PROJECT_ROOT / "streamlit_app.py").read_text(encoding="utf-8")
-    rendering_source = (PROJECT_ROOT / "graphviz_rendering.py").read_text(encoding="utf-8")
+    rendering_source = (PROJECT_ROOT / "src" / "rendering" / "graphviz_rendering.py").read_text(encoding="utf-8")
 
     assert "party_view=party_view_presentation(projection)" in app_source
     assert "render_party_view_tab(party_view, label_font_color)" in rendering_source

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .combined_graph import CombinedCharacterGraph, CombinedCharacterNode, CombinedRelationshipEdge, compact
+from src.graph.combined_graph import CombinedCharacterGraph, CombinedCharacterNode, compact
 
 
 REVIEW_COLUMNS = [

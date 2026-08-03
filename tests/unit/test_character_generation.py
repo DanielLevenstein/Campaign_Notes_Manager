@@ -5,7 +5,7 @@ from pathlib import Path
 
 import src.persistence.lore_documents as storage
 from src.writing.character_generator import RandomCharacterGenerator
-from src.persistence.paths import CHARACTER_METADATA_DIR, CHARACTERS_DIR, ROOT_DIR
+from paths import CHARACTER_METADATA_DIR, CHARACTERS_DIR, ROOT_DIR
 from src.persistence.lore_documents import (
     Character,
     CharacterProfile,
@@ -21,7 +21,7 @@ from src.persistence.lore_documents import (
     regenerate_character_graph,
     write_character_connections,
 )
-from character_graph.schema import RelationshipEdge
+from src.graph.schema import RelationshipEdge
 
 
 FIXTURE_CHARACTER_SHEETS_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "character_sheets"

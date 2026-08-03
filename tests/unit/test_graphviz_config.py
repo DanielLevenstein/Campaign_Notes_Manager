@@ -1,6 +1,6 @@
 import json
 
-from character_graph.graphviz_config import load_graphviz_config
+from src.graph.graphviz_config import load_graphviz_config
 
 
 def test_load_graphviz_config_merges_global_then_view_override(tmp_path):

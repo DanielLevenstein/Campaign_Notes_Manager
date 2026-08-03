@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from character_graph.extraction import extract_character_graph
-from character_graph.ingest import load_backstory
-from character_graph.schema import CharacterGraph, CharacterNode, PrimaryCharacterRef, RelationshipEdge
+from src.extraction.extraction import extract_character_graph
+from src.graph.schema import CharacterGraph, CharacterNode, PrimaryCharacterRef, RelationshipEdge
+from src.ingest.ingest import load_backstory
 from src.writing.character_rewrites import (
     graph_generated_backstory,
     graph_generated_summary,

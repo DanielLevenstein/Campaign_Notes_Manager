@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from .schema import CharacterGraph
+from src.graph.schema import CharacterGraph
 
 
 EVIDENCE_MAX_LENGTH = 240

@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from src.persistence.paths import CHARACTER_METADATA_DIR
+from paths import CHARACTER_METADATA_DIR
 from src.persistence.lore_documents import Character, CharacterProfile, create_generated_character, sanitize_name
 
 

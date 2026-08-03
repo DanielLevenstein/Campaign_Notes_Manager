@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .schema import SCHEMA_VERSION, CharacterGraph
+from src.graph.schema import SCHEMA_VERSION, CharacterGraph
 
 
 def validate_graph(graph: CharacterGraph, expected_source_hash: str | None = None) -> list[str]:

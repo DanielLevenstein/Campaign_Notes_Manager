@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from character_graph.schema import CharacterGraph, CharacterNode, EmbeddingRecord, PrimaryCharacterRef, RelationshipEdge
+from src.graph.schema import CharacterGraph, CharacterNode, EmbeddingRecord, PrimaryCharacterRef, RelationshipEdge
 from src.graph.projections import (
     build_combined_graph_projection,
     character_sheet_lore_graphs,

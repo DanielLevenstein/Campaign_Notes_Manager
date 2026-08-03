@@ -7,15 +7,15 @@ import re
 
 import streamlit as st
 
-from character_graph.combined_graph import (
+from src.graph.combined_graph import (
     clean_evidence_text,
     compact,
 )
-from character_graph.graph_view import (
+from src.graph.graph_view import (
     evidence_rows,
 )
 from src.persistence import storage as persistence
-from graphviz_rendering import render_knowledge_graph_tabs
+from src.rendering.graphviz_rendering import render_knowledge_graph_tabs
 
 
 from src.persistence.lore_documents import (
@@ -23,8 +23,6 @@ from src.persistence.lore_documents import (
     CharacterProfile,
     Place,
     PlaceProfile,
-    character_family_name,
-    character_first_name,
     create_character,
     create_place_markdown,
     default_details,
@@ -86,7 +84,7 @@ from src.persistence.lore_import import (
 )
 from src.graph.presentation import party_view_presentation
 from src.graph.projections import build_combined_graph_projection
-from src.persistence.paths import (
+from paths import (
     TEST_FIXTURES_DIRECTORY,
     WORLD_BUILDING_BACKUP_DIR,
 )

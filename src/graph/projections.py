@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from character_graph.combined_graph import (
+from src.graph.combined_graph import (
     CombinedCharacterGraph,
     CombinedCharacterNode,
     build_combined_character_graph,
@@ -13,8 +13,8 @@ from character_graph.combined_graph import (
     compact,
     graph_view_root_nodes,
 )
-from character_graph.schema import CharacterGraph
-from character_graph.session_entities import derived_lore_entity_relationships
+from src.graph.schema import CharacterGraph
+from src.persistence.session_entities import derived_lore_entity_relationships
 from src.persistence.lore_documents import (
     Character,
     Place,
@@ -23,7 +23,7 @@ from src.persistence.lore_documents import (
     read_place_markdown,
     read_text,
 )
-from src.persistence.paths import CHARACTERS_DIR, LORE_DIR, PLACES_DIR, SESSION_NOTES_DIR
+from paths import CHARACTERS_DIR, LORE_DIR, PLACES_DIR, SESSION_NOTES_DIR
 
 
 DISABLE_LORE_BACKUPS = "LOCAL_CHATBOT_DISABLE_LORE_BACKUPS"

@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
-from .embeddings import HashingEmbedder, cosine_similarity
-from .schema import AttributeNode, CharacterGraph, CharacterNode, PlaceNode, RelationshipEdge
+from src.graph.embeddings import HashingEmbedder, cosine_similarity
+from src.graph.schema import AttributeNode, CharacterGraph, CharacterNode, PlaceNode, RelationshipEdge
 
 
 @dataclass(frozen=True)

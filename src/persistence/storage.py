@@ -191,7 +191,7 @@ def delete_file(path: Path | str, *, linked_graph_path: Path | str | None = None
 
 
 def save_graph(graph: CharacterGraph, path: Path | str) -> None:
-    from character_graph.validation import validate_graph
+    from src.graph.validation import validate_graph
 
     persisted_graph = graph_for_persistence(graph)
     warnings = validate_graph(persisted_graph)
@@ -202,7 +202,7 @@ def save_graph(graph: CharacterGraph, path: Path | str) -> None:
 
 
 def load_graph(path: Path | str) -> CharacterGraph | None:
-    from character_graph.schema import CharacterGraph
+    from src.graph.schema import CharacterGraph
 
     source = Path(path)
     if not source.exists():
@@ -220,7 +220,7 @@ def load_graph(path: Path | str) -> CharacterGraph | None:
 
 
 def graph_for_persistence(graph: CharacterGraph) -> CharacterGraph:
-    from character_graph.schema import CharacterGraph
+    from src.graph.schema import CharacterGraph
 
     return CharacterGraph(
         schema_version=graph.schema_version,

@@ -1,7 +1,7 @@
 import scripts.generate_single_character_backstory_rewrite_report as report_script
 import scripts.generate_single_character_summary_rewrite_report as summary_report_script
-from character_graph.extraction import extract_character_graph
-from character_graph.ingest import load_backstory
+from src.extraction.extraction import extract_character_graph
+from src.ingest.ingest import load_backstory
 from src.writing.character_rewrites import graph_generated_summary, model_rewrite_quality_issues, rewrite_sentence_quality_score
 from src.writing.rewrite_quality import TARGET_SENTENCE_WORD_COUNT, sentence_length_distribution, writing_quality_score
 from src.persistence.lore_documents import Character, read_character_profile

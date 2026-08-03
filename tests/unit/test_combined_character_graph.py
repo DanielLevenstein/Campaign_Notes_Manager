@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from character_graph.combined_graph import (
+from src.graph.combined_graph import (
     build_combined_character_graph,
     combined_attribute_rows,
     combined_node_detail_rows,
@@ -15,11 +15,11 @@ from character_graph.combined_graph import (
     other_connections_graph,
     party_connections_graph,
 )
-from character_graph.graphviz_config import load_graphviz_config
-from character_graph.extraction import extract_character_graph
-from character_graph.ingest import load_backstory
-from character_graph.schema import AttributeNode, CharacterGraph, CharacterNode, PlaceNode, PrimaryCharacterRef, RelationshipEdge
-from character_graph.session_entities import derived_lore_entity_relationships, extract_lore_entity_candidates
+from src.graph.graphviz_config import load_graphviz_config
+from src.extraction.extraction import extract_character_graph
+from src.ingest.ingest import load_backstory
+from src.graph.schema import AttributeNode, CharacterGraph, CharacterNode, PlaceNode, PrimaryCharacterRef, RelationshipEdge
+from src.persistence.session_entities import derived_lore_entity_relationships, extract_lore_entity_candidates
 import src.persistence.lore_documents as storage
 from src.persistence.lore_documents import Character, append_character_connections, read_character_profile
 

@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -199,7 +200,7 @@ def knowledge_graph_view_specs() -> list[dict[str, object]]:
     return [
         {
             "graph_family": "Characters Graph",
-            "view": "Single Character",
+            "view": "Character View",
             "screenshot": "Characters_Graph_Single_Character.png",
         },
         {
@@ -287,7 +288,7 @@ def assert_lore_connection_table_only_has_character_connections(graph_expander, 
 
 def assert_graph_view_spec_set(fixtures: list[dict[str, object]]) -> None:
     expected_views = {
-        ("Characters Graph", "Single Character"),
+        ("Characters Graph", "Character View"),
         ("Characters Graph", "Party View"),
         ("Places Graph", "Location View"),
         ("Places Graph", "Heading View"),
@@ -618,7 +619,7 @@ def test_capture_knowledge_graph_screenshot(isolated_character_app):
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
         expect(graph_expander.get_by_role("button", name="sync Regenerate All Lore Graphs")).to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Single Character", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Character View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Place Lore", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Session Note Graph", exact=True)).not_to_be_visible(timeout=10000)
@@ -626,7 +627,7 @@ def test_capture_knowledge_graph_screenshot(isolated_character_app):
         expect(graph_expander.get_by_text("Before Selection", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_text("Selected View", exact=True)).not_to_be_visible(timeout=10000)
         if graph_node_name:
-            graph_expander.get_by_text("Single Character", exact=True).click()
+            graph_expander.get_by_role("tab", name="Character View", exact=True).click()
             expect(graph_expander.get_by_role("tab").first).to_be_visible(timeout=10000)
             graph_tab = graph_expander.get_by_role("tab", name=graph_node_name, exact=True)
             if graph_tab.count():
@@ -718,7 +719,7 @@ def test_character_top_level_shows_single_character_and_party_view(isolated_char
         graph_expander = page.locator("[data-testid=stExpander]").filter(has_text="Combined Knowledge Graph")
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
-        expect(graph_expander.get_by_role("tab", name="Single Character", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Character View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Place Lore", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_text("Character Data Only", exact=True)).not_to_be_visible(timeout=10000)
@@ -789,11 +790,13 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
 
         expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Heading View", exact=True)).to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).not_to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory Section View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Place Lore", exact=True)).not_to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).not_to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).to_have_attribute(
+        expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
+        location_tab = graph_expander.get_by_role("tab", name="Location View", exact=True)
+        location_tab.click()
+        expect(location_tab).to_have_attribute(
             "aria-selected",
             "true",
             timeout=10000,
@@ -906,13 +909,14 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
         expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory Section View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Session Lore", exact=True)).not_to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).not_to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
         graph_expander.get_by_role("tab", name="Location View", exact=True).click()
+        location_panel = graph_expander.get_by_role("tabpanel", name="Location View")
 
-        graph_image = graph_expander.get_by_role("img").first
+        graph_image = location_panel.get_by_role("img").first
         expect(graph_image).to_be_visible(timeout=10000)
 
-        edge_label_issues = graph_edge_label_position_issues(graph_expander)
+        edge_label_issues = graph_edge_label_position_issues(location_panel)
         assert edge_label_issues == []
 
         graph_expander.scroll_into_view_if_needed()
@@ -1316,7 +1320,7 @@ def test_combined_graph_hides_secondary_entity_creation_controls(isolated_charac
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         page.get_by_text("Combined Knowledge Graph").last.click()
-        page.get_by_text("Single Character", exact=True).click()
+        page.get_by_role("tab", name="Character View", exact=True).click()
         expect(page.get_by_label("Graph Node For Orin Nightbloom", exact=True)).to_be_visible(timeout=10000)
         expect(page.get_by_text("Connections", exact=True).first).to_be_visible(timeout=10000)
         expect(page.get_by_label("Secondary Character", exact=True)).not_to_be_visible()

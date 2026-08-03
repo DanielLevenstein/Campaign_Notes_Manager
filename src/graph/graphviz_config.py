@@ -8,7 +8,7 @@ from typing import Any
 from src.persistence.storage import read_json
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 GRAPHVIZ_CONFIG_DIR = PROJECT_ROOT / "config" / "graphviz"
 
 

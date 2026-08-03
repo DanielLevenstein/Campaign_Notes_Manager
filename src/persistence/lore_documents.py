@@ -6,7 +6,7 @@ from pathlib import Path
 
 from src.persistence import storage as persistence
 
-from src.persistence.paths import (
+from paths import (
     CHARACTER_METADATA_DIR,
     CHARACTERS_DIR,
     GENERATED_CHARACTER_SHEETS_DIR,
@@ -1683,8 +1683,8 @@ def mark_auto_generated_headings(text: str, profile: CharacterProfile) -> str:
 
 
 def regenerate_character_graph(character: Character) -> None:
-    from character_graph.extraction import extract_character_graph
-    from character_graph.ingest import load_backstory
+    from src.extraction.extraction import extract_character_graph
+    from src.ingest.ingest import load_backstory
 
     lore_root = lore_root_for_path(character.backstory_path)
     meta_data_root = metadata_root_for_lore_root(lore_root)
@@ -1730,8 +1730,8 @@ def graph_edge_origin(edge) -> str:
 
 
 def regenerate_lore_graph(path: Path) -> None:
-    from character_graph.extraction import extract_character_graph
-    from character_graph.ingest import load_backstory
+    from src.extraction.extraction import extract_character_graph
+    from src.ingest.ingest import load_backstory
 
     lore_root = lore_root_for_path(path)
     meta_data_root = metadata_root_for_lore_root(lore_root)

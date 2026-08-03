@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from character_graph.combined_graph import CombinedCharacterGraph, full_character_connection_graph
+from src.graph.combined_graph import CombinedCharacterGraph, full_character_connection_graph
 from src.graph.projections import CombinedGraphProjection
 
 

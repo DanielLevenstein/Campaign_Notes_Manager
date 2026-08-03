@@ -4,8 +4,8 @@ import re
 from dataclasses import dataclass
 from typing import Callable
 
-from character_graph.embeddings import HashingEmbedder, cosine_similarity
-from character_graph.schema import CharacterGraph
+from src.graph.embeddings import HashingEmbedder, cosine_similarity
+from src.graph.schema import CharacterGraph
 
 from src.persistence.lore_documents import CharacterProfile, character_first_name
 

@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Callable
 
-from .schema import CharacterGraph
+from src.graph.schema import CharacterGraph
 
 
 PRESERVED_RELATIONSHIP_TYPES = {

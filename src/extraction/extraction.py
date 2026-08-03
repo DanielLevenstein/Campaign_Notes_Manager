@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from .embeddings import build_embedding_record
-from .ingest import BackstoryDocument
-from .schema import (
+from src.graph.embeddings import build_embedding_record
+from src.ingest.ingest import BackstoryDocument
+from src.graph.schema import (
     SCHEMA_VERSION,
     Alignment,
     AttributeNode,

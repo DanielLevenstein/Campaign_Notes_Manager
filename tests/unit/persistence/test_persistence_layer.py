@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from character_graph.schema import (
+from src.graph.schema import (
     CharacterGraph,
     CharacterNode,
     EmbeddingRecord,

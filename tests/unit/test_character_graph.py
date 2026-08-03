@@ -2,12 +2,12 @@ import json
 import os
 from pathlib import Path
 
-from character_graph.extraction import extract_character_graph
-from character_graph.graph_view import attribute_rows, evidence_rows, place_rows, relationship_dot, relationship_rows
-from character_graph.ingest import load_backstory
-from character_graph.schema import CharacterGraph, CharacterNode, PrimaryCharacterRef, RelationshipEdge
+from src.extraction.extraction import extract_character_graph
+from src.graph.graph_view import attribute_rows, evidence_rows, place_rows, relationship_dot, relationship_rows
+from src.ingest.ingest import load_backstory
+from src.graph.schema import CharacterGraph, CharacterNode, PrimaryCharacterRef, RelationshipEdge
 from src.persistence.storage import load_graph, save_graph
-from character_graph.validation import validate_graph
+from src.graph.validation import validate_graph
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]

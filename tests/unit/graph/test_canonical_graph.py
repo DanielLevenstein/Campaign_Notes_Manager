@@ -1,4 +1,4 @@
-from character_graph.combined_graph import (
+from src.graph.combined_graph import (
     CombinedCharacterGraph,
     CombinedCharacterNode,
     CombinedRelationshipEdge,
@@ -16,7 +16,7 @@ from src.graph import (
     normalize_source_file,
     source_file_key,
 )
-from character_graph.schema import (
+from src.graph.schema import (
     CharacterGraph,
     CharacterNode,
     PrimaryCharacterRef,

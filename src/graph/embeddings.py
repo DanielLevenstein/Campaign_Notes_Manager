@@ -4,7 +4,7 @@ import hashlib
 import math
 import re
 
-from .schema import EmbeddingRecord
+from src.graph.schema import EmbeddingRecord
 
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9']+")

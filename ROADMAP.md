@@ -32,6 +32,11 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Kept legacy Graphviz tab behavior in place for non-Party views while creating a stable vertical slice for the new architecture, so later work can migrate one view at a time instead of rewriting every tab at once.
 - [x] Preserved tab-specific behavior for the current UI while narrowing the intended Phase 3 finish line to a single stable view backed by projection and presentation data.
 
+### Phase 2.2 File Path Fixes
+- Move all code under the character_graph directory into the new source directory using modules extract, ingest, and deduplication.
+- Move the world_building folder out of source code. Let user choose the local directory they want to save their project files.
+- Change the import test lore UI to a proper file picker which defaults to the test fixtures directory.
+
 ## Phase 3.1 – Decouple UI rendering from graph internals
 - [x] Replace direct graph reads in graphviz_rendering.py and streamlit_app.py with projection API calls.
 - [ ] Make the UI consume projection results rather than infer behavior from internal node-type heuristics.
