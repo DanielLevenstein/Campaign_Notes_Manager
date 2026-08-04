@@ -1,17 +1,8 @@
 # Bugs Found
-- In the session notes tab, when hiding all headings, the detailed graph edge notes table is removed from the UI.
-- Dates and section headings are still showing up as characters in the UI.
+- [ ] Fix bugs in node deduplication
+- [ ] Fix the artifact edge direction bug
 
-- Worldbuilding directory got moved in the source directory move.
-- 
-## Phase 2-3 Remaining Work
-
-- Move file-list, heading-list, and file/heading subgraph helpers out of `graphviz_rendering.py` and behind projection APIs.
-- Make graph UI controls consume projection option objects instead of inspecting `node_type`, `source_file`, and Markdown heading IDs directly.
-- Add projection versioning or etags so Streamlit can cache graph views and refresh only when source graph data changes.
-- Add an event/update flow so graph regeneration can notify the UI when files, headings, or projections change.
-- Migrate one additional graph view through the presentation layer after Party View, preferably a file/heading view that exercises source and heading selection.
-- Keep legacy Graphviz rendering available until the migrated view has parity tests and a stable screenshot or contract test.
+Identify other potential bugs from Phase 2.3 code changes. 
 
 ### Phase 2.3 Update Connection Types
 - Connection types like "Investigate Cult" should be split into two entities a node named "Cult" with an edge with the label "Investigate"
@@ -51,3 +42,6 @@
 
 - Implemented Phase 1.1 character name metadata improvements with `Character Name`, `Player Name`, read-only aliases, derived first/family names, and content-driven alias metadata.
 - Implemented Phase 1.2 persistence hashing so unchanged Markdown skips graph regeneration and unchanged lore folders skip automatic latest-backup rewrites.
+- Implemented Phase 2.1 Projection And Presentation Layer 
+- Implemented Phase 2.2 Added Artifact connection type
+- Started PHASE 2.3 Update Connection Types

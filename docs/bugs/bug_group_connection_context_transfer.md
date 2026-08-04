@@ -26,8 +26,8 @@ Observed behavior:
 ## Screenshot Evidence
 Screenshots provided by the user:
 
-- `docs/screenshots/group_connection_bug1.png`
-- `docs/screenshots/group_connection_bug2.png`
+- `docs/bugs/screenshots/group_connection_bug1.png`
+- `docs/bugs/screenshots/group_connection_bug2.png`
 
 Important interpretation from the user:
 

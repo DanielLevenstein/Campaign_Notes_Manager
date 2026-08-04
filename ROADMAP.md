@@ -41,6 +41,8 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Split compound connection types such as `Investigate Cult` into a target node named `Cult` and an `Investigate` edge.
 - [x] Moved graph node and edge allow-lists into split config files under `config/nodes` and `config/edges`.
 - [x] Derived lore edge values from the combined evidence block for the two connected nodes, while preserving configured and dominant relationship labels.
+- [ ] Fix bugs in node deduplication
+- [ ] Fix artifact edge direction bug
 
 ## Phase 3.1 – Decouple UI rendering from graph internals
 - [x] Replace direct graph reads in graphviz_rendering.py and streamlit_app.py with projection API calls.
