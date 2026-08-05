@@ -1,4 +1,4 @@
-# Indigo Cult Deduplication
+# Groups Displayed in Character Column
 
 ## Steps to reproduce
 - Import complex_session_graph.md
@@ -9,4 +9,7 @@
 - Indigo Cult should show up as a single node of a type group, and any identified members of it should show up as character connections. 
 
 ## Screenshots
-- `bugs/screenshots/Indigo_cult_duplication.png`
+
+This screenshot showcases the duplication issue where Indigo Cult is represented both as a group and an individual.
+
+- [Groups Displayed in Characters Column](docs/bugs/screenshots/Indigo_cult_duplication.png)

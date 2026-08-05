@@ -9,5 +9,6 @@
 - Place icons should be split based on what header level they showed up in the original source document.
 
 ## Screenshots
-- `docs/bugs/screenshots/place_column_collapse`
-- `docs/tests/fixtures/screenshots/buggy/Places_Graph_Location_View.png`
+
+- [place_column_collapse](docs/bugs/screenshots/place_column_collapse)
+- [Places_Graph_Location_View](tests/fixtures/screenshots/buggy/Places_Graph_Location_View.png)
