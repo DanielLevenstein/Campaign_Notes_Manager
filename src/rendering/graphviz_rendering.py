@@ -49,6 +49,7 @@ class LoreGraphViewDefinition:
     fanout_linked_characters: bool = True
     supports_heading_filter: bool = False
     supports_directory_hide_options: bool = False
+    include_all_heading_option: bool = False
     default_source_file: str | None = None
 
 
@@ -72,9 +73,10 @@ class MarkdownSubheading:
 
 SINGLE_CHARACTER_TAB = "Character View"
 PARTY_VIEW_TAB = "Party View"
+DIRECTORY_VIEW_TAB = "Directory View"
 FILE_VIEW_TAB = "File View"
 SESSION_VIEW_TAB = "Section View"
-DIRECTORY_FILE_VIEW_TAB = "Directory File View"
+DIRECTORY_FILE_VIEW_TAB = DIRECTORY_VIEW_TAB
 PLACES_HEADING_VIEW_TAB = "Heading View"
 PLACES_FILE_VIEW_TAB = "Location View"
 SESSION_HEADING_VIEW_TAB = "Heading View"
@@ -105,85 +107,47 @@ STRUCTURED_KNOWLEDGE_VIEW = KnowledgeGraphView(
 
 def graph_tab_names(active_main_tab: str) -> list[str]:
     if active_main_tab == "Places":
-        return [PARTY_VIEW_TAB, PLACES_FILE_VIEW_TAB, PLACES_HEADING_VIEW_TAB, DIRECTORY_FILE_VIEW_TAB]
+        return [PARTY_VIEW_TAB, DIRECTORY_VIEW_TAB]
     if active_main_tab == "Session Notes":
-        return [PARTY_VIEW_TAB, SESSION_FILE_VIEW_TAB, SESSION_HEADING_VIEW_TAB, DIRECTORY_FILE_VIEW_TAB]
+        return [PARTY_VIEW_TAB, DIRECTORY_VIEW_TAB]
     return [SINGLE_CHARACTER_TAB, PARTY_VIEW_TAB]
 
 
 def lore_graph_view_definitions(active_main_tab: str, *, default_session_source_file: str | None = None) -> dict[str, LoreGraphViewDefinition]:
     if active_main_tab == "Places":
         return {
-            PLACES_FILE_VIEW_TAB: LoreGraphViewDefinition(
-                view_name=PLACES_FILE_VIEW_TAB,
-                source_predicate=is_place_source_document_node,
-                projection=place_lore_graph,
-                column_layout="place_lore",
-                source_empty_message="Add Place Lore To Use File View.",
-                graph_empty_message="No Place Lore Connections Were Found For This File.",
-                source_key="place_lore_file_view_source_file",
-            ),
-            PLACES_HEADING_VIEW_TAB: LoreGraphViewDefinition(
-                view_name=PLACES_HEADING_VIEW_TAB,
-                source_predicate=is_place_source_document_node,
-                projection=place_lore_graph,
-                column_layout="place_lore",
-                source_empty_message="Add Place Lore To Use Heading View.",
-                heading_empty_message="Add Markdown Headings To Place Lore To Use Heading View.",
-                graph_empty_message="No Place Lore Connections Were Found For This Heading.",
-                source_key="place_lore_heading_view_source_file",
-                heading_key="place_lore_heading_view_heading",
-                show_lore_notes=True,
-                hide_source_document_roots=True,
-                supports_heading_filter=True,
-            ),
-            DIRECTORY_FILE_VIEW_TAB: LoreGraphViewDefinition(
-                view_name=DIRECTORY_FILE_VIEW_TAB,
+            DIRECTORY_VIEW_TAB: LoreGraphViewDefinition(
+                view_name=DIRECTORY_VIEW_TAB,
                 source_predicate=is_place_source_document_node,
                 projection=place_lore_graph,
                 column_layout="place_lore_directory",
-                source_empty_message="Add Place Lore To Use Directory File View.",
+                source_empty_message="Add Place Lore To Use Directory View.",
+                heading_empty_message="Add Markdown Headings To Place Lore To Use Directory View.",
                 graph_empty_message="No Place Lore Connections Were Found For This File.",
                 source_key="place_lore_directory_file_view_source_file",
+                heading_key="place_lore_directory_view_heading",
                 hide_source_document_roots=True,
+                supports_heading_filter=True,
+                supports_directory_hide_options=True,
+                include_all_heading_option=True,
             ),
         }
     if active_main_tab == "Session Notes":
         return {
-            SESSION_FILE_VIEW_TAB: LoreGraphViewDefinition(
-                view_name=SESSION_FILE_VIEW_TAB,
-                source_predicate=is_session_note_node,
-                projection=markdown_header_lore_graph,
-                column_layout="session_note_lore",
-                source_empty_message="Add Session Notes To Use File View.",
-                graph_empty_message="No Session Note Connections Were Found For This File.",
-                source_key="session_lore_file_view_source_file",
-                default_source_file=default_session_source_file,
-            ),
-            SESSION_HEADING_VIEW_TAB: LoreGraphViewDefinition(
-                view_name=SESSION_HEADING_VIEW_TAB,
-                source_predicate=is_session_note_node,
-                projection=markdown_header_lore_graph,
-                column_layout="session_note_lore",
-                source_empty_message="Add Session Notes To Use Heading View.",
-                heading_empty_message="Add Markdown Headings To Session Notes To Use Heading View.",
-                graph_empty_message="No Session Note Connections Were Found For This Heading.",
-                source_key="session_lore_heading_view_source_file",
-                heading_key="session_lore_heading_view_heading",
-                show_lore_notes=True,
-                hide_source_document_roots=True,
-                supports_heading_filter=True,
-            ),
-            DIRECTORY_FILE_VIEW_TAB: LoreGraphViewDefinition(
-                view_name=DIRECTORY_FILE_VIEW_TAB,
+            DIRECTORY_VIEW_TAB: LoreGraphViewDefinition(
+                view_name=DIRECTORY_VIEW_TAB,
                 source_predicate=is_session_note_node,
                 projection=markdown_header_lore_graph,
                 column_layout="session_note_lore_directory",
-                source_empty_message="Add Session Notes To Use Directory File View.",
+                source_empty_message="Add Session Notes To Use Directory View.",
+                heading_empty_message="Add Markdown Headings To Session Notes To Use Directory View.",
                 graph_empty_message="No Session Note Connections Were Found For This File.",
                 source_key="session_lore_directory_file_view_source_file",
+                heading_key="session_lore_directory_view_heading",
                 hide_source_document_roots=True,
+                supports_heading_filter=True,
                 supports_directory_hide_options=True,
+                include_all_heading_option=True,
                 default_source_file=default_session_source_file,
             ),
         }
@@ -382,8 +346,12 @@ def render_lore_graph_view_controls(
             label="Heading Selected",
             key=definition.heading_key or f"{definition.source_key}_heading",
             projected_graph=source_graph,
+            include_all_option=definition.include_all_heading_option,
+            all_option_label=f"{Path(selected_source_file).name}",
         )
-        if selected_heading_id is None:
+        if selected_heading_id == "":
+            selected_heading_id = None
+        if selected_heading_id is None and not definition.include_all_heading_option:
             st.info(definition.heading_empty_message)
             return None
     return LoreGraphViewSelection(
@@ -430,7 +398,10 @@ def project_lore_graph(
     }
     if projection is markdown_header_lore_graph:
         projection_kwargs["hidden_heading_levels"] = hidden_heading_levels or set()
-    return projection(graph, **projection_kwargs)
+    projected_graph = projection(graph, **projection_kwargs)
+    if projection is not markdown_header_lore_graph and hidden_heading_levels:
+        projected_graph = graph_without_markdown_heading_levels(projected_graph, hidden_heading_levels)
+    return projected_graph
 
 
 def render_place_file_view_tab(
@@ -753,7 +724,7 @@ def render_lore_heading_filter(
     all_option_label: str = "All Elements",
 ) -> str | None:
     options = lore_heading_options(graph, source_predicate, projected_graph=projected_graph)
-    if not options:
+    if not options and not include_all_option:
         return None
     if include_all_option:
         options = [(all_option_label, "")] + options

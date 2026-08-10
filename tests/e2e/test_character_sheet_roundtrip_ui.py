@@ -210,33 +210,13 @@ def knowledge_graph_view_specs() -> list[dict[str, object]]:
         },
         {
             "graph_family": "Places Graph",
-            "view": "Location View",
-            "screenshot": "Places_Graph_Location_View.png",
-        },
-        {
-            "graph_family": "Places Graph",
-            "view": "Heading View",
-            "screenshot": "Places_Graph_Heading_View.png",
-        },
-        {
-            "graph_family": "Places Graph",
-            "view": "Directory File View",
-            "screenshot": "Places_Graph_Directory_File_View.png",
+            "view": "Directory View",
+            "screenshot": "Places_Graph_Directory_View.png",
         },
         {
             "graph_family": "Session Notes Graph",
-            "view": "Location View",
-            "screenshot": "Session_Notes_Graph_Location_View.png",
-        },
-        {
-            "graph_family": "Session Notes Graph",
-            "view": "Heading View",
-            "screenshot": "Session_Notes_Graph_Heading_View.png",
-        },
-        {
-            "graph_family": "Session Notes Graph",
-            "view": "Directory File View",
-            "screenshot": "Session_Notes_Graph_Directory_File_View.png",
+            "view": "Directory View",
+            "screenshot": "Session_Notes_Graph_Directory_View.png",
         },
     ]
 
@@ -330,12 +310,8 @@ def assert_graph_view_spec_set(fixtures: list[dict[str, object]]) -> None:
     expected_views = {
         ("Characters Graph", "Character View"),
         ("Characters Graph", "Party View"),
-        ("Places Graph", "Location View"),
-        ("Places Graph", "Heading View"),
-        ("Places Graph", "Directory File View"),
-        ("Session Notes Graph", "Location View"),
-        ("Session Notes Graph", "Heading View"),
-        ("Session Notes Graph", "Directory File View"),
+        ("Places Graph", "Directory View"),
+        ("Session Notes Graph", "Directory View"),
     }
     actual_views = {
         (str(fixture["graph_family"]), str(fixture["view"]))
@@ -830,20 +806,25 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
 
-        expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Heading View", exact=True)).to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Directory View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).not_to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Heading View", exact=True)).not_to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory Section View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Place Lore", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
-        location_tab = graph_expander.get_by_role("tab", name="Location View", exact=True)
-        location_tab.click()
-        expect(location_tab).to_have_attribute(
+        directory_tab = graph_expander.get_by_role("tab", name="Directory View", exact=True)
+        directory_tab.click()
+        expect(directory_tab).to_have_attribute(
             "aria-selected",
             "true",
             timeout=10000,
         )
-        place_graph_panel = graph_expander.get_by_role("tabpanel", name="Location View")
+        place_graph_panel = graph_expander.get_by_role("tabpanel", name="Directory View")
+        expect(place_graph_panel.get_by_role("combobox", name="Source File", exact=True)).to_be_visible(timeout=10000)
+        expect(place_graph_panel.get_by_role("combobox", name="Heading Selected", exact=True)).to_be_visible(timeout=10000)
+        for label in ("Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
+            expect(place_graph_panel.get_by_label(label, exact=True)).to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_role("img").first).to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_role("heading", name="Connections", exact=True)).to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_text("Atlantia Lore", exact=True).last).to_be_visible(timeout=10000)
@@ -852,18 +833,14 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
         expect(place_graph_panel.get_by_text("Family Tree", exact=True)).not_to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_text("Indigo Cult", exact=True)).not_to_be_visible(timeout=10000)
 
-        heading_tab = graph_expander.get_by_role("tab", name="Heading View", exact=True)
-        heading_tab.click()
-        heading_panel = graph_expander.get_by_role("tabpanel", name="Heading View")
-        expect(heading_panel.get_by_role("combobox", name="Source File", exact=True)).to_be_visible(timeout=10000)
-        heading_select = heading_panel.get_by_role("combobox", name="Heading Selected", exact=True)
+        heading_select = place_graph_panel.get_by_role("combobox", name="Heading Selected", exact=True)
         expect(heading_select).to_be_visible(timeout=10000)
         heading_select.click()
         page.keyboard.type("Moon Blade")
         page.keyboard.press("Enter")
-        expect(heading_panel.get_by_role("img").first).to_be_visible(timeout=10000)
-        expect(heading_panel.get_by_text("Moon Blade", exact=True).first).to_be_visible(timeout=10000)
-        assert graphviz_node_polygon_point_count(heading_panel, "Moon Blade") >= 6
+        expect(place_graph_panel.get_by_role("img").first).to_be_visible(timeout=10000)
+        expect(place_graph_panel.get_by_text("Moon Blade", exact=True).first).to_be_visible(timeout=10000)
+        assert graphviz_node_polygon_point_count(place_graph_panel, "Moon Blade") >= 6
 
         browser.close()
 
@@ -871,8 +848,9 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
 def graph_edge_label_position_issues(graph_expander) -> list[dict[str, object]]:
     return graph_expander.evaluate(
         """(root) => {
-            const svg = [...root.querySelectorAll("svg")]
-                .find((candidate) => candidate.querySelector("g.edge, g.node"));
+            const svgs = [...root.querySelectorAll("svg")]
+                .filter((candidate) => candidate.querySelector("g.edge, g.node"));
+            const svg = svgs[svgs.length - 1];
             if (!svg) {
                 throw new Error("Graphviz SVG was not rendered.");
             }
@@ -959,15 +937,24 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
         graph_expander = page.locator("[data-testid=stExpander]").filter(has_text="Combined Knowledge Graph")
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
-        expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Heading View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Directory View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).not_to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Heading View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Section View", exact=True)).not_to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory Section View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Session Lore", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
-        graph_expander.get_by_role("tab", name="Location View", exact=True).click()
-        location_panel = graph_expander.get_by_role("tabpanel", name="Location View")
+        graph_expander.get_by_role("tab", name="Directory View", exact=True).click()
+        location_panel = graph_expander.get_by_role("tabpanel", name="Directory View")
+        expect(location_panel.get_by_role("combobox", name="Source File", exact=True)).to_be_visible(timeout=10000)
+        heading_select = location_panel.get_by_role("combobox", name="Heading Selected", exact=True)
+        expect(heading_select).to_be_visible(timeout=10000)
+        heading_select.click()
+        page.get_by_role("option", name="Family_Tree.md / H2: The Ravenmark Family", exact=True).click()
+        for label in ("Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
+            checkbox = location_panel.get_by_label(label, exact=True)
+            expect(checkbox).to_be_visible(timeout=10000)
 
         graph_image = location_panel.get_by_role("img").first
         expect(graph_image).to_be_visible(timeout=10000)
@@ -998,14 +985,15 @@ def test_session_note_directory_file_view_can_hide_headings_and_keep_context_edg
         expect(page.get_by_role("heading", name="Session Notes", exact=True)).to_be_visible(timeout=10000)
 
         graph_expander = open_combined_graph_expander(page)
-        directory_tab = graph_expander.get_by_role("tab", name="Directory File View", exact=True)
+        directory_tab = graph_expander.get_by_role("tab", name="Directory View", exact=True)
         expect(directory_tab).to_be_visible(timeout=10000)
         directory_tab.click()
-        directory_panel = graph_expander.get_by_role("tabpanel", name="Directory File View")
+        directory_panel = graph_expander.get_by_role("tabpanel", name="Directory View")
 
         file_select = directory_panel.get_by_role("combobox", name="Source File", exact=True)
         expect(file_select).to_be_visible(timeout=10000)
         expect(file_select).to_have_value("complex_session_graph.md", timeout=10000)
+        expect(directory_panel.get_by_role("combobox", name="Heading Selected", exact=True)).to_be_visible(timeout=10000)
 
         for label in ("Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
             checkbox = directory_panel.get_by_label(label, exact=True)
@@ -1032,7 +1020,7 @@ def test_session_note_directory_file_view_can_hide_headings_and_keep_context_edg
         assert "Tharevon traveled through the Pixi Kingdom." in table_text
         assert "Jory Ravenmark and Neal Lovington investigated the Indigo Cult." in table_text
         assert "They traced the Indigo Cult to the Moon Gate." in table_text
-        assert "Arlen Voss recovered the Moon Blade." in table_text
+        assert "Arlen Voss a member of the Atlantia city console" in table_text
         browser.close()
 
 

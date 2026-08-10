@@ -314,7 +314,7 @@ The Indigo Cult later attacked the carnival.
         graph_expander = page.locator("[data-testid=stExpander]").filter(has_text="Combined Knowledge Graph")
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
-        graph_expander.get_by_role("tab", name="Location View", exact=True).click()
+        graph_expander.get_by_role("tab", name="Directory View", exact=True).click()
         expect(graph_expander.get_by_text("Indigo Cult", exact=True).first).to_be_visible(timeout=10000)
         browser.close()
 

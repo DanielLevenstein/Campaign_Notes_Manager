@@ -224,11 +224,15 @@ def session_note_select_options(paths, show_dates: bool = False) -> list[dict[st
             if not note_date:
                 options.append({"label": display_session_note_option(path, show_dates=show_dates), "path": path.name, "section": ""})
             continue
+        section_option_count = 0
         for section in sections:
             if section.level == 1:
                 continue
             label = f"H{section.level}: {section.text}"
             options.append({"label": label, "path": path.name, "section": section.key})
+            section_option_count += 1
+        if section_option_count == 0 and not note_date:
+            options.append({"label": display_session_note_option(path, show_dates=show_dates), "path": path.name, "section": ""})
     return options
 
 
@@ -1255,6 +1259,8 @@ def render_session_notes() -> None:
             index=current_index,
             key="main_existing_session_note",
         )
+        if selected_note_label not in display_names:
+            selected_note_label = display_names[current_index]
         selected_option = select_options[display_names.index(selected_note_label)]
         selected_note = next(path for path in note_files if path.name == selected_option["path"])
         if st.button("Open Session Note", icon=":material/event_note:", key="main_open_session_note"):

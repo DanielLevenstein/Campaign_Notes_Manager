@@ -11,10 +11,10 @@ Column 1: Main Characters
 Column 2: Secondary Characters & places
 
 ## Places Graph
-Views [Location View, Heading View]
-- File View allows the user to view lore items from a single source file
-- Section View allows users to view lore items from a single Markdown heading
-  - For session views hide headings which have no root nodes associated with them. 
+Views [Directory View]
+- Directory View allows the user to view lore items from a single place source file.
+- Directory View can optionally filter to a single Markdown heading.
+- Directory View exposes header controls for hiding the source file name and H1-H3 headings.
 
 Column 0: Source Documents 
 Column 1: Markdown Heading 1 & Main Place Names
@@ -27,10 +27,10 @@ Display all graph connections as a straight line and enforce that columns are ma
 Table of connections should only show edges with character connections
 
 ## Session Notes Graph
-Views [Location View, Directory File View]
-- File View allows the user to view lore items from a single source file
-- Section View allows users to view lore items from a single Markdown heading
-  - For session views hide headings which have no root nodes associated with them. 
+Views [Directory View]
+- Directory View allows the user to view lore items from a single session-note source file.
+- Directory View can optionally filter to a single Markdown heading.
+- Directory View exposes header controls for hiding the source file name and H1-H3 headings.
 
 Column 0: Source Documents
 Column 1: Markdown Heading 1 & Place Name

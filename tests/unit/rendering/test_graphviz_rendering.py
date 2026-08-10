@@ -5,13 +5,9 @@ from src.graph.combined_graph import (
     combined_relationship_dot,
 )
 from src.rendering.graphviz_rendering import (
-    DIRECTORY_FILE_VIEW_TAB,
+    DIRECTORY_VIEW_TAB,
     PARTY_VIEW_TAB,
-    PLACES_HEADING_VIEW_TAB,
-    SESSION_FILE_VIEW_TAB,
-    SESSION_HEADING_VIEW_TAB,
     SINGLE_CHARACTER_TAB,
-    PLACES_FILE_VIEW_TAB,
     graph_without_lore_source_knots,
     graph_tab_names,
     lore_graph_view_definitions,
@@ -31,33 +27,24 @@ from src.rendering.graphviz_rendering import (
 
 def test_graph_tabs_follow_active_main_tab():
     assert graph_tab_names("Characters") == [SINGLE_CHARACTER_TAB, PARTY_VIEW_TAB]
-    assert graph_tab_names("Places") == [
-        PARTY_VIEW_TAB,
-        PLACES_FILE_VIEW_TAB,
-        PLACES_HEADING_VIEW_TAB,
-        DIRECTORY_FILE_VIEW_TAB,
-    ]
-    assert graph_tab_names("Session Notes") == [
-        PARTY_VIEW_TAB,
-        SESSION_FILE_VIEW_TAB,
-        SESSION_HEADING_VIEW_TAB,
-        DIRECTORY_FILE_VIEW_TAB,
-    ]
+    assert graph_tab_names("Places") == [PARTY_VIEW_TAB, DIRECTORY_VIEW_TAB]
+    assert graph_tab_names("Session Notes") == [PARTY_VIEW_TAB, DIRECTORY_VIEW_TAB]
 
 
 def test_lore_view_definitions_standardize_source_and_heading_projection_contracts():
     place_views = lore_graph_view_definitions("Places")
     session_views = lore_graph_view_definitions("Session Notes", default_session_source_file="Session_Notes.md")
 
-    assert set(place_views) == {PLACES_FILE_VIEW_TAB, PLACES_HEADING_VIEW_TAB, DIRECTORY_FILE_VIEW_TAB}
-    assert set(session_views) == {SESSION_FILE_VIEW_TAB, SESSION_HEADING_VIEW_TAB, DIRECTORY_FILE_VIEW_TAB}
-    assert place_views[PLACES_FILE_VIEW_TAB].view_name == PLACES_FILE_VIEW_TAB
-    assert place_views[PLACES_FILE_VIEW_TAB].source_key == "place_lore_file_view_source_file"
-    assert place_views[PLACES_HEADING_VIEW_TAB].supports_heading_filter is True
-    assert place_views[PLACES_HEADING_VIEW_TAB].heading_key == "place_lore_heading_view_heading"
-    assert session_views[SESSION_FILE_VIEW_TAB].default_source_file == "Session_Notes.md"
-    assert session_views[SESSION_HEADING_VIEW_TAB].supports_heading_filter is True
-    assert session_views[DIRECTORY_FILE_VIEW_TAB].supports_directory_hide_options is True
+    assert set(place_views) == {DIRECTORY_VIEW_TAB}
+    assert set(session_views) == {DIRECTORY_VIEW_TAB}
+    assert place_views[DIRECTORY_VIEW_TAB].view_name == DIRECTORY_VIEW_TAB
+    assert place_views[DIRECTORY_VIEW_TAB].source_key == "place_lore_directory_file_view_source_file"
+    assert place_views[DIRECTORY_VIEW_TAB].supports_heading_filter is True
+    assert place_views[DIRECTORY_VIEW_TAB].supports_directory_hide_options is True
+    assert place_views[DIRECTORY_VIEW_TAB].include_all_heading_option is True
+    assert session_views[DIRECTORY_VIEW_TAB].default_source_file == "Session_Notes.md"
+    assert session_views[DIRECTORY_VIEW_TAB].supports_heading_filter is True
+    assert session_views[DIRECTORY_VIEW_TAB].supports_directory_hide_options is True
 
 
 def test_heading_view_projection_applies_source_file_before_heading_filter(tmp_path):
@@ -148,13 +135,13 @@ def test_heading_view_projection_applies_source_file_before_heading_filter(tmp_p
         ],
     )
     heading_id = "source_heading__sourcedocumentatlantialore__line_3__harbor"
-    definition = lore_graph_view_definitions("Places")[PLACES_HEADING_VIEW_TAB]
+    definition = lore_graph_view_definitions("Places")[DIRECTORY_VIEW_TAB]
 
     projected = project_lore_graph_for_view(
         graph,
         definition=definition,
         selection=LoreGraphViewSelection(
-            view_name=PLACES_HEADING_VIEW_TAB,
+            view_name=DIRECTORY_VIEW_TAB,
             source_file=str(atlantia_path),
             heading_id=heading_id,
             hide_source_document_roots=True,
