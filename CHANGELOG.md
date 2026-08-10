@@ -31,6 +31,7 @@
 - Standardized Places and Session Notes Graphviz view inputs around `View Name`, `Source File`, and `Heading Selected`, moved source-file selection into the shared Streamlit rendering pipeline, kept heading filtering in the projection call, and added Session Notes Heading View to the visible graph views.
 - Fixed Session Notes directory projection so extracted entities from `Family_Tree.md` are not treated as source documents, preventing duplicate `Family Tree` H1 nodes.
 - Collapsed graph tabs to the supported `Character View`, `Party View`, and `Directory View` set, and restored Directory View header controls with source-file, heading, and H1/H2/H3 hide filters.
+- Replaced the temporary Directory View tab with the final shared tab set: `Character View`, `Party View`, `Location View`, and `Session View` on every graph section. Location View and Session View now share the Directory View rendering pipeline through `config/graphviz/directory_view.json`.
 
 # experimental/knowledge_rewrite_phase3
 ## Phase 3 Descoped

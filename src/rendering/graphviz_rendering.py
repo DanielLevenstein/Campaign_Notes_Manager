@@ -73,14 +73,15 @@ class MarkdownSubheading:
 
 SINGLE_CHARACTER_TAB = "Character View"
 PARTY_VIEW_TAB = "Party View"
-DIRECTORY_VIEW_TAB = "Directory View"
 FILE_VIEW_TAB = "File View"
 SESSION_VIEW_TAB = "Section View"
-DIRECTORY_FILE_VIEW_TAB = DIRECTORY_VIEW_TAB
+DIRECTORY_FILE_VIEW_TAB = "Directory View"
+DIRECTORY_VIEW_TAB = DIRECTORY_FILE_VIEW_TAB
 PLACES_HEADING_VIEW_TAB = "Heading View"
 PLACES_FILE_VIEW_TAB = "Location View"
 SESSION_HEADING_VIEW_TAB = "Heading View"
-SESSION_FILE_VIEW_TAB = "Location View"
+SESSION_FILE_VIEW_TAB = "Session View"
+GRAPH_VIEW_TABS = [SINGLE_CHARACTER_TAB, PARTY_VIEW_TAB, PLACES_FILE_VIEW_TAB, SESSION_FILE_VIEW_TAB]
 
 DIRECTORY_SESSION_VIEW_TAB = "Directory Section View"
 
@@ -93,7 +94,7 @@ CHARACTER_DATA_ONLY_VIEW = KnowledgeGraphView(
     label="Character Data Only",
 )
 LORE_GRAPH_CONFIG = KnowledgeGraphView(
-    key="full_structured_graph",
+    key="directory_view",
     label="Lore Graph",
 )
 SESSION_MONTH_VIEW = KnowledgeGraphView(
@@ -106,52 +107,43 @@ STRUCTURED_KNOWLEDGE_VIEW = KnowledgeGraphView(
 )
 
 def graph_tab_names(active_main_tab: str) -> list[str]:
-    if active_main_tab == "Places":
-        return [PARTY_VIEW_TAB, DIRECTORY_VIEW_TAB]
-    if active_main_tab == "Session Notes":
-        return [PARTY_VIEW_TAB, DIRECTORY_VIEW_TAB]
-    return [SINGLE_CHARACTER_TAB, PARTY_VIEW_TAB]
+    return list(GRAPH_VIEW_TABS)
 
 
 def lore_graph_view_definitions(active_main_tab: str, *, default_session_source_file: str | None = None) -> dict[str, LoreGraphViewDefinition]:
-    if active_main_tab == "Places":
-        return {
-            DIRECTORY_VIEW_TAB: LoreGraphViewDefinition(
-                view_name=DIRECTORY_VIEW_TAB,
-                source_predicate=is_place_source_document_node,
-                projection=place_lore_graph,
-                column_layout="place_lore_directory",
-                source_empty_message="Add Place Lore To Use Directory View.",
-                heading_empty_message="Add Markdown Headings To Place Lore To Use Directory View.",
-                graph_empty_message="No Place Lore Connections Were Found For This File.",
-                source_key="place_lore_directory_file_view_source_file",
-                heading_key="place_lore_directory_view_heading",
-                hide_source_document_roots=True,
-                supports_heading_filter=True,
-                supports_directory_hide_options=True,
-                include_all_heading_option=True,
-            ),
-        }
-    if active_main_tab == "Session Notes":
-        return {
-            DIRECTORY_VIEW_TAB: LoreGraphViewDefinition(
-                view_name=DIRECTORY_VIEW_TAB,
-                source_predicate=is_session_note_node,
-                projection=markdown_header_lore_graph,
-                column_layout="session_note_lore_directory",
-                source_empty_message="Add Session Notes To Use Directory View.",
-                heading_empty_message="Add Markdown Headings To Session Notes To Use Directory View.",
-                graph_empty_message="No Session Note Connections Were Found For This File.",
-                source_key="session_lore_directory_file_view_source_file",
-                heading_key="session_lore_directory_view_heading",
-                hide_source_document_roots=True,
-                supports_heading_filter=True,
-                supports_directory_hide_options=True,
-                include_all_heading_option=True,
-                default_source_file=default_session_source_file,
-            ),
-        }
-    return {}
+    return {
+        PLACES_FILE_VIEW_TAB: LoreGraphViewDefinition(
+            view_name=PLACES_FILE_VIEW_TAB,
+            source_predicate=is_place_source_document_node,
+            projection=place_lore_graph,
+            column_layout="place_lore_directory",
+            source_empty_message="Add Place Lore To Use Location View.",
+            heading_empty_message="Add Markdown Headings To Place Lore To Use Location View.",
+            graph_empty_message="No Place Lore Connections Were Found For This File.",
+            source_key="location_view_source_file",
+            heading_key="location_view_heading",
+            hide_source_document_roots=True,
+            supports_heading_filter=True,
+            supports_directory_hide_options=True,
+            include_all_heading_option=True,
+        ),
+        SESSION_FILE_VIEW_TAB: LoreGraphViewDefinition(
+            view_name=SESSION_FILE_VIEW_TAB,
+            source_predicate=is_session_note_node,
+            projection=markdown_header_lore_graph,
+            column_layout="session_note_lore_directory",
+            source_empty_message="Add Session Notes To Use Session View.",
+            heading_empty_message="Add Markdown Headings To Session Notes To Use Session View.",
+            graph_empty_message="No Session Note Connections Were Found For This File.",
+            source_key="session_view_source_file",
+            heading_key="session_view_heading",
+            hide_source_document_roots=True,
+            supports_heading_filter=True,
+            supports_directory_hide_options=True,
+            include_all_heading_option=True,
+            default_source_file=default_session_source_file,
+        ),
+    }
 
 
 DISALLOWED_PLACE_GRAPH_CHARACTER_KEYS = {"family", "stone", "students"}

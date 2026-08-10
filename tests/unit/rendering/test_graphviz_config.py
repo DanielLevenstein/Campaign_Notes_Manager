@@ -62,3 +62,11 @@ def test_global_graphviz_config_includes_artifact_node_override():
         "shape": "hexagon",
         "fillcolor": "#fce7f3",
     }
+
+
+def test_directory_graphviz_config_exists_for_location_and_session_views():
+    config = load_graphviz_config("directory_view")
+
+    assert config["view_key"] == "directory_view"
+    assert config["label"] == "Directory View"
+    assert config["graph"]["rankdir"] == "LR"

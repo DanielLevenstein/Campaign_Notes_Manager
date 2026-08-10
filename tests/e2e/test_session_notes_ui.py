@@ -161,7 +161,9 @@ def import_session_note_file(page, path: Path, imported_file_name: str = "") -> 
     file_input = file_uploader.locator("input[type=file]")
     file_input.set_input_files([])
     file_input.set_input_files(str(path))
-    expect(page.get_by_text(path.name)).to_be_visible(timeout=10000)
+    if not upload_button.is_visible():
+        page.get_by_text("Import Session Note", exact=True).last.click()
+        expect(upload_button).to_be_visible(timeout=10000)
     if imported_file_name:
         page.get_by_role("textbox", name="Imported File Name").fill(imported_file_name)
     upload_button.click()
@@ -314,8 +316,13 @@ The Indigo Cult later attacked the carnival.
         graph_expander = page.locator("[data-testid=stExpander]").filter(has_text="Combined Knowledge Graph")
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
-        graph_expander.get_by_role("tab", name="Directory View", exact=True).click()
-        expect(graph_expander.get_by_text("Indigo Cult", exact=True).first).to_be_visible(timeout=10000)
+        session_tab = graph_expander.get_by_role("tab", name="Session View", exact=True)
+        expect(session_tab).not_to_have_attribute("aria-disabled", "true", timeout=10000)
+        session_tab.click()
+        graph_image = graph_expander.get_by_role("img").first
+        expect(graph_image).to_be_visible(timeout=10000)
+        graph_text = graph_image.evaluate("(node) => node.textContent || node.getAttribute('aria-label') || ''")
+        assert "Indigo Cult" in graph_text
         browser.close()
 
     assert (session_notes_dir / "Uploaded_Graph_Notes.md").exists()

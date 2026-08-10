@@ -1649,37 +1649,24 @@ def edge_constraint_attribute(
     if column_layout_requested:
         source_column = column_by_node.get(edge.source)
         target_column = column_by_node.get(edge.target)
-        if source_column in {
-            "column_0_family_names",
-            "column_0_source_documents",
-            "column_0_source_documents_places",
-            "column_0_source_documents_groups",
-        } and target_column in {
-            "column_1_markdown_heading_1",
-            "column_2_markdown_heading_2",
-            "column_3_markdown_heading_3",
-            "column_2_secondary_characters",
-            "column_3_places",
-            "column_4_character_connections",
-        }:
+        source_column_index = graph_column_index(source_column)
+        target_column_index = graph_column_index(target_column)
+        if source_column_index is not None and target_column_index is not None and source_column_index < target_column_index:
             attributes.extend(["tailport=e", "headport=w"])
-        elif target_column in {
-            "column_0_family_names",
-            "column_0_source_documents",
-            "column_0_source_documents_places",
-            "column_0_source_documents_groups",
-        } and source_column in {
-            "column_1_markdown_heading_1",
-            "column_2_markdown_heading_2",
-            "column_3_markdown_heading_3",
-            "column_2_secondary_characters",
-            "column_3_places",
-            "column_4_character_connections",
-        }:
+        elif source_column_index is not None and target_column_index is not None and source_column_index > target_column_index:
             attributes.extend(["tailport=w", "headport=e"])
     if not attributes:
         return ""
     return ", " + ", ".join(dict.fromkeys(attributes))
+
+
+def graph_column_index(column_name: str | None) -> int | None:
+    if column_name is None:
+        return None
+    match = re.match(r"column_(?P<index>\d+)_", column_name)
+    if match is None:
+        return None
+    return int(match.group("index"))
 
 
 def is_markdown_lore_column_layout(column_layout: str) -> bool:
