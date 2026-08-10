@@ -24,7 +24,7 @@ These notes are attempting to match the format of a raw chat log or player-manag
 ### Follow-Up Leads
 
 - Check the brass map against the tower windows.
-- Ask the local guide about the flooded stair.
+- Ask the local guide about the flooded stairs.
 - Keep the silver key separated from the iron token.
 
 # Session 3:

@@ -27,6 +27,10 @@
 - Completed Phase 2.2 by adding artifact graph-edge configuration, artifact extraction/projection support, and Playwright coverage for artifact nodes in Places heading view and Session Notes directory view fixtures.
 - Completed Phase 2.3 by moving graph node and edge allow-lists into split `config/nodes` and `config/edges` files, splitting compound connection labels into edge/node pairs, and deriving lore edge labels from combined evidence between connected nodes.
 
+## Phase 3 Graph View Improvements
+- Standardized Places and Session Notes Graphviz view inputs around `View Name`, `Source File`, and `Heading Selected`, moved source-file selection into the shared Streamlit rendering pipeline, kept heading filtering in the projection call, and added Session Notes Heading View to the visible graph views.
+- Fixed Session Notes directory projection so extracted entities from `Family_Tree.md` are not treated as source documents, preventing duplicate `Family Tree` H1 nodes.
+
 # experimental/knowledge_rewrite_phase3
 ## Phase 3 Descoped
 - Began Phase 3 by introducing a pure combined-graph projection read model, moving lore graph loading and combined graph assembly out of `streamlit_app.py`, and adding guardrail tests so the Streamlit entry point consumes the projection API instead of direct graph internals.

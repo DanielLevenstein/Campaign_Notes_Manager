@@ -1,13 +1,9 @@
 # Bugs Found
+- [ ] Header and file filters got lost in graphviz refactoring. 
 - [ ] Fix bugs in node deduplication
 - [ ] Fix the artifact edge direction bug
 
 Identify other potential bugs from Phase 2.3 code changes. 
-
-### Phase 2.3 Update Connection Types
-- Connection types like "Investigate Cult" should be split into two entities a node named "Cult" with an edge with the label "Investigate"
-- Information about what connection types are allowed for each graph node and edge should be moved to a config file under `config/edges`, and `config/nodes`
-- Edge values should be determined from the data present in the combined evidence block from the two connected nodes. 
 
 ## Graph View Improvements
 

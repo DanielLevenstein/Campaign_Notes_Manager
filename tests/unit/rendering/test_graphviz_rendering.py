@@ -9,10 +9,12 @@ from src.rendering.graphviz_rendering import (
     PARTY_VIEW_TAB,
     PLACES_HEADING_VIEW_TAB,
     SESSION_FILE_VIEW_TAB,
+    SESSION_HEADING_VIEW_TAB,
     SINGLE_CHARACTER_TAB,
     PLACES_FILE_VIEW_TAB,
     graph_without_lore_source_knots,
     graph_tab_names,
+    lore_graph_view_definitions,
     place_lore_connection_rows,
     lore_graph_connection_rows,
     place_lore_graph,
@@ -21,7 +23,9 @@ from src.rendering.graphviz_rendering import (
     markdown_header_lore_graph,
     graph_without_source_document_roots,
     graph_without_markdown_heading_levels,
+    project_lore_graph_for_view,
     render_lore_graph,
+    LoreGraphViewSelection,
 )
 
 
@@ -36,8 +40,131 @@ def test_graph_tabs_follow_active_main_tab():
     assert graph_tab_names("Session Notes") == [
         PARTY_VIEW_TAB,
         SESSION_FILE_VIEW_TAB,
+        SESSION_HEADING_VIEW_TAB,
         DIRECTORY_FILE_VIEW_TAB,
     ]
+
+
+def test_lore_view_definitions_standardize_source_and_heading_projection_contracts():
+    place_views = lore_graph_view_definitions("Places")
+    session_views = lore_graph_view_definitions("Session Notes", default_session_source_file="Session_Notes.md")
+
+    assert set(place_views) == {PLACES_FILE_VIEW_TAB, PLACES_HEADING_VIEW_TAB, DIRECTORY_FILE_VIEW_TAB}
+    assert set(session_views) == {SESSION_FILE_VIEW_TAB, SESSION_HEADING_VIEW_TAB, DIRECTORY_FILE_VIEW_TAB}
+    assert place_views[PLACES_FILE_VIEW_TAB].view_name == PLACES_FILE_VIEW_TAB
+    assert place_views[PLACES_FILE_VIEW_TAB].source_key == "place_lore_file_view_source_file"
+    assert place_views[PLACES_HEADING_VIEW_TAB].supports_heading_filter is True
+    assert place_views[PLACES_HEADING_VIEW_TAB].heading_key == "place_lore_heading_view_heading"
+    assert session_views[SESSION_FILE_VIEW_TAB].default_source_file == "Session_Notes.md"
+    assert session_views[SESSION_HEADING_VIEW_TAB].supports_heading_filter is True
+    assert session_views[DIRECTORY_FILE_VIEW_TAB].supports_directory_hide_options is True
+
+
+def test_heading_view_projection_applies_source_file_before_heading_filter(tmp_path):
+    atlantia_path = tmp_path / "Atlantia_Lore.md"
+    atlantia_path.write_text(
+        "\n".join(
+            [
+                "# Atlantia Lore",
+                "Atlantia is home to Jory Ravenmark.",
+                "## Harbor",
+                "Jory Ravenmark watched the tide from the Harbor.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    family_path = tmp_path / "Family_Tree.md"
+    family_path.write_text(
+        "\n".join(
+            [
+                "# Family Tree",
+                "Atlantia is listed beside Mrs Nightbloom.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    graph = CombinedCharacterGraph(
+        characters={
+            "source_document__atlantia_lore": CombinedCharacterNode(
+                id="source_document__atlantia_lore",
+                name="Atlantia Lore",
+                source_file=str(atlantia_path),
+                node_type="source_document",
+            ),
+            "atlantia": CombinedCharacterNode(
+                id="atlantia",
+                name="Atlantia",
+                source_file=str(atlantia_path),
+                node_type="place",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+            "family_tree": CombinedCharacterNode(
+                id="family_tree",
+                name="Family Tree",
+                source_file=str(family_path),
+                node_type="source_document",
+            ),
+            "mrs_nightbloom": CombinedCharacterNode(
+                id="mrs_nightbloom",
+                name="Mrs Nightbloom",
+                source_file="world_building/lore/session_notes/Family_Tree.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="source_document__atlantia_lore",
+                target="atlantia",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["Atlantia is home to Jory Ravenmark."],
+            ),
+            CombinedRelationshipEdge(
+                source="source_document__atlantia_lore",
+                target="jory_ravenmark",
+                relationship_type="home",
+                relationship_label="Home",
+                evidence=["Jory Ravenmark watched the tide from the Harbor."],
+            ),
+            CombinedRelationshipEdge(
+                source="family_tree",
+                target="atlantia",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Atlantia is listed beside Mrs Nightbloom."],
+            ),
+            CombinedRelationshipEdge(
+                source="family_tree",
+                target="mrs_nightbloom",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Atlantia is listed beside Mrs Nightbloom."],
+            ),
+        ],
+    )
+    heading_id = "source_heading__sourcedocumentatlantialore__line_3__harbor"
+    definition = lore_graph_view_definitions("Places")[PLACES_HEADING_VIEW_TAB]
+
+    projected = project_lore_graph_for_view(
+        graph,
+        definition=definition,
+        selection=LoreGraphViewSelection(
+            view_name=PLACES_HEADING_VIEW_TAB,
+            source_file=str(atlantia_path),
+            heading_id=heading_id,
+            hide_source_document_roots=True,
+        ),
+    )
+
+    assert heading_id in projected.characters
+    assert "jory_ravenmark" in projected.characters
+    assert "family_tree" not in projected.characters
+    assert "mrs_nightbloom" not in projected.characters
 
 
 def test_place_lore_graph_keeps_source_place_and_character_connections(tmp_path):
@@ -1626,6 +1753,79 @@ def test_session_note_lore_graph_uses_headings_groups_characters_and_places(tmp_
         "atlantia",
     }
     assert "ravenmark_family" not in heading_view_graph.characters
+
+
+def test_session_note_directory_projection_deduplicates_family_tree_h1_from_extracted_entities(tmp_path):
+    session_dir = tmp_path / "session_notes"
+    session_dir.mkdir()
+    session_path = session_dir / "Family_Tree.md"
+    session_path.write_text(
+        "\n".join(
+            [
+                "# Family Tree",
+                "These notes collect family history around Atlantia.",
+                "## The Ravenmark Family",
+                "Jory Ravenmark and Mary Ravenmark are discussed here.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    graph = CombinedCharacterGraph(
+        characters={
+            "family_tree": CombinedCharacterNode(
+                id="family_tree",
+                name="Family Tree",
+                source_file=str(session_path),
+                node_type="source_document",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file=str(session_path),
+                node_type="character",
+            ),
+            "mary_ravenmark": CombinedCharacterNode(
+                id="mary_ravenmark",
+                name="Mary Ravenmark",
+                source_file=str(session_path),
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="family_tree",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Mary Ravenmark are discussed here."],
+            ),
+            CombinedRelationshipEdge(
+                source="family_tree",
+                target="mary_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Jory Ravenmark and Mary Ravenmark are discussed here."],
+            ),
+        ],
+    )
+
+    projected = markdown_header_lore_graph(
+        graph,
+        source_file=str(session_path),
+        fanout_linked_characters=True,
+        hide_source_document_roots=True,
+    )
+
+    family_tree_headings = [
+        node
+        for node in projected.characters.values()
+        if node.name == "Family Tree" and node.is_heading
+    ]
+    assert len(family_tree_headings) == 1
+    assert "source_heading__joryravenmark__line_1__familytree" not in projected.characters
+    assert "source_heading__maryravenmark__line_1__familytree" not in projected.characters
+    assert "jory_ravenmark" in projected.characters
+    assert "mary_ravenmark" in projected.characters
 
 
 def test_session_note_graph_keeps_only_session_note_connections():

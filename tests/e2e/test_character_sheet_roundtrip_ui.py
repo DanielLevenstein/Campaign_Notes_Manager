@@ -230,6 +230,11 @@ def knowledge_graph_view_specs() -> list[dict[str, object]]:
         },
         {
             "graph_family": "Session Notes Graph",
+            "view": "Heading View",
+            "screenshot": "Session_Notes_Graph_Heading_View.png",
+        },
+        {
+            "graph_family": "Session Notes Graph",
             "view": "Directory File View",
             "screenshot": "Session_Notes_Graph_Directory_File_View.png",
         },
@@ -329,6 +334,7 @@ def assert_graph_view_spec_set(fixtures: list[dict[str, object]]) -> None:
         ("Places Graph", "Heading View"),
         ("Places Graph", "Directory File View"),
         ("Session Notes Graph", "Location View"),
+        ("Session Notes Graph", "Heading View"),
         ("Session Notes Graph", "Directory File View"),
     }
     actual_views = {
@@ -849,7 +855,8 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
         heading_tab = graph_expander.get_by_role("tab", name="Heading View", exact=True)
         heading_tab.click()
         heading_panel = graph_expander.get_by_role("tabpanel", name="Heading View")
-        heading_select = heading_panel.get_by_role("combobox", name="Place Lore Heading", exact=True)
+        expect(heading_panel.get_by_role("combobox", name="Source File", exact=True)).to_be_visible(timeout=10000)
+        heading_select = heading_panel.get_by_role("combobox", name="Heading Selected", exact=True)
         expect(heading_select).to_be_visible(timeout=10000)
         heading_select.click()
         page.keyboard.type("Moon Blade")
@@ -953,6 +960,7 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
         expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Heading View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Section View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory Section View", exact=True)).not_to_be_visible(timeout=10000)
@@ -995,7 +1003,7 @@ def test_session_note_directory_file_view_can_hide_headings_and_keep_context_edg
         directory_tab.click()
         directory_panel = graph_expander.get_by_role("tabpanel", name="Directory File View")
 
-        file_select = directory_panel.get_by_role("combobox", name="Session Note File", exact=True)
+        file_select = directory_panel.get_by_role("combobox", name="Source File", exact=True)
         expect(file_select).to_be_visible(timeout=10000)
         expect(file_select).to_have_value("complex_session_graph.md", timeout=10000)
 
