@@ -87,6 +87,16 @@ def test_graphviz_view_configs_use_nested_column_arrays():
         ["source_files", "h1"],
         ["h2"],
         ["h3"],
-        ["artifacts", "places", "groups"],
+        ["places"],
+        ["groups"],
+        ["artifacts"],
         ["linked_characters"],
+    ]
+    assert load_graphviz_config("full_knowledge_graph")["columns"] == [
+        ["source_files", "h1"],
+        ["h2"],
+        ["h3"],
+        ["family_names", "artifacts", "groups"],
+        ["main_characters"],
+        ["secondary_characters", "places"],
     ]

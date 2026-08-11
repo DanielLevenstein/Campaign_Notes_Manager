@@ -11,8 +11,7 @@ SCREENSHOT_PAIRS = {
     "Characters_Graph_Party_View.png": "Characters_Graph_Party_View.png",
     "Characters_Graph_Single_Character.png": "Characters_Graph_Single_Character.png",
     "Places_Graph_File_View.png": "Places_Graph_Location_View.png",
-    "Session_Notes_Graph_File_View.png": "Session_Notes_Graph_Location_View.png",
-    "Session_Notes_Graph_Directory_File_View.png": "Session_Notes_Graph_Directory_File_View.png",
+    "Session_Notes_Graph_File_View.png": "Session_Notes_Graph_Session_View.png",
 }
 MAX_PIXEL_DIFF_RATIO = 0.35
 

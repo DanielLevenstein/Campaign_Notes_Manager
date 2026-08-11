@@ -18,10 +18,11 @@ from src.writing.character_rewrites import (
 from src.writing.rewrite_quality import writing_quality_score
 from src.persistence.lore_documents import Character, read_character_profile
 from scripts.generate_single_character_backstory_rewrite_report import summary_length_score
+from tests.support.test_paths import CHARACTER_SHEETS_FIXTURE_DIR, PROJECT_ROOT
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-JORY_PATH = ROOT_DIR / "tests" / "fixtures" / "character_sheets" / "Jory_Ravenmark.md"
+ROOT_DIR = PROJECT_ROOT
+JORY_PATH = CHARACTER_SHEETS_FIXTURE_DIR / "Jory_Ravenmark.md"
 
 GOOD_JORY_SUMMARY = (
     "Jory Ravenmark is a Human Barbarian haunted by the loss of her family at sea. "
@@ -85,7 +86,7 @@ def test_summary_required_terms_exclude_secondary_relationship_names():
 
 
 def test_backstory_required_terms_use_story_natural_coverage_terms():
-    character_path = ROOT_DIR / "tests" / "fixtures" / "character_sheets" / "Orin_Nightbloom.md"
+    character_path = CHARACTER_SHEETS_FIXTURE_DIR / "Orin_Nightbloom.md"
     character = Character(name=character_path.stem, path=character_path)
     profile = read_character_profile(character)
     graph = extract_character_graph(load_backstory(character_path, character_id=character.name))
@@ -110,7 +111,7 @@ def test_backstory_prompt_has_two_paragraph_contract():
 
 
 def test_backstory_prompt_source_context_does_not_clip_mid_sentence():
-    character_path = ROOT_DIR / "tests" / "fixtures" / "character_sheets" / "Orin_Nightbloom.md"
+    character_path = CHARACTER_SHEETS_FIXTURE_DIR / "Orin_Nightbloom.md"
     character = Character(name=character_path.stem, path=character_path)
     profile = read_character_profile(character)
     graph = extract_character_graph(load_backstory(character_path, character_id=character.name))

@@ -85,7 +85,7 @@ def test_rewrite_backstory_button_is_hidden_without_model_runtime(graph_rewrite_
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page()
-        page.goto(app_url, wait_until="networkidle")
+        page.goto(app_url, wait_until="domcontentloaded")
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         select_character(page, "Orin Nightbloom", 0)
 
@@ -109,7 +109,7 @@ def test_repopulate_summary_button_is_hidden_without_model_runtime(graph_rewrite
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page()
-        page.goto(app_url, wait_until="networkidle")
+        page.goto(app_url, wait_until="domcontentloaded")
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         select_character(page, "Orin Nightbloom", 0)
 

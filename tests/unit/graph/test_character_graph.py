@@ -8,9 +8,10 @@ from src.ingest.ingest import load_backstory
 from src.graph.schema import CharacterGraph, CharacterNode, PrimaryCharacterRef, RelationshipEdge
 from src.persistence.storage import load_graph, save_graph
 from src.graph.validation import validate_graph
+from tests.support.test_paths import CHARACTER_SHEETS_FIXTURE_DIR, PROJECT_ROOT
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = PROJECT_ROOT
 CHARACTER_GRAPH_LORE_FIXTURE_ENV = "LOCAL_CHATBOT_CHARACTER_GRAPH_TEST_LORE_DIR"
 
 
@@ -875,7 +876,7 @@ def character_graph_test_character_sheets() -> list[Path]:
         else:
             character_dir = source
     else:
-        character_dir = ROOT_DIR / "tests" / "fixtures" / "character_sheets"
+        character_dir = CHARACTER_SHEETS_FIXTURE_DIR
     return sorted(
         path
         for path in character_dir.glob("*.md")

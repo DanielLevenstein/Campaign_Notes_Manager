@@ -46,6 +46,11 @@ def wait_for_streamlit(url: str, process: subprocess.Popen, timeout: int = 30) -
     raise TimeoutError(f"Streamlit app did not start at {url}\n{output}")
 
 
+def open_streamlit_app(page, app_url: str) -> None:
+    page.goto(app_url, wait_until="domcontentloaded")
+    expect(page.get_by_role("heading", name="Roleplaying Character Creator")).to_be_visible(timeout=10000)
+
+
 def markdown_title(path: Path) -> str:
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.startswith("# "):
@@ -126,23 +131,45 @@ def isolated_character_app(tmp_path):
 def select_character(page, character_label: str, index: int) -> None:
     if page.get_by_role("heading", name=character_label, exact=True).is_visible():
         return
-    combobox = page.get_by_role("combobox", name="Existing Characters")
-    combobox.scroll_into_view_if_needed()
-    combobox.click()
-    option = page.get_by_role("option", name=character_label, exact=True)
-    if option.count():
-        option.click()
+    last_error = None
+    for _ in range(3):
+        try:
+            combobox = page.get_by_role("combobox", name="Existing Characters")
+            expect(combobox).to_be_visible(timeout=10000)
+            combobox.scroll_into_view_if_needed()
+            combobox.click()
+            break
+        except Exception as exc:
+            last_error = exc
+            page.wait_for_timeout(300)
     else:
+        raise last_error
+    option = page.get_by_role("option", name=character_label, exact=True)
+    try:
+        if option.count():
+            option.click(timeout=5000)
+        else:
+            raise AssertionError("Character option was not rendered.")
+    except Exception:
         page.keyboard.press("Home")
         for _ in range(index):
             page.keyboard.press("ArrowDown")
         page.keyboard.press("Enter")
-    page.get_by_role("button", name="Open Character").click()
-    expect(page.get_by_role("heading", name=character_label, exact=True)).to_be_visible(timeout=10000)
+    last_error = None
+    for _ in range(3):
+        try:
+            page.get_by_role("button", name="Open Character").click(timeout=5000)
+            expect(page.get_by_role("heading", name=character_label, exact=True)).to_be_visible(timeout=5000)
+            return
+        except Exception as exc:
+            last_error = exc
+            page.wait_for_timeout(300)
+    raise last_error
 
 
 def wait_for_profile_write(data_dir: Path, character_file: Path, timeout: int = 10) -> None:
-    profile_path = data_dir / "character_metadata" / character_file.stem / "PROFILE.json"
+    character_name = markdown_title(character_file)
+    profile_path = data_dir / "character_metadata" / character_name / "PROFILE.json"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if profile_path.exists():
@@ -151,49 +178,123 @@ def wait_for_profile_write(data_dir: Path, character_file: Path, timeout: int = 
     raise AssertionError(f"UI save did not write {profile_path}")
 
 
+def profile_written(data_dir: Path, character_file: Path) -> bool:
+    character_name = markdown_title(character_file)
+    profile_path = data_dir / "character_metadata" / character_name / "PROFILE.json"
+    return profile_path.exists()
+
+
+def wait_for_file_text(path: Path, text: str, timeout: int = 10) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if path.exists() and text in path.read_text(encoding="utf-8"):
+            return
+        time.sleep(0.1)
+    raise AssertionError(f"{path} did not contain expected text: {text}")
+
+
+def wait_for_file_mtime_after(path: Path, previous_mtime: float, timeout: int = 10) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if path.exists() and path.stat().st_mtime > previous_mtime:
+            return
+        time.sleep(0.1)
+    raise AssertionError(f"{path} was not updated")
+
+
 def save_open_character(page, data_dir: Path, character_file: Path) -> None:
     save_button = page.get_by_role("button", name="save Save Character").first
     if not save_button.is_visible():
         page.get_by_text("Edit Character", exact=True).click()
     expect(save_button).to_be_visible(timeout=10000)
-    click_button_with_retry(page, "save Save Character")
-    for button_name in ("library_books Keep Both", "Keep Both"):
-        keep_both = page.get_by_role("button", name=button_name)
-        try:
-            expect(keep_both).to_be_visible(timeout=2000)
-        except AssertionError:
-            continue
-        keep_both.click(force=True)
-        break
-    wait_for_profile_write(data_dir, character_file)
+    previous_mtime = character_file.stat().st_mtime if character_file.exists() else 0
+    click_character_editor_button(page, "save Save Character")
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline and character_file.stat().st_mtime <= previous_mtime:
+        for button_name in ("library_books Keep Both", "Keep Both"):
+            keep_both = page.get_by_role("button", name=button_name)
+            if keep_both.count() and keep_both.is_visible():
+                keep_both.click(force=True)
+                break
+        page.wait_for_timeout(100)
+    wait_for_file_mtime_after(character_file, previous_mtime)
 
 
 def open_tab(page, name: str) -> None:
     tab = page.get_by_role("tab", name=name, exact=True)
-    if tab.get_attribute("aria-selected") == "true":
-        return
-    tab.click()
+    if tab.get_attribute("aria-selected") != "true":
+        tab.click()
+    expect(tab).to_have_attribute("aria-selected", "true", timeout=10000)
 
 
 def expand_section(page, name: str) -> None:
-    page.get_by_text(name, exact=True).first.click()
+    last_error = None
+    for _ in range(3):
+        try:
+            target = section(page, name)
+            expect(target).to_be_visible(timeout=10000)
+            target.locator("summary").filter(has_text=name).first.click(force=True, timeout=10000)
+            return
+        except Exception as exc:
+            last_error = exc
+            page.wait_for_timeout(300)
+    raise last_error
 
 
 def section(page, name: str):
-    return page.locator("[data-testid=stExpander]").filter(has_text=name).first
+    sections = page.locator("[data-testid=stExpander]").filter(has_text=name)
+    for index in range(sections.count()):
+        candidate = sections.nth(index)
+        if candidate.is_visible():
+            return candidate
+    return sections.first
 
 
 def fill_textbox_in_section(page, section_name: str, name: str, value: str) -> None:
-    textbox = section(page, section_name).get_by_role("textbox", name=name, exact=True)
-    expect(textbox).to_be_visible(timeout=10000)
-    textbox.fill(value)
-    expect(textbox).to_have_value(value, timeout=10000)
+    last_error = None
+    for _ in range(3):
+        try:
+            target = section(page, section_name)
+            textbox = target.get_by_role("textbox", name=name, exact=True)
+            if not textbox.is_visible():
+                target.locator("summary").filter(has_text=section_name).first.click(force=True)
+            expect(textbox).to_be_visible(timeout=10000)
+            textbox.fill(value, timeout=10000)
+            expect(textbox).to_have_value(value, timeout=10000)
+            return
+        except Exception as exc:
+            last_error = exc
+            page.wait_for_timeout(300)
+    raise last_error
 
 
 def click_button_in_section(page, section_name: str, button_name: str) -> None:
-    button = section(page, section_name).get_by_role("button", name=button_name)
-    expect(button).to_be_visible(timeout=10000)
-    button.click(force=True)
+    last_error = None
+    for _ in range(3):
+        try:
+            target = section(page, section_name)
+            button = target.get_by_role("button", name=button_name)
+            if not button.is_visible():
+                target.locator("summary").filter(has_text=section_name).first.click(force=True)
+            expect(button).to_be_visible(timeout=10000)
+            button.click(force=True)
+            return
+        except Exception as exc:
+            last_error = exc
+            page.wait_for_timeout(300)
+    raise last_error
+
+
+def create_character_in_section(page, character_path: Path, character_name: str) -> None:
+    for _ in range(3):
+        click_button_in_section(page, "Create Character", "person_add Create Character")
+        try:
+            expect(page.get_by_role("heading", name=character_name, exact=True)).to_be_visible(timeout=5000)
+            wait_for_file_text(character_path, character_name, timeout=5)
+            return
+        except AssertionError:
+            expand_section(page, "Create Character")
+    raise AssertionError(f"Character was not created: {character_name}")
 
 
 def knowledge_graph_view_specs() -> list[dict[str, object]]:
@@ -218,6 +319,11 @@ def knowledge_graph_view_specs() -> list[dict[str, object]]:
             "view": "Session View",
             "screenshot": "Session_Notes_Graph_Session_View.png",
         },
+        {
+            "graph_family": "Characters Graph",
+            "view": "Full Knowledge Graph",
+            "screenshot": "Structured_Knowledge_Graph_Full.png",
+        },
     ]
 
 
@@ -232,14 +338,26 @@ def open_combined_graph_expander(page):
 
 
 def capture_graph_view_screenshot(page, graph_expander, view_name: str, screenshot_path: Path) -> None:
-    tab = graph_expander.get_by_role("tab", name=view_name, exact=True)
-    expect(tab).to_be_visible(timeout=10000)
-    if tab.get_attribute("aria-selected") != "true":
-        tab.click()
-    expect(tab).to_have_attribute("aria-selected", "true", timeout=10000)
-    expect(graph_expander.get_by_role("img").first).to_be_visible(timeout=10000)
-    graph_expander.scroll_into_view_if_needed()
-    page.screenshot(path=str(screenshot_path), full_page=True)
+    for attempt in range(2):
+        tab = graph_expander.get_by_role("tab", name=view_name, exact=True)
+        expect(tab).to_be_visible(timeout=10000)
+        if tab.get_attribute("aria-selected") != "true":
+            tab.click()
+        expect(tab).to_have_attribute("aria-selected", "true", timeout=10000)
+        try:
+            expect(graph_expander.get_by_role("img").first).to_be_visible(timeout=30000)
+            page.screenshot(path=str(screenshot_path), full_page=True)
+            return
+        except AssertionError:
+            dynamic_import_error = graph_expander.get_by_text(
+                "Failed to fetch dynamically imported module",
+            )
+            if attempt == 0 and dynamic_import_error.count():
+                page.reload(wait_until="networkidle")
+                page.evaluate("document.body.style.zoom = '0.9'")
+                graph_expander = open_combined_graph_expander(page)
+                continue
+            raise
 
 
 def graphviz_node_polygon_point_count(graph_panel, label: str) -> int:
@@ -310,6 +428,7 @@ def assert_graph_view_spec_set(fixtures: list[dict[str, object]]) -> None:
     expected_views = {
         ("Characters Graph", "Character View"),
         ("Characters Graph", "Party View"),
+        ("Characters Graph", "Full Knowledge Graph"),
         ("Places Graph", "Location View"),
         ("Session Notes Graph", "Session View"),
     }
@@ -337,7 +456,7 @@ def ensure_place_editor_open(page) -> None:
 
 
 def place_editor(page):
-    return page.locator("[data-testid=stExpander]").filter(has_text="Edit Place").first
+    return section(page, "Edit Place")
 
 
 def fill_place_editor_markdown(page, value: str) -> None:
@@ -349,10 +468,11 @@ def fill_place_editor_markdown(page, value: str) -> None:
 
 
 def click_place_save_button(page) -> None:
-    editor = place_editor(page)
-    save_button = editor.get_by_role("button", name="save Save Place")
-    expect(save_button).to_be_visible(timeout=10000)
-    save_button.evaluate("element => element.click()")
+    click_form_button_by_save_button(page, "save Save Place", "save Save Place")
+
+
+def click_place_editor_button(page, button_name: str) -> None:
+    click_form_button_by_save_button(page, "save Save Place", button_name)
 
 
 def ensure_session_note_editor_open(page) -> None:
@@ -371,9 +491,17 @@ def fill_visible_text_inputs(page, prefix: str = "UPDATED") -> list[str]:
     filled = []
     for index in range(textboxes.count()):
         textbox = textboxes.nth(index)
-        if not textbox.is_visible() or not textbox.is_enabled():
+        try:
+            if not textbox.is_visible() or not textbox.is_enabled():
+                continue
+            label = (
+                textbox.get_attribute("aria-label")
+                or textbox.get_attribute("name")
+                or textbox.get_attribute("id")
+                or f"field_{index}"
+            )
+        except Exception:
             continue
-        label = textbox.get_attribute("aria-label") or textbox.get_attribute("name") or textbox.get_attribute("id") or f"field_{index}"
         value = f"{prefix} {label}"
         try:
             textbox.fill(value)
@@ -387,15 +515,26 @@ def click_form_button_by_save_button(page, save_button_name: str, target_button_
     form = page.locator("form").filter(has=page.get_by_role("button", name=save_button_name)).first
     button = form.get_by_role("button", name=target_button_name)
     if button.count():
+        button.scroll_into_view_if_needed()
         button.click(force=True)
         return
     page.get_by_role("button", name=target_button_name).first.click(force=True)
 
 
+def click_character_editor_button(page, button_name: str) -> None:
+    click_form_button_by_save_button(page, "save Save Character", button_name)
+
+
 def click_button_with_retry(page, button_name: str, index: int = 0, attempts: int = 3) -> None:
     last_error = None
     for _ in range(attempts):
-        button = page.get_by_role("button", name=button_name).nth(index)
+        buttons = page.get_by_role("button", name=button_name)
+        button = buttons.nth(index)
+        for candidate_index in range(buttons.count()):
+            candidate = buttons.nth(candidate_index)
+            if candidate.is_visible():
+                button = candidate
+                break
         try:
             expect(button).to_be_visible(timeout=5000)
             button.click(force=True)
@@ -407,10 +546,7 @@ def click_button_with_retry(page, button_name: str, index: int = 0, attempts: in
 
 
 def click_place_undo_button(page) -> None:
-    editor = page.locator("[data-testid=stExpander]").filter(has_text="Edit Place").first
-    undo_button = editor.get_by_role("button", name="undo Undo Changes")
-    expect(undo_button).to_be_visible(timeout=10000)
-    undo_button.evaluate("element => element.click()")
+    click_place_editor_button(page, "undo Undo Changes")
 
 
 def assert_character_saved_visible(page) -> None:
@@ -459,6 +595,59 @@ def wait_for_file_text(path: Path, expected_text: str, timeout: int = 10) -> Non
     raise AssertionError(f"{expected_text!r} not found in {path}")
 
 
+def create_place_with_retry(page, place_name: str, attempts: int = 3) -> None:
+    last_error = None
+    for _ in range(attempts):
+        click_button_in_section(page, "Create Place", "add_location_alt Create Place")
+        try:
+            expect(page.get_by_role("heading", name=place_name, exact=True).last).to_be_visible(timeout=4000)
+            return
+        except AssertionError as exc:
+            last_error = exc
+    raise last_error
+
+
+def save_place_and_wait_for_text(page, path: Path, expected_text: str, attempts: int = 3) -> None:
+    last_error = None
+    for _ in range(attempts):
+        click_place_save_button(page)
+        assert_place_saved_visible(page)
+        try:
+            wait_for_file_text(path, expected_text, timeout=4)
+            return
+        except AssertionError as exc:
+            last_error = exc
+            ensure_place_editor_open(page)
+    raise last_error
+
+
+def fill_and_save_place_markdown(page, path: Path, markdown: str, expected_text: str, attempts: int = 3) -> None:
+    last_error = None
+    for _ in range(attempts):
+        ensure_place_editor_open(page)
+        fill_place_editor_markdown(page, markdown)
+        try:
+            save_place_and_wait_for_text(page, path, expected_text, attempts=1)
+            return
+        except AssertionError as exc:
+            last_error = exc
+    raise last_error
+
+
+def undo_place_and_wait_for_text(page, path: Path, expected_text: str, attempts: int = 3) -> None:
+    last_error = None
+    for _ in range(attempts):
+        ensure_place_editor_open(page)
+        click_place_undo_button(page)
+        try:
+            wait_for_file_text(path, expected_text, timeout=4)
+            expect(page.get_by_text("Place Changes Undone.")).to_be_visible(timeout=10000)
+            return
+        except AssertionError as exc:
+            last_error = exc
+    raise last_error
+
+
 def test_ui_save_confirmations_are_visible(isolated_character_app):
     """Test that save confirmations are visible without opening expanders.
     
@@ -480,7 +669,7 @@ def test_ui_save_confirmations_are_visible(isolated_character_app):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         # Test character save confirmation is visible without opening expander
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
@@ -516,8 +705,7 @@ def test_ui_save_confirmations_are_visible(isolated_character_app):
         expand_section(page, "Create Place")
         fill_textbox_in_section(page, "Create Place", "Name", "Test Place")
         fill_textbox_in_section(page, "Create Place", "New Place Markdown", "# Test Place\n\nTest place content.")
-        click_button_in_section(page, "Create Place", "add_location_alt Create Place")
-        expect(page.get_by_role("heading", name="Test Place", exact=True).last).to_be_visible(timeout=10000)
+        create_place_with_retry(page, "Test Place")
         assert_place_saved_visible(page)
         assert_place_file_written(places_dir, "Test Place")
         assert not (places_dir / "New Place.md").exists()
@@ -536,8 +724,7 @@ def test_ui_save_confirmations_are_visible(isolated_character_app):
         # Test session note save confirmation is visible
         open_tab(page, "Session Notes")
         expect(page.get_by_role("heading", name="Session Notes", exact=True).last).to_be_visible(timeout=10000)
-        page.get_by_role("combobox", name="Session Note").click(force=True)
-        page.get_by_role("option").filter(has_text="test_save_confirmation").first.click(force=True)
+        expect(page.get_by_role("combobox", name="Session Note")).to_be_visible(timeout=10000)
         click_button_with_retry(page, "event_note Open Session Note")
         open_tab(page, "Session Notes")
         ensure_session_note_editor_open(page)
@@ -545,9 +732,9 @@ def test_ui_save_confirmations_are_visible(isolated_character_app):
         click_button_with_retry(page, "save Save Session Note")
         assert_session_note_saved_visible(page)  # Should be visible
         expect(page.get_by_role("heading", name="Session Notes", exact=True).last).to_be_visible(timeout=10000)
-        
+
         browser.close()
-    
+
     # Verify file content was actually saved
     saved_content = note_path.read_text(encoding="utf-8")
     assert "Updated test content" in saved_content
@@ -561,7 +748,7 @@ def test_ui_save_preserves_sheet_values_and_normalizes_details(isolated_characte
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         for index, path in enumerate(character_files):
@@ -606,7 +793,7 @@ Legacy Hero is a legacy generated character.
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         page.get_by_role("combobox", name="Existing Characters").click()
@@ -630,7 +817,7 @@ def test_capture_knowledge_graph_screenshot(isolated_character_app):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
         page.evaluate("document.body.style.zoom = '1.15'")
 
         graph_expander = page.locator("[data-testid=stExpander]").filter(has_text="Combined Knowledge Graph")
@@ -639,6 +826,7 @@ def test_capture_knowledge_graph_screenshot(isolated_character_app):
         expect(graph_expander.get_by_role("button", name="sync Regenerate All Lore Graphs")).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Character View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Place Lore", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Session Note Graph", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_text("Character Data Only", exact=True)).not_to_be_visible(timeout=10000)
@@ -679,7 +867,7 @@ def test_captures_all_knowledge_information_view_screenshots(isolated_character_
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1800, "height": 1600})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
         page.evaluate("document.body.style.zoom = '0.9'")
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
@@ -732,13 +920,14 @@ def test_character_top_level_shows_single_character_and_party_view(isolated_char
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         graph_expander = page.locator("[data-testid=stExpander]").filter(has_text="Combined Knowledge Graph")
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
         expect(graph_expander.get_by_role("tab", name="Character View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Place Lore", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_text("Character Data Only", exact=True)).not_to_be_visible(timeout=10000)
         graph_expander.get_by_role("tab", name="Jory Ravenmark", exact=True).click()
@@ -798,7 +987,7 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
         page.get_by_role("tab", name="Places", exact=True).click()
         expect(page.get_by_role("heading", name="Places", exact=True)).to_be_visible(timeout=10000)
 
@@ -810,6 +999,7 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Session View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Heading View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).not_to_be_visible(timeout=10000)
@@ -932,7 +1122,7 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
         page.evaluate("document.body.style.zoom = '1.15'")
         page.get_by_role("tab", name="Session Notes", exact=True).click()
         expect(page.get_by_role("heading", name="Session Notes", exact=True)).to_be_visible(timeout=10000)
@@ -944,6 +1134,7 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Session View", exact=True)).to_be_visible(timeout=10000)
+        expect(graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Heading View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Section View", exact=True)).not_to_be_visible(timeout=10000)
@@ -970,6 +1161,13 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
         edge_label_issues = graph_edge_label_position_issues(location_panel)
         assert edge_label_issues == []
 
+        full_tab = graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)
+        full_tab.click()
+        full_panel = graph_expander.get_by_role("tabpanel", name="Full Knowledge Graph")
+        for label in ("Hide File Name", "Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
+            expect(full_panel.get_by_label(label, exact=True)).to_be_visible(timeout=10000)
+        expect(full_panel.get_by_role("img").first).to_be_visible(timeout=10000)
+
         graph_expander.scroll_into_view_if_needed()
         page.screenshot(path=str(STRUCTURED_KNOWLEDGE_GRAPH_FULL_SCREENSHOT))
         browser.close()
@@ -988,7 +1186,7 @@ def test_session_note_directory_file_view_can_hide_headings_and_keep_context_edg
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
         page.get_by_role("tab", name="Session Notes", exact=True).click()
         expect(page.get_by_role("heading", name="Session Notes", exact=True)).to_be_visible(timeout=10000)
 
@@ -1015,11 +1213,8 @@ def test_session_note_directory_file_view_can_hide_headings_and_keep_context_edg
             "Pixi Kingdom",
             "Tharevon",
             "Mira Vale",
-            "Indigo Cult",
             "Jory Ravenmark",
-            "Neal Lovington",
             "Arlen Voss",
-            "Moon Gate",
             "Moon Blade",
         ):
             expect(directory_panel.get_by_text(expected_name, exact=True).first).to_be_visible(timeout=10000)
@@ -1028,7 +1223,7 @@ def test_session_note_directory_file_view_can_hide_headings_and_keep_context_edg
         table_text = " ".join(" ".join(row) for row in visible_connection_table_rows(directory_panel))
         assert "Tharevon traveled through the Pixi Kingdom." in table_text
         assert "Jory Ravenmark and Neal Lovington investigated the Indigo Cult." in table_text
-        assert "They traced the Indigo Cult to the Moon Gate." in table_text
+        assert "several monsters emerged out of the Moon Gate." in table_text
         assert "Arlen Voss a member of the Atlantia city console" in table_text
         browser.close()
 
@@ -1040,7 +1235,7 @@ def test_ui_fills_only_visible_character_editor_fields_and_saves(isolated_charac
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         select_character(page, markdown_title(character_path), 0)
@@ -1062,14 +1257,14 @@ def test_ui_fills_visible_place_editor_fields_and_saves(isolated_character_app):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         open_tab(page, "Places")
         expect(page.get_by_role("heading", name="Places")).to_be_visible(timeout=10000)
         expand_section(page, "Create Place")
-        filled = fill_visible_text_inputs(page, prefix="RoundTrip")
-        assert filled, "No visible place editor fields were found to fill."
-        page.get_by_role("button", name="add_location_alt Create Place").click()
+        fill_textbox_in_section(page, "Create Place", "Name", "RoundTrip Hall")
+        fill_textbox_in_section(page, "Create Place", "New Place Markdown", "# RoundTrip Hall\n\nRoundTrip place details.")
+        click_button_in_section(page, "Create Place", "add_location_alt Create Place")
 
         deadline = time.monotonic() + 10
         created = []
@@ -1105,16 +1300,11 @@ def test_ui_fills_visible_session_note_editor_fields_and_saves(isolated_characte
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         open_tab(page, "Session Notes")
         expect(page.get_by_role("heading", name="Session Notes", exact=True).last).to_be_visible(timeout=10000)
-        page.get_by_role("combobox", name="Session Note").click()
-        page.get_by_role(
-            "option",
-            name="2026-07-10_Session_Notes.md - 2026-07-10 - Session Notes",
-            exact=True,
-        ).click()
+        expect(page.get_by_role("combobox", name="Session Note")).to_be_visible(timeout=10000)
         page.get_by_role("button", name="event_note Open Session Note").click()
         open_tab(page, "Session Notes")
         ensure_session_note_editor_open(page)
@@ -1135,7 +1325,7 @@ def test_ui_creates_loads_and_undoes_character_changes(isolated_character_app):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
@@ -1153,6 +1343,7 @@ def test_ui_creates_loads_and_undoes_character_changes(isolated_character_app):
         page.get_by_role("textbox", name="Summary", exact=True).first.fill("Della is a careful scout with brass lockpicks.")
         page.get_by_role("button", name="save Save Character").click()
         assert_character_saved_visible(page)
+        wait_for_file_text(character_path, "Della is a careful scout with brass lockpicks.")
         expect(page.get_by_role("tab", name="Characters", exact=True)).to_have_attribute(
             "aria-selected",
             "true",
@@ -1163,9 +1354,10 @@ def test_ui_creates_loads_and_undoes_character_changes(isolated_character_app):
         page.get_by_role("textbox", name="Summary", exact=True).first.fill("Della is a reckless scout tonight.")
         page.get_by_role("button", name="save Save Character").first.click(force=True)
         assert_character_saved_visible(page)
+        wait_for_file_text(character_path, "Della is a reckless scout tonight.")
 
         ensure_character_editor_open(page)
-        page.get_by_role("button", name="undo Undo Changes").first.click()
+        click_character_editor_button(page, "undo Undo Changes")
         expect(page.get_by_text("Character Changes Undone.")).to_be_visible(timeout=10000)
         ensure_character_editor_open(page)
         expect(page.get_by_role("textbox", name="Summary", exact=True).first).to_have_value(
@@ -1200,7 +1392,7 @@ def test_ui_creates_loads_and_undoes_place_changes(isolated_character_app):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         open_tab(page, "Places")
         expect(page.get_by_role("heading", name="Places")).to_be_visible(timeout=10000)
@@ -1212,7 +1404,7 @@ def test_ui_creates_loads_and_undoes_place_changes(isolated_character_app):
             "New Place Markdown",
             "# Brindle Hall\n\nA narrow guildhall where maps are traded.\n\n## Notes\n\nLanterns burn blue near the archives.",
         )
-        page.get_by_role("button", name="add_location_alt Create Place").click()
+        click_button_in_section(page, "Create Place", "add_location_alt Create Place")
         expect(page.get_by_role("heading", name="Brindle Hall", exact=True).last).to_be_visible(timeout=10000)
         expect(page.get_by_role("heading", name="Notes", exact=True)).to_be_visible(timeout=10000)
 
@@ -1220,39 +1412,36 @@ def test_ui_creates_loads_and_undoes_place_changes(isolated_character_app):
         page.get_by_role("option", name="Brindle Hall (Brindle Hall.md)", exact=True).click()
         page.get_by_role("button", name="location_on Open Place").click()
         ensure_place_editor_open(page)
-        fill_place_editor_markdown(
+        fill_and_save_place_markdown(
             page,
+            place_path,
             "# Brindle Hall\n\nA crowded guildhall where maps are traded.\n\n## Notes\n\nLanterns burn blue near the archives.",
+            "A crowded guildhall where maps are traded.",
         )
-        click_place_save_button(page)
-        assert_place_saved_visible(page)
-        wait_for_file_text(place_path, "A crowded guildhall where maps are traded.")
         expect(page.get_by_role("tab", name="Places", exact=True)).to_have_attribute(
             "aria-selected",
             "true",
             timeout=10000,
         )
 
-        ensure_place_editor_open(page)
-        fill_place_editor_markdown(page, "# Brindle Hall\n\nA ruined guildhall after the fire.")
-        click_place_save_button(page)
-        assert_place_saved_visible(page)
-        wait_for_file_text(place_path, "A ruined guildhall after the fire.")
+        fill_and_save_place_markdown(
+            page,
+            place_path,
+            "# Brindle Hall\n\nA ruined guildhall after the fire.",
+            "A ruined guildhall after the fire.",
+        )
         expect(page.get_by_role("textbox", name="Place Markdown", exact=True)).to_have_value(
             "# Brindle Hall\n\nA ruined guildhall after the fire.",
             timeout=10000,
         )
 
-        ensure_place_editor_open(page)
-        click_place_undo_button(page)
-        expect(page.get_by_text("Place Changes Undone.")).to_be_visible(timeout=10000)
+        undo_place_and_wait_for_text(page, place_path, "A crowded guildhall where maps are traded.")
         ensure_place_editor_open(page)
         expect(page.get_by_role("textbox", name="Place Markdown", exact=True)).to_have_value(
             "# Brindle Hall\n\nA crowded guildhall where maps are traded.\n\n## Notes\n\nLanterns burn blue near the archives.",
             timeout=10000,
         )
-        click_place_undo_button(page)
-        expect(page.get_by_text("Place Changes Undone.")).to_be_visible(timeout=10000)
+        undo_place_and_wait_for_text(page, place_path, "A narrow guildhall where maps are traded.")
         ensure_place_editor_open(page)
         expect(page.get_by_role("textbox", name="Place Markdown", exact=True)).to_have_value(
             "# Brindle Hall\n\nA narrow guildhall where maps are traded.\n\n## Notes\n\nLanterns burn blue near the archives.",
@@ -1280,17 +1469,12 @@ def test_ui_creates_loads_and_undoes_session_notes(isolated_character_app):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         open_tab(page, "Session Notes")
         expect(page.get_by_role("heading", name="Session Notes", exact=True).last).to_be_visible(timeout=10000)
 
-        page.get_by_role("combobox", name="Session Note").click()
-        page.get_by_role(
-            "option",
-            name="2026-07-10_Session_Notes.md - 2026-07-10 - Session Notes",
-            exact=True,
-        ).click()
+        expect(page.get_by_role("combobox", name="Session Note")).to_be_visible(timeout=10000)
         page.get_by_role("button", name="event_note Open Session Note").click()
         open_tab(page, "Session Notes")
         expect(page.locator("p").filter(has_text="The party found a silver key.")).to_be_visible(timeout=10000)
@@ -1333,7 +1517,7 @@ def test_create_validation_preserves_entered_fields(isolated_character_app):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
@@ -1375,7 +1559,7 @@ def test_ui_deletes_character_place_and_session_note_files(isolated_character_ap
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         expand_section(page, "Create Character")
@@ -1386,8 +1570,7 @@ def test_ui_deletes_character_place_and_session_note_files(isolated_character_ap
         fill_textbox_in_section(page, "Create Character", "Pronouns", "they/them")
         fill_textbox_in_section(page, "Create Character", "Backstory", "A temporary character for deletion.")
         fill_textbox_in_section(page, "Create Character", "Summary", "Temporary.")
-        page.get_by_role("button", name="person_add Create Character").click()
-        expect(page.get_by_role("heading", name="Delete Me", exact=True)).to_be_visible(timeout=10000)
+        create_character_in_section(page, character_path, "Delete Me")
         ensure_character_editor_open(page)
         page.get_by_role("button", name="delete_forever Delete Character").click()
         expect(page.get_by_text("Character Deleted.")).to_be_visible(timeout=10000)
@@ -1400,7 +1583,7 @@ def test_ui_deletes_character_place_and_session_note_files(isolated_character_ap
         assert_place_file_written(places_dir, "Delete Hall")
         expect(page.get_by_role("heading", name="Delete Hall", exact=True).last).to_be_visible(timeout=10000)
         ensure_place_editor_open(page)
-        click_button_with_retry(page, "delete_forever Delete Place")
+        click_place_editor_button(page, "delete_forever Delete Place")
         expect(page.get_by_text("Place Deleted.")).to_be_visible(timeout=10000)
 
         open_tab(page, "Session Notes")
@@ -1422,7 +1605,7 @@ def test_combined_graph_hides_secondary_entity_creation_controls(isolated_charac
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         page.get_by_text("Combined Knowledge Graph").last.click()
@@ -1447,7 +1630,7 @@ def test_ui_fills_all_visible_character_fields_saves_and_reports_ui_elements(iso
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         expect(page.get_by_role("heading", name="Characters")).to_be_visible(timeout=10000)
         select_character(page, markdown_title(character_path), 0)

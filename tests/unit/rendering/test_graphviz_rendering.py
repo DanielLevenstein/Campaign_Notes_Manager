@@ -6,6 +6,7 @@ from src.graph.combined_graph import (
 )
 from src.graph.graphviz_config import load_graphviz_config
 from src.rendering.graphviz_rendering import (
+    FULL_KNOWLEDGE_GRAPH_TAB,
     PARTY_VIEW_TAB,
     PLACES_FILE_VIEW_TAB,
     SINGLE_CHARACTER_TAB,
@@ -28,7 +29,13 @@ from src.rendering.graphviz_rendering import (
 
 
 def test_graph_tabs_follow_active_main_tab():
-    expected_tabs = [SINGLE_CHARACTER_TAB, PARTY_VIEW_TAB, PLACES_FILE_VIEW_TAB, SESSION_FILE_VIEW_TAB]
+    expected_tabs = [
+        SINGLE_CHARACTER_TAB,
+        PARTY_VIEW_TAB,
+        PLACES_FILE_VIEW_TAB,
+        SESSION_FILE_VIEW_TAB,
+        FULL_KNOWLEDGE_GRAPH_TAB,
+    ]
 
     assert graph_tab_names("Characters") == expected_tabs
     assert graph_tab_names("Places") == expected_tabs
@@ -648,12 +655,12 @@ def test_directory_place_lore_dot_keeps_source_documents_in_column_zero():
     source_column = dot[dot.index('subgraph "cluster_column_0_source_files_h1"') :]
     heading_2_column = dot[dot.index('subgraph "cluster_column_1_h2"') :]
     heading_3_column = dot[dot.index('subgraph "cluster_column_2_h3"') :]
-    semantic_column = dot[dot.index('subgraph "cluster_column_3_artifacts_places_groups"') :]
+    places_column = dot[dot.index('subgraph "cluster_column_3_places"') :]
 
     assert source_column.index('"source_document__atlantia_lore"') < source_column.index('subgraph "cluster_column_1_h2"')
     assert heading_2_column.index('"source_heading__atlantia__harbor"') < heading_2_column.index('subgraph "cluster_column_2_h3"')
-    assert heading_3_column.index('"source_heading__atlantia__faculty"') < heading_3_column.index('subgraph "cluster_column_3_artifacts_places_groups"')
-    assert semantic_column.index('"atlantia"') < semantic_column.index('subgraph "cluster_column_4_linked_characters"')
+    assert heading_3_column.index('"source_heading__atlantia__faculty"') < heading_3_column.index('subgraph "cluster_column_3_places"')
+    assert places_column.index('"atlantia"') < places_column.index('subgraph "cluster_column_4_groups"')
     assert '"source_heading__atlantia__harbor" [label="Harbor", fillcolor="#dcfce7", color="#94a3b8", shape="component"' in dot
 
 
@@ -727,12 +734,13 @@ def test_directory_session_lore_dot_keeps_groups_with_sub_places_and_places_in_h
 
     source_column = dot[dot.index('subgraph "cluster_column_0_source_files_h1"') :]
     heading_2_column = dot[dot.index('subgraph "cluster_column_1_h2"') :]
-    semantic_column = dot[dot.index('subgraph "cluster_column_3_artifacts_places_groups"') :]
+    places_column = dot[dot.index('subgraph "cluster_column_3_places"') :]
+    groups_column = dot[dot.index('subgraph "cluster_column_4_groups"') :]
 
     assert source_column.index('"session_1"') < source_column.index('subgraph "cluster_column_1_h2"')
     assert heading_2_column.index('"source_heading__session_1__harbor"') < heading_2_column.index('subgraph "cluster_column_2_h3"')
-    assert semantic_column.index('"atlantia"') < semantic_column.index('subgraph "cluster_column_4_linked_characters"')
-    assert semantic_column.index('"ravenmark_family"') < semantic_column.index('subgraph "cluster_column_4_linked_characters"')
+    assert places_column.index('"atlantia"') < places_column.index('subgraph "cluster_column_4_groups"')
+    assert groups_column.index('"ravenmark_family"') < groups_column.index('subgraph "cluster_column_5_artifacts"')
     labels_by_edge = {
         (edge.source, edge.target): edge.relationship_label
         for edge in graph.edges

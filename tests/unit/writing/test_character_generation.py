@@ -22,9 +22,10 @@ from src.persistence.lore_documents import (
     write_character_connections,
 )
 from src.graph.schema import RelationshipEdge
+from tests.support.test_paths import CHARACTER_SHEETS_FIXTURE_DIR
 
 
-FIXTURE_CHARACTER_SHEETS_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "character_sheets"
+FIXTURE_CHARACTER_SHEETS_DIR = CHARACTER_SHEETS_FIXTURE_DIR
 
 
 def test_render_backstory_matches_character_template_shape():

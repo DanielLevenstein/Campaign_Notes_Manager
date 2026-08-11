@@ -25,9 +25,10 @@ from src.graph.schema import AttributeNode, CharacterGraph, CharacterNode, Place
 from src.persistence.session_entities import derived_lore_entity_relationships, extract_lore_entity_candidates
 import src.persistence.lore_documents as storage
 from src.persistence.lore_documents import Character, append_character_connections, read_character_profile
+from tests.support.test_paths import TEST_FIXTURES_DIR
 
 
-FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
+FIXTURES_DIR = TEST_FIXTURES_DIR
 
 
 def graph_from_text(tmp_path, filename: str, text: str):

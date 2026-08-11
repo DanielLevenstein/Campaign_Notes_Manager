@@ -29,10 +29,11 @@ from src.writing.rewrite_model import (
     run_worker_process,
 )
 from src.persistence.lore_documents import Character, CharacterProfile, read_character_profile
+from tests.support.test_paths import CHARACTER_SHEETS_FIXTURE_DIR, PROJECT_ROOT
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-FIXTURE_CHARACTER_SHEETS_DIR = ROOT_DIR / "tests" / "fixtures" / "character_sheets"
+ROOT_DIR = PROJECT_ROOT
+FIXTURE_CHARACTER_SHEETS_DIR = CHARACTER_SHEETS_FIXTURE_DIR
 REPETITIVE_REWRITE_TEXT = (
     "Jory follows every storm track and every rumor she can find. "
     "Jory follows every storm track and every rumor she can find. "
