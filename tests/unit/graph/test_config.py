@@ -1,6 +1,6 @@
 import pytest
 
-from src.graph.config import character_graph_config_from_dict, load_character_graph_config
+from src.graph.config import character_graph_config_from_dict, load_character_graph_config, load_combined_graph_aliases
 
 
 def test_character_graph_config_loads_edges_and_nodes_from_split_config():
@@ -13,6 +13,13 @@ def test_character_graph_config_loads_edges_and_nodes_from_split_config():
     assert config.canonical_edge_type("investigated") == "investigate"
     assert config.infer_edge_type_from_evidence("Jory investigated the cult.", "Mentioned") == "investigate"
     assert config.node_buckets["entity"] == "characters"
+
+
+def test_combined_graph_alias_config_loads_session_name_variants():
+    aliases = load_combined_graph_aliases()
+
+    assert aliases["typhon"] == frozenset({"Typheb", "Typhen", "Typhin"})
+    assert aliases["sauriv"] == frozenset({"Sauriv-Isk", "Surriv"})
 
 
 def test_character_graph_config_rejects_duplicate_edge_types_across_buckets():

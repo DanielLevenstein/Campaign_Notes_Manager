@@ -1,8 +1,8 @@
 import os
 from datetime import date
 
-import src.extraction.session_notes as session_notes
-from src.extraction.session_notes import (
+import src.extraction.raw_txt_import as session_notes
+from src.extraction.raw_txt_import import (
     child_markdown_sections,
     combine_markdown_section,
     date_from_line,

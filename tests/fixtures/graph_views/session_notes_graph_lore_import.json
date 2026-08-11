@@ -14,7 +14,7 @@
   ],
   "source_fixtures": [
     "tests/fixtures/character_sheets",
-    "tests/fixtures/session_notes/Session_Notes_Fixture.md"
+    "tests/fixtures/session_notes/complex_session_graph.md"
   ],
   "connection_table": {
     "only_connection_type": "Character",

@@ -4,6 +4,7 @@ from src.graph.combined_graph import (
     CombinedRelationshipEdge,
     combined_relationship_dot,
 )
+from src.graph.graphviz_config import load_graphviz_config
 from src.rendering.graphviz_rendering import (
     PARTY_VIEW_TAB,
     PLACES_FILE_VIEW_TAB,
@@ -641,18 +642,18 @@ def test_directory_place_lore_dot_keeps_source_documents_in_column_zero():
     dot = combined_relationship_dot(
         graph,
         main_character_ids=set(graph.characters),
-        graphviz_config={"column_layout": "place_lore_directory"},
+        graphviz_config={**load_graphviz_config("directory_view"), "column_layout": "place_lore_directory"},
     )
 
-    source_column = dot[dot.index('subgraph "cluster_column_0_source_documents"') :]
-    heading_1_column = dot[dot.index('subgraph "cluster_column_1_markdown_heading_1"') :]
-    heading_2_column = dot[dot.index('subgraph "cluster_column_2_markdown_heading_2"') :]
-    heading_3_column = dot[dot.index('subgraph "cluster_column_3_markdown_heading_3"') :]
+    source_column = dot[dot.index('subgraph "cluster_column_0_source_files_h1"') :]
+    heading_2_column = dot[dot.index('subgraph "cluster_column_1_h2"') :]
+    heading_3_column = dot[dot.index('subgraph "cluster_column_2_h3"') :]
+    semantic_column = dot[dot.index('subgraph "cluster_column_3_artifacts_places_groups"') :]
 
-    assert source_column.index('"source_document__atlantia_lore"') < source_column.index('subgraph "cluster_column_1_markdown_heading_1"')
-    assert heading_1_column.index('"atlantia"') < heading_1_column.index('subgraph "cluster_column_2_markdown_heading_2"')
-    assert heading_2_column.index('"source_heading__atlantia__harbor"') < heading_2_column.index('subgraph "cluster_column_3_markdown_heading_3"')
-    assert heading_3_column.index('"source_heading__atlantia__faculty"') < heading_3_column.index('subgraph "cluster_column_4_character_connections"')
+    assert source_column.index('"source_document__atlantia_lore"') < source_column.index('subgraph "cluster_column_1_h2"')
+    assert heading_2_column.index('"source_heading__atlantia__harbor"') < heading_2_column.index('subgraph "cluster_column_2_h3"')
+    assert heading_3_column.index('"source_heading__atlantia__faculty"') < heading_3_column.index('subgraph "cluster_column_3_artifacts_places_groups"')
+    assert semantic_column.index('"atlantia"') < semantic_column.index('subgraph "cluster_column_4_linked_characters"')
     assert '"source_heading__atlantia__harbor" [label="Harbor", fillcolor="#dcfce7", color="#94a3b8", shape="component"' in dot
 
 
@@ -721,17 +722,17 @@ def test_directory_session_lore_dot_keeps_groups_with_sub_places_and_places_in_h
     dot = combined_relationship_dot(
         graph,
         main_character_ids=set(graph.characters),
-        graphviz_config={"column_layout": "session_note_lore_directory"},
+        graphviz_config={**load_graphviz_config("directory_view"), "column_layout": "session_note_lore_directory"},
     )
 
-    source_column = dot[dot.index('subgraph "cluster_column_0_source_documents"') :]
-    heading_1_column = dot[dot.index('subgraph "cluster_column_1_markdown_heading_1"') :]
-    heading_2_column = dot[dot.index('subgraph "cluster_column_2_markdown_heading_2"') :]
+    source_column = dot[dot.index('subgraph "cluster_column_0_source_files_h1"') :]
+    heading_2_column = dot[dot.index('subgraph "cluster_column_1_h2"') :]
+    semantic_column = dot[dot.index('subgraph "cluster_column_3_artifacts_places_groups"') :]
 
-    assert source_column.index('"session_1"') < source_column.index('subgraph "cluster_column_1_markdown_heading_1"')
-    assert heading_1_column.index('"atlantia"') < heading_1_column.index('subgraph "cluster_column_2_markdown_heading_2"')
-    assert heading_2_column.index('"ravenmark_family"') < heading_2_column.index('subgraph "cluster_column_3_markdown_heading_3"')
-    assert heading_2_column.index('"source_heading__session_1__harbor"') < heading_2_column.index('subgraph "cluster_column_3_markdown_heading_3"')
+    assert source_column.index('"session_1"') < source_column.index('subgraph "cluster_column_1_h2"')
+    assert heading_2_column.index('"source_heading__session_1__harbor"') < heading_2_column.index('subgraph "cluster_column_2_h3"')
+    assert semantic_column.index('"atlantia"') < semantic_column.index('subgraph "cluster_column_4_linked_characters"')
+    assert semantic_column.index('"ravenmark_family"') < semantic_column.index('subgraph "cluster_column_4_linked_characters"')
     labels_by_edge = {
         (edge.source, edge.target): edge.relationship_label
         for edge in graph.edges
@@ -742,7 +743,7 @@ def test_directory_session_lore_dot_keeps_groups_with_sub_places_and_places_in_h
 def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_path):
     session_dir = tmp_path / "session_notes"
     session_dir.mkdir()
-    session_path = session_dir / "Session_Notes_Fixture.md"
+    session_path = session_dir / "complex_session_graph.md"
     session_path.write_text(
         "\n".join(
             [
@@ -804,7 +805,7 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
             "ignis_cult": CombinedCharacterNode(
                 id="ignis_cult",
                 name="Indigo Cult",
-                source_file="world_building/lore/session_notes/Session_Notes_Fixture.md",
+                source_file="world_building/lore/session_notes/complex_session_graph.md",
                 node_type="group",
             ),
             "moon_gate": CombinedCharacterNode(
@@ -816,7 +817,7 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
             "moon_blade": CombinedCharacterNode(
                 id="moon_blade",
                 name="Moon Blade",
-                source_file="world_building/lore/session_notes/Session_Notes_Fixture.md",
+                source_file="world_building/lore/session_notes/complex_session_graph.md",
                 node_type="artifact",
             ),
             "arlen_voss": CombinedCharacterNode(
@@ -828,7 +829,7 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
             "empty_cult": CombinedCharacterNode(
                 id="empty_cult",
                 name="Empty Cult",
-                source_file="world_building/lore/session_notes/Session_Notes_Fixture.md",
+                source_file="world_building/lore/session_notes/complex_session_graph.md",
                 node_type="group",
             ),
         },
@@ -953,16 +954,19 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
     assert "empty_cult" not in all_headings_hidden.characters
     assert all_hidden_labels_by_edge[("pixi_kingdom", "tharevon")] == "Session 4"
     assert all_hidden_labels_by_edge[("pixi_kingdom", "mira_vale")] == "Pixi Kingdom"
-    assert all_hidden_labels_by_edge[("ignis_cult", "jory_ravenmark")] == "Indigo Cult"
-    assert all_hidden_labels_by_edge[("ignis_cult", "neal_lovington")] == "Indigo Cult"
+    assert ("ignis_cult", "jory_ravenmark") not in all_hidden_labels_by_edge
+    assert ("ignis_cult", "neal_lovington") not in all_hidden_labels_by_edge
+    assert all_hidden_labels_by_edge[("jory_ravenmark", "ignis_cult")] == "Indigo Cult"
+    assert all_hidden_labels_by_edge[("neal_lovington", "ignis_cult")] == "Indigo Cult"
     assert all_hidden_labels_by_edge[("ignis_cult", "moon_gate")] == "Indigo Cult"
-    assert all_hidden_labels_by_edge[("moon_blade", "arlen_voss")] == "Moon Blade"
+    assert ("moon_blade", "arlen_voss") not in all_hidden_labels_by_edge
+    assert all_hidden_labels_by_edge[("arlen_voss", "moon_blade")] == "Moon Blade"
 
 
 def test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nodes(tmp_path):
     session_dir = tmp_path / "session_notes"
     session_dir.mkdir()
-    session_path = session_dir / "Session_Notes_Fixture.md"
+    session_path = session_dir / "complex_session_graph.md"
     session_path.write_text(
         "\n".join(
             [
@@ -1055,8 +1059,8 @@ def test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nod
     edge_pairs = {(edge.source, edge.target) for edge in projected.edges}
 
     assert indigo_nodes == ["indigo_cult"]
-    assert ("indigo_cult", "jory_ravenmark") in edge_pairs
-    assert ("indigo_cult", "neal_lovington") in edge_pairs
+    assert ("jory_ravenmark", "indigo_cult") in edge_pairs
+    assert ("neal_lovington", "indigo_cult") in edge_pairs
     assert ("indigo_cult", "moon_gate") in edge_pairs
 
 
@@ -1154,8 +1158,8 @@ def test_directory_session_lore_hide_file_name_preserves_source_bridge_connectio
 
     assert "source_heading__session_notes__session_1" not in headings_hidden.characters
     assert "source_heading__session_notes__session_2" not in headings_hidden.characters
-    assert hidden_labels_by_edge[("atlantia_bandits", "jory_ravenmark")] == "Session 1"
-    assert hidden_labels_by_edge[("atlantia_bandits", "orin_nightbloom")] == "Session 2"
+    assert hidden_labels_by_edge[("jory_ravenmark", "atlantia_bandits")] == "Session 1"
+    assert hidden_labels_by_edge[("orin_nightbloom", "atlantia_bandits")] == "Session 2"
 
 
 def test_hidden_session_headings_preserve_connection_table_evidence():
@@ -1413,9 +1417,9 @@ def test_hiding_file_name_and_h1_preserves_all_direct_h1_connections():
 
     assert "session_notes" not in projected.characters
     assert "source_heading__session_notes__session_1" not in projected.characters
-    assert labels_by_edge[("atlantia_bandits", "jory_ravenmark")] == "Session 1"
-    assert labels_by_edge[("atlantia_bandits", "orin_nightbloom")] == "Session 1"
-    assert labels_by_edge[("atlantia_bandits", "neal_lovington")] == "Session 1"
+    assert labels_by_edge[("jory_ravenmark", "atlantia_bandits")] == "Session 1"
+    assert labels_by_edge[("orin_nightbloom", "atlantia_bandits")] == "Session 1"
+    assert labels_by_edge[("neal_lovington", "atlantia_bandits")] == "Session 1"
 
 
 def test_selected_h1_filter_still_preserves_all_edges_when_h1_is_hidden(tmp_path):
@@ -1511,9 +1515,9 @@ def test_selected_h1_filter_still_preserves_all_edges_when_h1_is_hidden(tmp_path
     }
 
     assert selected_h1_id not in projected.characters
-    assert labels_by_edge[("atlantia_bandits", "jory_ravenmark")] == "Session 1"
-    assert labels_by_edge[("atlantia_bandits", "orin_nightbloom")] == "Session 1"
-    assert labels_by_edge[("atlantia_bandits", "neal_lovington")] == "Session 1"
+    assert labels_by_edge[("jory_ravenmark", "atlantia_bandits")] == "Session 1"
+    assert labels_by_edge[("orin_nightbloom", "atlantia_bandits")] == "Session 1"
+    assert labels_by_edge[("neal_lovington", "atlantia_bandits")] == "Session 1"
 
 
 def test_directory_session_lore_hide_file_name_removes_misclassified_session_notes_source(tmp_path):
@@ -1719,7 +1723,7 @@ def test_session_note_lore_graph_uses_headings_groups_characters_and_places(tmp_
     assert "family_tree" in file_view_graph.characters
     assert "side_notes" not in file_view_graph.characters
     assert "mary_ravenmark" in file_view_graph.characters
-    assert ("ravenmark_family", "mary_ravenmark") in {
+    assert ("mary_ravenmark", "ravenmark_family") in {
         (edge.source, edge.target)
         for edge in file_view_graph.edges
     }

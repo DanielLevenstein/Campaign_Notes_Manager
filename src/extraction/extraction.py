@@ -5,6 +5,7 @@ from datetime import datetime
 
 from src.graph.embeddings import build_embedding_record
 from src.graph.config import CharacterGraphConfig, load_character_graph_config
+from src.extraction.config import load_character_extraction_config
 from src.ingest.ingest import BackstoryDocument
 from src.graph.schema import (
     SCHEMA_VERSION,
@@ -20,111 +21,25 @@ from src.graph.schema import (
 )
 
 
-NAME_PATTERN = re.compile(r"\b([A-Z][a-z]+(?:[ \t]+(?:the[ \t]+)?[A-Z][a-z]+){0,3})\b")
-HEADING_PATTERN = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
-SENTENCE_PATTERN = re.compile(r"[^.!?\n]+[.!?]?")
-HONORIFIC_WORDS = {"Mr", "Mrs", "Ms", "Mx", "Dr", "Miss"}
-UNKNOWN_VALUES = {"", "unknown", "none", "n/a", "na", "unspecified", "not specified", "tbd"}
-NON_NAME_WORDS = {
-    "A",
-    "An",
-    "And",
-    "As",
-    "At",
-    "But",
-    "By",
-    "For",
-    "From",
-    "Haunted",
-    "He",
-    "Her",
-    "His",
-    "I",
-    "In",
-    "It",
-    "Its",
-    "Most",
-    "No",
-    "On",
-    "Or",
-    "One",
-    "She",
-    "That",
-    "The",
-    "Their",
-    "They",
-    "This",
-    "Those",
-    "When",
-    "Where",
-    "While",
-    "With",
-}
-PLACE_SUFFIXES = {
-    "Academy",
-    "Bastion",
-    "Cavern",
-    "City",
-    "College",
-    "Coast",
-    "Court",
-    "Fortress",
-    "Forest",
-    "Guild",
-    "Hall",
-    "Halls",
-    "Harbor",
-    "Keep",
-    "Kingdom",
-    "Library",
-    "Mage College",
-    "Monastery",
-    "Order",
-    "School",
-    "Sea",
-    "Shore",
-    "Shores",
-    "Temple",
-    "Tower",
-    "Tavern",
-    "University",
-    "Village",
-}
-GENERIC_PLACE_NAMES = {suffix.lower() for suffix in PLACE_SUFFIXES}
+EXTRACTION_CONFIG = load_character_extraction_config()
+NAME_PATTERN = re.compile(EXTRACTION_CONFIG.name_pattern)
+HEADING_PATTERN = re.compile(EXTRACTION_CONFIG.heading_pattern, re.MULTILINE)
+SENTENCE_PATTERN = re.compile(EXTRACTION_CONFIG.sentence_pattern)
+HONORIFIC_WORDS = EXTRACTION_CONFIG.honorific_words
+UNKNOWN_VALUES = EXTRACTION_CONFIG.unknown_values
+NON_NAME_WORDS = EXTRACTION_CONFIG.non_name_words
+PLACE_SUFFIXES = EXTRACTION_CONFIG.place_suffixes
+GENERIC_PLACE_NAMES = EXTRACTION_CONFIG.generic_place_names
 MOTIVATION_PATTERNS = [
-    re.compile(r"\b(?:wants|seeks|hopes|needs|tries|trying|adventures)\s+to\s+([^.!?;]+)", re.IGNORECASE),
-    re.compile(r"\b(?:goal|motivation)\s+(?:is|was)\s+to\s+([^.!?;]+)", re.IGNORECASE),
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in EXTRACTION_CONFIG.motivation_patterns
 ]
 RELATIONSHIP_RULES = [
-    ("betrayer", "Betrayer", "hostile", ("betray", "betrayed", "betraying")),
-    ("former_mentor", "Former mentor", "complicated", ("former mentor", "trained", "teacher", "mentor")),
-    ("family", "Family", "positive", ("sister", "brother", "mother", "father", "parent", "child", "family")),
-    ("client", "Client", "positive", ("client", "customer", "patron", "regular")),
-    ("rival", "Rivals", "hostile", ("rival", "competitor")),
-    ("enemy", "Enemy", "hostile", ("enemy", "foe", "hates", "opposes", "against")),
-    ("ally", "Ally", "positive", ("ally", "companion", "friend", "trusted")),
-    ("lover", "Lover", "positive", ("lover", "beloved", "romance", "romantic")),
+    (rule.relationship_type, rule.label, rule.sentiment, rule.keywords)
+    for rule in EXTRACTION_CONFIG.relationship_rules
 ]
-
-TRAIT_WORDS = {
-    "careful",
-    "guarded",
-    "strategic",
-    "resentful",
-    "loyal",
-    "wary",
-    "practical",
-    "ambitious",
-    "patient",
-    "reckless",
-    "kind",
-    "cruel",
-    "brave",
-    "fearful",
-    "cautious",
-    "curious",
-}
-GENERATED_EVIDENCE_MAX_LENGTH = 240
+TRAIT_WORDS = EXTRACTION_CONFIG.trait_words
+GENERATED_EVIDENCE_MAX_LENGTH = EXTRACTION_CONFIG.generated_evidence_max_length
 
 
 def extract_character_graph(

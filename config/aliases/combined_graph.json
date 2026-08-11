@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.1.0",
+  "session_name_variants": {
+    "dizlevad": ["Dizelvad"],
+    "morningstar": ["Moningstar"],
+    "sauriv": ["Sauriv-Isk", "Surriv"],
+    "typhon": ["Typheb", "Typhen", "Typhin"]
+  }
+}

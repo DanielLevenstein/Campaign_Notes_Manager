@@ -1,0 +1,148 @@
+{
+  "schema_version": "0.1.0",
+  "patterns": {
+    "name": "\\b([A-Z][a-z]+(?:[ \\t]+(?:the[ \\t]+)?[A-Z][a-z]+){0,3})\\b",
+    "heading": "^#\\s+(.+?)\\s*$",
+    "sentence": "[^.!?\\n]+[.!?]?"
+  },
+  "honorific_words": ["Dr", "Miss", "Mr", "Mrs", "Ms", "Mx"],
+  "unknown_values": ["", "unknown", "none", "n/a", "na", "unspecified", "not specified", "tbd"],
+  "non_name_words": [
+    "A",
+    "An",
+    "And",
+    "As",
+    "At",
+    "But",
+    "By",
+    "For",
+    "From",
+    "Haunted",
+    "He",
+    "Her",
+    "His",
+    "I",
+    "In",
+    "It",
+    "Its",
+    "Most",
+    "No",
+    "On",
+    "Or",
+    "One",
+    "She",
+    "That",
+    "The",
+    "Their",
+    "They",
+    "This",
+    "Those",
+    "When",
+    "Where",
+    "While",
+    "With"
+  ],
+  "place_suffixes": [
+    "Academy",
+    "Bastion",
+    "Cavern",
+    "City",
+    "College",
+    "Coast",
+    "Court",
+    "Fortress",
+    "Forest",
+    "Guild",
+    "Hall",
+    "Halls",
+    "Harbor",
+    "Keep",
+    "Kingdom",
+    "Library",
+    "Mage College",
+    "Monastery",
+    "Order",
+    "School",
+    "Sea",
+    "Shore",
+    "Shores",
+    "Temple",
+    "Tower",
+    "Tavern",
+    "University",
+    "Village"
+  ],
+  "motivation_patterns": [
+    "\\b(?:wants|seeks|hopes|needs|tries|trying|adventures)\\s+to\\s+([^.!?;]+)",
+    "\\b(?:goal|motivation)\\s+(?:is|was)\\s+to\\s+([^.!?;]+)"
+  ],
+  "relationship_rules": [
+    {
+      "type": "betrayer",
+      "label": "Betrayer",
+      "sentiment": "hostile",
+      "keywords": ["betray", "betrayed", "betraying"]
+    },
+    {
+      "type": "former_mentor",
+      "label": "Former mentor",
+      "sentiment": "complicated",
+      "keywords": ["former mentor", "trained", "teacher", "mentor"]
+    },
+    {
+      "type": "family",
+      "label": "Family",
+      "sentiment": "positive",
+      "keywords": ["sister", "brother", "mother", "father", "parent", "child", "family"]
+    },
+    {
+      "type": "client",
+      "label": "Client",
+      "sentiment": "positive",
+      "keywords": ["client", "customer", "patron", "regular"]
+    },
+    {
+      "type": "rival",
+      "label": "Rivals",
+      "sentiment": "hostile",
+      "keywords": ["rival", "competitor"]
+    },
+    {
+      "type": "enemy",
+      "label": "Enemy",
+      "sentiment": "hostile",
+      "keywords": ["enemy", "foe", "hates", "opposes", "against"]
+    },
+    {
+      "type": "ally",
+      "label": "Ally",
+      "sentiment": "positive",
+      "keywords": ["ally", "companion", "friend", "trusted"]
+    },
+    {
+      "type": "lover",
+      "label": "Lover",
+      "sentiment": "positive",
+      "keywords": ["lover", "beloved", "romance", "romantic"]
+    }
+  ],
+  "trait_words": [
+    "ambitious",
+    "brave",
+    "careful",
+    "cautious",
+    "cruel",
+    "curious",
+    "fearful",
+    "guarded",
+    "kind",
+    "loyal",
+    "patient",
+    "practical",
+    "reckless",
+    "resentful",
+    "strategic",
+    "wary"
+  ],
+  "generated_evidence_max_length": 240
+}

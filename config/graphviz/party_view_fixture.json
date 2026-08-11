@@ -33,10 +33,9 @@
     }
   },
   "columns": [
-    "family_names",
-    "main_characters",
-    "secondary_characters",
-    "places"
+    ["family_names", "artifacts", "groups"],
+    ["main_characters"],
+    ["secondary_characters", "places"]
   ],
   "editing_notes": [
     "This is the target renderer for docs/screenshots/Structured_Knowledge_Graph_Full.png.",

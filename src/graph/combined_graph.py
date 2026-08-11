@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Callable
 
-from src.graph.config import CharacterGraphConfig, load_character_graph_config
+from src.graph.config import CharacterGraphConfig, load_character_graph_config, load_combined_graph_aliases
 from src.graph.schema import CharacterGraph, infer_source_node_type
 
 
@@ -21,12 +21,6 @@ PRESERVED_RELATIONSHIP_TYPES = {
     "mentor",
 }
 
-CANONICAL_SESSION_NAME_VARIANTS = {
-    "dizlevad": {"Dizelvad"},
-    "morningstar": {"Moningstar"},
-    "sauriv": {"Sauriv-Isk", "Surriv"},
-    "typhon": {"Typheb", "Typhen", "Typhin"},
-}
 MAX_FOCUSED_GRAPH_CONNECTIONS = 6
 EvidenceRewriteClient = Callable[[list[dict[str, str]]], str]
 
@@ -1035,7 +1029,7 @@ def node_name_refs(name: str) -> set[str]:
     parts = name.split()
     if parts and parts[0].lower().rstrip(".") not in {"character", "session", "notes", "mr", "mrs", "ms", "mx", "dr"}:
         refs.add(parts[0])
-    refs.update(CANONICAL_SESSION_NAME_VARIANTS.get(compact(name), set()))
+    refs.update(load_combined_graph_aliases().get(compact(name), set()))
     return refs
 
 
@@ -1153,14 +1147,24 @@ def combined_relationship_dot(
     )
     if focus_node_id in display_characters:
         main_character_keys.update({compact(focus_node_id), compact(display_characters[focus_node_id].name)})
+    column_layout_requested = bool(main_character_keys or main_place_keys)
+    vertical_layout = should_use_vertical_layout(graph) and not column_layout_requested
+    column_layout = graphviz_config.get("column_layout", "character")
+    column_specs = graph_column_specs(graphviz_config)
+    if column_specs is not None:
+        display_characters = display_characters_for_columns(
+            display_characters,
+            main_character_keys,
+            main_place_keys,
+            column_layout,
+            column_specs,
+        )
     display_edges = [
         edge
         for edge in graph.edges
         if edge.source in display_characters and edge.target in display_characters
     ]
     display_edges = prominent_relationship_edges(display_edges)
-    column_layout_requested = bool(main_character_keys or main_place_keys)
-    vertical_layout = should_use_vertical_layout(graph) and not column_layout_requested
     graph_config = graphviz_config.get("graph", {})
     rankdir = (
         graph_config.get("vertical_rankdir", "TB")
@@ -1187,7 +1191,8 @@ def combined_relationship_dot(
         display_edges,
         main_character_keys,
         main_place_keys,
-        graphviz_config.get("column_layout", "character"),
+        column_layout,
+        column_specs,
     )
     column_by_node = graph_column_by_node(column_groups)
     for character_id, character in display_characters.items():
@@ -1483,11 +1488,17 @@ def graph_column_groups(
     main_character_keys: set[str],
     main_place_keys: set[str],
     column_layout: str = "character",
+    column_specs: list[list[str]] | None = None,
 ) -> dict[str, list[str]]:
-    groups = graph_column_group_template(column_layout)
+    groups = graph_column_group_template(column_layout, column_specs)
     weights = node_mention_weights(edges)
     connection_counts = node_connection_counts(edges)
     for node_id, node in nodes.items():
+        if column_specs is not None:
+            group_name = configured_column_group(node_id, node, main_character_keys, main_place_keys, column_layout, column_specs)
+            if group_name:
+                groups[group_name].append(node_id)
+            continue
         if is_markdown_lore_column_layout(column_layout):
             group_name = markdown_lore_column_group(node, column_layout)
             groups[group_name].append(node_id)
@@ -1528,7 +1539,12 @@ def graph_column_groups(
     return groups
 
 
-def graph_column_group_template(column_layout: str) -> dict[str, list[str]]:
+def graph_column_group_template(column_layout: str, column_specs: list[list[str]] | None = None) -> dict[str, list[str]]:
+    if column_specs is not None:
+        return {
+            configured_column_group_name(index, column): []
+            for index, column in enumerate(column_specs)
+        }
     if is_markdown_lore_column_layout(column_layout):
         return {
             markdown_lore_column_0_name(column_layout): [],
@@ -1543,6 +1559,111 @@ def graph_column_group_template(column_layout: str) -> dict[str, list[str]]:
         "column_2_secondary_characters": [],
         "column_3_places": [],
     }
+
+
+def graph_column_specs(graphviz_config: dict[str, Any]) -> list[list[str]] | None:
+    raw_columns = graphviz_config.get("columns")
+    if not isinstance(raw_columns, list):
+        return None
+    columns: list[list[str]] = []
+    for raw_column in raw_columns:
+        if isinstance(raw_column, str):
+            column = [raw_column]
+        elif isinstance(raw_column, list):
+            column = [item for item in raw_column if isinstance(item, str) and item]
+        else:
+            column = []
+        if column:
+            columns.append(column)
+    return columns or None
+
+
+def configured_column_group_name(index: int, column: list[str]) -> str:
+    suffix = "_".join(column_category_key(value) for value in column if column_category_key(value)) or "nodes"
+    return f"column_{index}_{suffix}"
+
+
+def column_category_key(value: str) -> str:
+    return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]+", "_", value.strip().lower())).strip("_")
+
+
+def display_characters_for_columns(
+    nodes: dict[str, CombinedCharacterNode],
+    main_character_keys: set[str],
+    main_place_keys: set[str],
+    column_layout: str,
+    column_specs: list[list[str]],
+) -> dict[str, CombinedCharacterNode]:
+    return {
+        node_id: node
+        for node_id, node in nodes.items()
+        if configured_column_group(node_id, node, main_character_keys, main_place_keys, column_layout, column_specs)
+    }
+
+
+def configured_column_group(
+    node_id: str,
+    node: CombinedCharacterNode,
+    main_character_keys: set[str],
+    main_place_keys: set[str],
+    column_layout: str,
+    column_specs: list[list[str]],
+) -> str:
+    categories = configured_node_categories(node_id, node, main_character_keys, main_place_keys, column_layout)
+    for index, column in enumerate(column_specs):
+        if categories & set(column):
+            return configured_column_group_name(index, column)
+    return ""
+
+
+def configured_node_categories(
+    node_id: str,
+    node: CombinedCharacterNode,
+    main_character_keys: set[str],
+    main_place_keys: set[str],
+    column_layout: str = "character",
+) -> set[str]:
+    categories: set[str] = set()
+    key = compact(node.name)
+    compact_id = compact(node_id)
+    if is_source_root_node(node):
+        categories.add("source_files")
+    if is_heading_node(node):
+        categories.add("headings")
+        heading_level = source_heading_level_for_node(node)
+        if heading_level is not None:
+            categories.add(f"h{min(3, heading_level)}")
+    if node.node_type == "family":
+        categories.add("family_names")
+    if node.node_type == "artifact":
+        categories.update({"artifacts", "lore_nodes"})
+    if node.node_type == "group":
+        categories.update({"groups", "lore_nodes"})
+    if node.node_type == "place":
+        categories.update({"places", "lore_nodes"})
+    if node.node_type == "character":
+        if key in main_character_keys or compact_id in main_character_keys:
+            categories.add("main_characters")
+        else:
+            categories.add("secondary_characters")
+        categories.add("linked_characters")
+    if node.node_type == "place" and (key in main_place_keys or compact_id in main_place_keys):
+        categories.add("places")
+    if is_markdown_lore_column_layout(column_layout):
+        categories.update(markdown_lore_config_categories(node, column_layout))
+    return categories
+
+
+def markdown_lore_config_categories(node: CombinedCharacterNode, column_layout: str) -> set[str]:
+    group_name = markdown_lore_column_group(node, column_layout)
+    categories: set[str] = set()
+    if is_heading_node(node):
+        for level in (1, 2, 3):
+            if f"markdown_heading_{level}" in group_name:
+                categories.add(f"h{level}")
+    if group_name.endswith("character_connections"):
+        categories.add("linked_characters")
+    return categories
 
 
 def markdown_lore_column_0_name(column_layout: str) -> str:
@@ -1604,6 +1725,22 @@ def markdown_lore_column_group(node: CombinedCharacterNode, column_layout: str) 
 
 
 def graph_column_node_type_rank(group_name: str, node_type: str) -> int:
+    if "source_files" in group_name or "headings" in group_name:
+        entity_type = source_heading_entity_type(node_type)
+        heading_level = source_heading_level(node_type)
+        return {
+            "source_document": 0,
+            "note": 0,
+            "place": 1,
+            "group": 1,
+            "artifact": 1,
+        }.get(entity_type or node_type, 2 + (heading_level or 0))
+    if any(category in group_name for category in ("family_names", "artifacts", "groups")):
+        return {
+            "family": 0,
+            "artifact": 1,
+            "group": 2,
+        }.get(node_type, 3)
     if group_name in {"column_0_family_names", "column_0_source_documents", "column_0_source_documents_places", "column_0_source_documents_groups"}:
         entity_type = source_heading_entity_type(node_type)
         return {

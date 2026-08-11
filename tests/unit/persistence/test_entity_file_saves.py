@@ -1,6 +1,6 @@
 from datetime import date
 
-import src.extraction.session_notes as session_notes
+import src.extraction.raw_txt_import as session_notes
 import src.persistence.lore_documents as storage
 from src.persistence.storage import load_graph
 from src.persistence.lore_documents import (

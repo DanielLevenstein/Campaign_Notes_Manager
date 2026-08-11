@@ -205,7 +205,7 @@ def test_ui_imports_uploaded_session_notes_as_one_markdown_file(isolated_session
     app_url, docs_lore_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
     import_file = docs_lore_dir / "discord_import.md"
-    shutil.copy2(ROOT_DIR / "tests" / "fixtures" / "session_notes" / "Session_Notes_Fixture.md", import_file)
+    shutil.copy2(ROOT_DIR / "tests" / "fixtures" / "session_notes" / "complex_session_graph.md", import_file)
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()

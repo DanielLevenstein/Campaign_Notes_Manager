@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CHARACTER_GRAPH_CONFIG = PROJECT_ROOT / "config" / "character_graph.json"
 DEFAULT_EDGE_CONFIG = PROJECT_ROOT / "config" / "edges" / "character_graph.json"
 DEFAULT_NODE_CONFIG = PROJECT_ROOT / "config" / "nodes" / "character_graph.json"
+DEFAULT_COMBINED_GRAPH_ALIAS_CONFIG = PROJECT_ROOT / "config" / "aliases" / "combined_graph.json"
 CONFIG_BUCKETS = ("relationships", "attributes", "places")
 
 
@@ -60,6 +62,38 @@ class CharacterGraphConfig:
         if matches:
             return sorted(matches, reverse=True)[0][1]
         return self.canonical_edge_type(fallback) or "reference"
+
+
+@lru_cache(maxsize=1)
+def load_combined_graph_aliases(path: Path = DEFAULT_COMBINED_GRAPH_ALIAS_CONFIG) -> dict[str, frozenset[str]]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid combined graph alias config JSON at {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"Combined graph alias config at {path} must contain a JSON object.")
+    return combined_graph_aliases_from_payload(payload)
+
+
+def combined_graph_aliases_from_payload(payload: dict[str, Any]) -> dict[str, frozenset[str]]:
+    variants = payload.get("session_name_variants", {})
+    if not isinstance(variants, dict):
+        raise ValueError("Combined graph alias config must contain a `session_name_variants` object.")
+    aliases: dict[str, frozenset[str]] = {}
+    for canonical_name, raw_aliases in variants.items():
+        canonical_key = normalize_edge_key(str(canonical_name))
+        if not canonical_key:
+            raise ValueError("Session name variant keys must be non-empty strings.")
+        if not isinstance(raw_aliases, list):
+            raise ValueError(f"Session name variants for `{canonical_name}` must be a list.")
+        aliases[canonical_key] = frozenset(
+            str(alias).strip()
+            for alias in raw_aliases
+            if str(alias).strip()
+        )
+    return aliases
 
 
 def load_character_graph_config(

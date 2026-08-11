@@ -74,7 +74,7 @@ def test_import_lore_directory_copies_fixture_subdirectories(tmp_path, monkeypat
     ).read_text(encoding="utf-8")
     assert (places_dir / "Atlantia_Lore.md").exists()
     assert (session_notes_dir / "Family_Tree.md").exists()
-    assert (session_notes_dir / "Session_Notes_Fixture.md").exists()
+    assert (session_notes_dir / "complex_session_graph.md").exists()
 
 
 def test_import_lore_directory_converts_old_txt_session_notes_to_markdown(tmp_path, monkeypatch):

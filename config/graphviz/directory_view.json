@@ -33,10 +33,13 @@
     }
   },
   "columns": [
-    "source_files",
-    "headings",
-    "lore_nodes",
-    "linked_characters"
+    ["source_files", "h1"],
+    ["h2"],
+    ["h3"],
+    ["places"],
+    ["groups"],
+    ["artifacts"],
+    ["linked_characters"]
   ],
   "editing_notes": [
     "Location View and Session View both use this config and select their concrete column layout in the rendering pipeline.",

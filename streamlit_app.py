@@ -50,7 +50,7 @@ from src.writing.rewrite_model import (
     LocalRewriteModelLifecycle,
     load_local_config,
 )
-from src.extraction.session_notes import (
+from src.extraction.raw_txt_import import (
     child_markdown_sections,
     combine_markdown_section,
     hide_markdown_section_heading,

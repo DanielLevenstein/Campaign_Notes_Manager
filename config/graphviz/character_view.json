@@ -32,13 +32,12 @@
     }
   },
   "columns": [
-    "family_names",
-    "main_characters",
-    "secondary_characters",
-    "places"
+    ["family_names", "artifacts", "groups"],
+    ["main_characters"],
+    ["secondary_characters", "places"]
   ],
   "editing_notes": [
-    "Override only values that should differ from config/graphviz/default_graph_view.json.",
+    "Override only values that should differ from config/graphviz/global_graph_view.json.",
     "After changing spacing or routing, run the graph label-position UI regression."
   ]
 }

@@ -2,6 +2,9 @@ from pathlib import Path
 
 from src.graph.combined_graph import (
     build_combined_character_graph,
+    CombinedCharacterGraph,
+    CombinedCharacterNode,
+    CombinedRelationshipEdge,
     combined_attribute_rows,
     combined_node_detail_rows,
     default_graphviz_config,
@@ -289,6 +292,126 @@ def test_party_view_fixture_uses_character_column_layout_without_hidden_sources(
     ]
     assert intra_column_edges
     assert all('constraint="false"' in line for line in intra_column_edges)
+
+
+def test_configured_columns_hide_sources_and_headings_when_omitted():
+    graph = configured_columns_fixture_graph()
+    graphviz_config = {
+        **default_graphviz_config(),
+        "columns": [
+            ["family_names", "artifacts", "groups"],
+            ["main_characters"],
+            ["secondary_characters", "places"],
+        ],
+    }
+
+    dot = combined_relationship_dot(
+        graph,
+        main_character_ids={"jory_ravenmark"},
+        main_place_ids={"atlantia"},
+        graphviz_config=graphviz_config,
+    )
+
+    assert 'subgraph "cluster_column_0_family_names_artifacts_groups"' in dot
+    assert 'subgraph "cluster_column_1_main_characters"' in dot
+    assert 'subgraph "cluster_column_2_secondary_characters_places"' in dot
+    assert '"session_notes"' not in dot
+    assert '"source_heading__session_notes__session_1"' not in dot
+    assert '"ravenmark_family"' in dot
+    assert '"moon_blade"' in dot
+    assert '"indigo_cult"' in dot
+
+
+def test_configured_columns_share_sources_and_headings_when_explicit():
+    graph = configured_columns_fixture_graph()
+    graphviz_config = {
+        **default_graphviz_config(),
+        "columns": [
+            ["source_files", "headings"],
+            ["family_names", "artifacts", "groups"],
+            ["main_characters"],
+            ["secondary_characters", "places"],
+        ],
+    }
+
+    dot = combined_relationship_dot(
+        graph,
+        main_character_ids={"jory_ravenmark"},
+        main_place_ids={"atlantia"},
+        graphviz_config=graphviz_config,
+    )
+
+    source_heading_column = dot[
+        dot.index('subgraph "cluster_column_0_source_files_headings"') :
+        dot.index('subgraph "cluster_column_1_family_names_artifacts_groups"')
+    ]
+    assert '"session_notes"' in source_heading_column
+    assert '"source_heading__session_notes__session_1"' in source_heading_column
+    assert '"ravenmark_family"' not in source_heading_column
+
+
+def configured_columns_fixture_graph() -> CombinedCharacterGraph:
+    return CombinedCharacterGraph(
+        characters={
+            "session_notes": CombinedCharacterNode(
+                id="session_notes",
+                name="Session Notes",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_document",
+            ),
+            "source_heading__session_notes__session_1": CombinedCharacterNode(
+                id="source_heading__session_notes__session_1",
+                name="Session 1",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_1",
+            ),
+            "ravenmark_family": CombinedCharacterNode(
+                id="ravenmark_family",
+                name="Ravenmark Family",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="family",
+            ),
+            "moon_blade": CombinedCharacterNode(
+                id="moon_blade",
+                name="Moon Blade",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="artifact",
+            ),
+            "indigo_cult": CombinedCharacterNode(
+                id="indigo_cult",
+                name="Indigo Cult",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="group",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+            "neal_lovington": CombinedCharacterNode(
+                id="neal_lovington",
+                name="Neal Lovington",
+                source_file="world_building/lore/character_sheets/Neal_Lovington.md",
+                node_type="character",
+            ),
+            "atlantia": CombinedCharacterNode(
+                id="atlantia",
+                name="Atlantia",
+                source_file="world_building/lore/places/Atlantia.md",
+                node_type="place",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge("session_notes", "source_heading__session_notes__session_1", "heading", ""),
+            CombinedRelationshipEdge("source_heading__session_notes__session_1", "jory_ravenmark", "mentions", "Mentions"),
+            CombinedRelationshipEdge("jory_ravenmark", "ravenmark_family", "family", "Family"),
+            CombinedRelationshipEdge("jory_ravenmark", "moon_blade", "artifact", "Artifact"),
+            CombinedRelationshipEdge("jory_ravenmark", "indigo_cult", "mentions", "Mentions"),
+            CombinedRelationshipEdge("jory_ravenmark", "neal_lovington", "ally", "Ally"),
+            CombinedRelationshipEdge("jory_ravenmark", "atlantia", "home", "Home"),
+        ],
+    )
 
 
 def test_party_column_layout_orders_connections_by_mention_count():

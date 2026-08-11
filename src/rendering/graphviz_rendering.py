@@ -1089,9 +1089,10 @@ def markdown_header_lore_graph(
             relationship_label = semantic_heading_display_name(heading.text)
         append_projected_edge(
             projected_edges,
-            CombinedRelationshipEdge(
+            projected_lore_context_edge(
                 source=edge_source,
                 target=adjacent_id,
+                nodes={**graph.characters, **projected_nodes},
                 relationship_type=edge.relationship_type,
                 relationship_label=relationship_label,
                 evidence=list(edge.evidence),
@@ -1250,9 +1251,10 @@ def graph_without_markdown_heading_nodes(
                     continue
                 append_projected_edge(
                     replacement_edges,
-                    CombinedRelationshipEdge(
+                    projected_lore_context_edge(
                         source=parent_id,
                         target=child_id,
+                        nodes=visible_nodes,
                         relationship_type="heading",
                         relationship_label=heading_label,
                         evidence=hidden_heading_bridge_evidence(graph, heading_id, hidden_heading_ids, parent_id, child_id),
@@ -1442,7 +1444,7 @@ def contextual_heading_child_pairs(
                 or target.node_type not in {"character", "place", "group", "artifact", "family"}
             ):
                 continue
-            pairs.append((source_id, target_id))
+            pairs.append(lore_context_edge_direction(source_id, target_id, nodes))
     if pairs:
         return pairs
     for source_id in child_ids:
@@ -1513,15 +1515,50 @@ def append_linked_character_fanout(
         connected_ids.update({root_id, adjacent_id})
         append_projected_edge(
             projected_edges,
-            CombinedRelationshipEdge(
+            projected_lore_context_edge(
                 source=root_id,
                 target=adjacent_id,
+                nodes=graph.characters,
                 relationship_type=edge.relationship_type,
                 relationship_label=edge.relationship_label,
                 evidence=list(edge.evidence),
                 bidirectional=edge.bidirectional,
             ),
         )
+
+
+def projected_lore_context_edge(
+    *,
+    source: str,
+    target: str,
+    nodes: dict[str, CombinedCharacterNode],
+    relationship_type: str,
+    relationship_label: str,
+    evidence: list[str] | None = None,
+    bidirectional: bool = False,
+) -> CombinedRelationshipEdge:
+    directed_source, directed_target = lore_context_edge_direction(source, target, nodes)
+    return CombinedRelationshipEdge(
+        source=directed_source,
+        target=directed_target,
+        relationship_type=relationship_type,
+        relationship_label=relationship_label,
+        evidence=evidence or [],
+        bidirectional=bidirectional,
+    )
+
+
+def lore_context_edge_direction(
+    source: str,
+    target: str,
+    nodes: dict[str, CombinedCharacterNode],
+) -> tuple[str, str]:
+    source_node = nodes.get(source)
+    target_node = nodes.get(target)
+    if source_node is not None and target_node is not None:
+        if source_node.node_type in {"artifact", "group"} and target_node.node_type == "character":
+            return target, source
+    return source, target
 
 
 def filter_lore_graph_by_heading(graph: CombinedCharacterGraph, heading_id: str) -> CombinedCharacterGraph:

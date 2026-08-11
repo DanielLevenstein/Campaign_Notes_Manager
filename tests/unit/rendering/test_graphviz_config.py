@@ -70,3 +70,23 @@ def test_directory_graphviz_config_exists_for_location_and_session_views():
     assert config["view_key"] == "directory_view"
     assert config["label"] == "Directory View"
     assert config["graph"]["rankdir"] == "LR"
+
+
+def test_graphviz_view_configs_use_nested_column_arrays():
+    assert load_graphviz_config("character_view")["columns"] == [
+        ["family_names", "artifacts", "groups"],
+        ["main_characters"],
+        ["secondary_characters", "places"],
+    ]
+    assert load_graphviz_config("party_view_fixture")["columns"] == [
+        ["family_names", "artifacts", "groups"],
+        ["main_characters"],
+        ["secondary_characters", "places"],
+    ]
+    assert load_graphviz_config("directory_view")["columns"] == [
+        ["source_files", "h1"],
+        ["h2"],
+        ["h3"],
+        ["artifacts", "places", "groups"],
+        ["linked_characters"],
+    ]
