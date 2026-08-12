@@ -81,7 +81,14 @@ PLACES_HEADING_VIEW_TAB = "Heading View"
 PLACES_FILE_VIEW_TAB = "Location View"
 SESSION_HEADING_VIEW_TAB = "Heading View"
 SESSION_FILE_VIEW_TAB = "Session View"
-GRAPH_VIEW_TABS = [SINGLE_CHARACTER_TAB, PARTY_VIEW_TAB, PLACES_FILE_VIEW_TAB, SESSION_FILE_VIEW_TAB]
+FULL_KNOWLEDGE_GRAPH_TAB = "Full Knowledge Graph"
+GRAPH_VIEW_TABS = [
+    SINGLE_CHARACTER_TAB,
+    PARTY_VIEW_TAB,
+    PLACES_FILE_VIEW_TAB,
+    SESSION_FILE_VIEW_TAB,
+    FULL_KNOWLEDGE_GRAPH_TAB,
+]
 
 DIRECTORY_SESSION_VIEW_TAB = "Directory Section View"
 
@@ -102,8 +109,8 @@ SESSION_MONTH_VIEW = KnowledgeGraphView(
     label="Month Selection",
 )
 STRUCTURED_KNOWLEDGE_VIEW = KnowledgeGraphView(
-    key="full_structured_graph",
-    label="Structured Knowledge View",
+    key="full_knowledge_graph",
+    label=FULL_KNOWLEDGE_GRAPH_TAB,
 )
 
 def graph_tab_names(active_main_tab: str) -> list[str]:
@@ -244,6 +251,13 @@ def render_knowledge_graph_tabs(
                 render_lore_graph_view(
                     combined,
                     definition=lore_view_definitions[tab_name],
+                    label_font_color=label_font_color,
+                )
+            elif tab_name == FULL_KNOWLEDGE_GRAPH_TAB:
+                render_full_knowledge_graph_view(
+                    combined=combined,
+                    main_character_ids=main_character_ids,
+                    main_place_ids=main_place_ids,
                     label_font_color=label_font_color,
                 )
 
@@ -628,6 +642,57 @@ def render_presented_relationship_graph(
         label_font_color=label_font_color,
         graphviz_config=load_graphviz_config(presentation.graphviz_config_key),
         relationship_rows=presentation.relationship_rows,
+    )
+
+
+def render_full_knowledge_graph_view(
+    *,
+    combined: CombinedCharacterGraph,
+    main_character_ids: set[str],
+    main_place_ids: set[str],
+    label_font_color: str,
+) -> None:
+    st.subheader(STRUCTURED_KNOWLEDGE_VIEW.label)
+    if not combined.characters:
+        st.info("Add Lore To See The Full Knowledge Graph.")
+        return
+    hide_source_files = st.checkbox(
+        "Hide File Name",
+        key="full_knowledge_graph_hidden_elements_file_name",
+        value=False,
+    )
+    graph = full_knowledge_graph(
+        combined,
+        hide_source_files=hide_source_files,
+    )
+    render_relationship_graph(
+        graph,
+        main_character_ids=main_character_ids,
+        main_place_ids=main_place_ids,
+        label_font_color=label_font_color,
+        graphviz_config=load_graphviz_config(STRUCTURED_KNOWLEDGE_VIEW.key),
+    )
+
+
+def full_knowledge_graph(
+    graph: CombinedCharacterGraph,
+    *,
+    hide_source_files: bool = False,
+) -> CombinedCharacterGraph:
+    projected_graph = graph
+    if hide_source_files:
+        projected_graph = graph_without_source_document_roots(projected_graph)
+    return graph_without_all_markdown_headings(projected_graph)
+
+
+def graph_without_all_markdown_headings(graph: CombinedCharacterGraph) -> CombinedCharacterGraph:
+    return graph_without_markdown_heading_nodes(
+        graph,
+        {
+            node_id
+            for node_id, node in graph.characters.items()
+            if is_markdown_heading_node(node)
+        },
     )
 
 

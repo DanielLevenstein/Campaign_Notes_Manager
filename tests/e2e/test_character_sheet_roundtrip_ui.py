@@ -337,6 +337,17 @@ def open_combined_graph_expander(page):
     return graph_expander
 
 
+def scroll_graph_image_into_view(graph_panel, timeout: int = 30000):
+    graph_image = graph_panel.get_by_role("img").first
+    expect(graph_image).to_be_visible(timeout=timeout)
+    graph_image.evaluate(
+        """(element) => {
+            element.scrollIntoView({block: "center", inline: "center", behavior: "instant"});
+        }"""
+    )
+    return graph_image
+
+
 def capture_graph_view_screenshot(page, graph_expander, view_name: str, screenshot_path: Path) -> None:
     for attempt in range(2):
         tab = graph_expander.get_by_role("tab", name=view_name, exact=True)
@@ -344,9 +355,10 @@ def capture_graph_view_screenshot(page, graph_expander, view_name: str, screensh
         if tab.get_attribute("aria-selected") != "true":
             tab.click()
         expect(tab).to_have_attribute("aria-selected", "true", timeout=10000)
+        graph_panel = graph_expander.get_by_role("tabpanel", name=view_name)
         try:
-            expect(graph_expander.get_by_role("img").first).to_be_visible(timeout=30000)
-            page.screenshot(path=str(screenshot_path), full_page=True)
+            scroll_graph_image_into_view(graph_panel)
+            page.screenshot(path=str(screenshot_path))
             return
         except AssertionError:
             dynamic_import_error = graph_expander.get_by_text(
@@ -841,10 +853,10 @@ def test_capture_knowledge_graph_screenshot(isolated_character_app):
             graph_node_select = graph_expander.get_by_label(f"Graph Node For {graph_node_name}", exact=True).first
             expect(graph_node_select).to_have_value(graph_node_name, timeout=10000)
         else:
-            expect(graph_expander.get_by_role("img").first).to_be_visible(timeout=10000)
+            scroll_graph_image_into_view(graph_expander, timeout=10000)
         page.wait_for_timeout(1000)
 
-        graph_expander.scroll_into_view_if_needed()
+        scroll_graph_image_into_view(graph_expander, timeout=10000)
         page.screenshot(path=str(screenshot_path))
         browser.close()
 
@@ -1164,11 +1176,13 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
         full_tab = graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)
         full_tab.click()
         full_panel = graph_expander.get_by_role("tabpanel", name="Full Knowledge Graph")
-        for label in ("Hide File Name", "Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
-            expect(full_panel.get_by_label(label, exact=True)).to_be_visible(timeout=10000)
-        expect(full_panel.get_by_role("img").first).to_be_visible(timeout=10000)
+        expect(full_panel.get_by_label("Hide File Name", exact=True)).to_be_visible(timeout=10000)
+        for label in ("Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
+            expect(full_panel.get_by_label(label, exact=True)).not_to_be_visible(timeout=10000)
+        expect(full_panel.get_by_role("combobox", name="Heading Selected", exact=True)).not_to_be_visible(timeout=10000)
+        scroll_graph_image_into_view(full_panel, timeout=10000)
 
-        graph_expander.scroll_into_view_if_needed()
+        scroll_graph_image_into_view(full_panel, timeout=10000)
         page.screenshot(path=str(STRUCTURED_KNOWLEDGE_GRAPH_FULL_SCREENSHOT))
         browser.close()
 

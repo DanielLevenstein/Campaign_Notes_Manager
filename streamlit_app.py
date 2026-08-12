@@ -413,14 +413,23 @@ def undo_character_changes(character: Character) -> None:
             update_graph=lambda _path: regenerate_character_graph(character),
         )
     st.session_state[key] = snapshots
+    bump_character_editor_revision(character)
     mark_combined_graph_dirty()
     st.session_state[f"character_status_{character.name}"] = "Character Changes Undone."
     st.rerun()
 
 
+def bump_character_editor_revision(character: Character) -> None:
+    st.session_state[f"character_editor_revision_{character.name}"] = st.session_state.get(
+        f"character_editor_revision_{character.name}",
+        0,
+    ) + 1
+
+
 def save_character_update(character: Character, updated: CharacterProfile) -> None:
     push_character_undo(character)
     write_character_profile(character, updated)
+    bump_character_editor_revision(character)
     mark_combined_graph_dirty()
     st.session_state[f"character_status_{character.name}"] = "Character Saved."
     st.session_state.pop(f"pending_character_save_{character.name}", None)
@@ -1558,34 +1567,36 @@ def render_character_panel() -> None:
 
 def render_character_editor(character: Character) -> None:
     profile = read_character_profile(character)
+    editor_revision = st.session_state.get(f"character_editor_revision_{character.name}", 0)
+    key_suffix = f"{character.name}_{editor_revision}"
     st.markdown("#### Edit Character")
     editor_context = st.container()
     with editor_context:
-        with st.form(f"edit_character_{character.name}"):
+        with st.form(f"edit_character_{key_suffix}"):
             name_cols = st.columns(2)
             name_cols[0].text_input(
                 "Character Name",
                 value=profile.name,
                 disabled=True,
-                key=f"edit_character_name_{character.name}",
+                key=f"edit_character_name_{key_suffix}",
             )
             player_name = name_cols[1].text_input(
                 "Player Name",
                 value=profile_player_name(profile),
-                key=f"edit_player_name_{character.name}",
+                key=f"edit_player_name_{key_suffix}",
             )
             st.text_area(
                 "Aliases",
                 value=render_alias_metadata(aliases=profile.aliases),
                 height=80,
                 disabled=True,
-                key=f"edit_aliases_{character.name}",
+                key=f"edit_aliases_{key_suffix}",
             )
             stat_cols = st.columns(4)
-            level = stat_cols[0].text_input("Level", value=profile.level)
-            race = stat_cols[1].text_input("Race", value=profile.race)
-            character_class = stat_cols[2].text_input("Class", value=profile.character_class)
-            pronouns = stat_cols[3].text_input("Pronouns", value=profile.pronouns)
+            level = stat_cols[0].text_input("Level", value=profile.level, key=f"edit_level_{key_suffix}")
+            race = stat_cols[1].text_input("Race", value=profile.race, key=f"edit_race_{key_suffix}")
+            character_class = stat_cols[2].text_input("Class", value=profile.character_class, key=f"edit_class_{key_suffix}")
+            pronouns = stat_cols[3].text_input("Pronouns", value=profile.pronouns, key=f"edit_pronouns_{key_suffix}")
             if has_distinct_original(profile.summary, profile.original_summary):
                 summary_cols = st.columns(2)
                 summary_cols[0].caption(section_status_label("Character Summary", profile))
@@ -1593,6 +1604,7 @@ def render_character_editor(character: Character) -> None:
                     "Summary",
                     value=profile.summary,
                     height=96,
+                    key=f"edit_summary_{key_suffix}",
                 )
                 summary_cols[1].caption("Original Character Summary")
                 summary_cols[1].text_area(
@@ -1600,10 +1612,11 @@ def render_character_editor(character: Character) -> None:
                     value=profile.original_summary,
                     height=96,
                     disabled=True,
+                    key=f"edit_original_summary_{key_suffix}",
                 )
             else:
                 render_section_status("Character Summary", profile)
-                summary = st.text_area("Summary", value=profile.summary, height=96)
+                summary = st.text_area("Summary", value=profile.summary, height=96, key=f"edit_summary_{key_suffix}")
             if has_distinct_original(profile.backstory, profile.original_backstory):
                 backstory_cols = st.columns(2)
                 backstory_cols[0].caption(section_status_label("Character Backstory", profile))
@@ -1611,6 +1624,7 @@ def render_character_editor(character: Character) -> None:
                     "Backstory",
                     value=profile.backstory,
                     height=180,
+                    key=f"edit_backstory_{key_suffix}",
                 )
                 backstory_cols[1].caption("Original Character Backstory")
                 backstory_cols[1].text_area(
@@ -1618,18 +1632,19 @@ def render_character_editor(character: Character) -> None:
                     value=profile.original_backstory,
                     height=180,
                     disabled=True,
+                    key=f"edit_original_backstory_{key_suffix}",
                 )
             else:
                 render_section_status("Character Backstory", profile)
-                backstory = st.text_area("Backstory", value=profile.backstory, height=180)
+                backstory = st.text_area("Backstory", value=profile.backstory, height=180, key=f"edit_backstory_{key_suffix}")
 
             with st.expander("Optional Metadata", expanded=character_optional_metadata_present(profile)):
                 detail_cols = st.columns(3)
-                drives = detail_cols[0].text_area("Drives", value=render_list_field(profile.drives), height=96)
-                alliances = detail_cols[1].text_area("Alliances", value=render_list_field(profile.alliances), height=96)
-                enemies = detail_cols[2].text_area("Enemies", value=render_list_field(profile.enemies), height=96)
+                drives = detail_cols[0].text_area("Drives", value=render_list_field(profile.drives), height=96, key=f"edit_drives_{key_suffix}")
+                alliances = detail_cols[1].text_area("Alliances", value=render_list_field(profile.alliances), height=96, key=f"edit_alliances_{key_suffix}")
+                enemies = detail_cols[2].text_area("Enemies", value=render_list_field(profile.enemies), height=96, key=f"edit_enemies_{key_suffix}")
                 details_value = profile.details or default_details(profile)
-                details = st.text_area("Character Details", value=details_value, height=120)
+                details = st.text_area("Character Details", value=details_value, height=120, key=f"edit_details_{key_suffix}")
             action_cols = st.columns(5)
             save_requested = action_cols[0].form_submit_button(
                 "Save Character",
