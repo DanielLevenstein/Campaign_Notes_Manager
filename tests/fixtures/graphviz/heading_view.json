@@ -1,13 +1,13 @@
 {
   "schema_version": "0.1.0",
   "config_scope": "knowledge_view",
-  "view_key": "directory_view",
+  "view_key": "heading_view",
   "label": "Directory View",
   "description": "Shared Graphviz defaults for Location View and Session View directory-style lore graphs.",
   "inherits": "config/graphviz/global_graph_view.json",
   "merge_order": [
     "config/graphviz/global_graph_view.json",
-    "config/graphviz/directory_view.json"
+    "config/graphviz/heading_view.json"
   ],
   "graph": {
     "rankdir": "LR",

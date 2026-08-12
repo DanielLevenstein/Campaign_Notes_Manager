@@ -74,7 +74,7 @@ def test_load_graphviz_config_recursively_merges_parent_view_config(tmp_path):
         ),
         encoding="utf-8",
     )
-    (config_dir / "directory_view.json").write_text(
+    (config_dir / "heading_view.json").write_text(
         json.dumps(
             {
                 "inherits": "config/graphviz/global_graph_view.json",
@@ -88,7 +88,7 @@ def test_load_graphviz_config_recursively_merges_parent_view_config(tmp_path):
     (config_dir / "session_view.json").write_text(
         json.dumps(
             {
-                "inherits": "config/graphviz/directory_view.json",
+                "inherits": "config/graphviz/heading_view.json",
                 "columns": [["source_files"], ["h1"], ["linked_characters"]],
             }
         ),
@@ -146,7 +146,7 @@ def test_full_structured_graph_config_preserves_legacy_column_grouping():
     assert config["graph"]["rankdir"] == "LR"
 
 
-def test_location_and_session_graphviz_configs_inherit_directory_view(tmp_path):
+def test_location_and_session_graphviz_configs_inherit_heading_view(tmp_path):
     config_dir = tmp_path / "graphviz"
     config_dir.mkdir()
     (config_dir / "global_graph_view.json").write_text(
@@ -159,10 +159,10 @@ def test_location_and_session_graphviz_configs_inherit_directory_view(tmp_path):
         ),
         encoding="utf-8",
     )
-    (config_dir / "directory_view.json").write_text(
+    (config_dir / "heading_view.json").write_text(
         json.dumps(
             {
-                "view_key": "directory_view",
+                "view_key": "heading_view",
                 "label": "Directory View",
                 "inherits": "config/graphviz/global_graph_view.json",
                 "graph": {"rankdir": "LR"},
@@ -175,7 +175,7 @@ def test_location_and_session_graphviz_configs_inherit_directory_view(tmp_path):
             {
                 "view_key": "location_view",
                 "label": "Location View",
-                "inherits": "config/graphviz/directory_view.json",
+                "inherits": "config/graphviz/heading_view.json",
             }
         ),
         encoding="utf-8",
@@ -185,17 +185,17 @@ def test_location_and_session_graphviz_configs_inherit_directory_view(tmp_path):
             {
                 "view_key": "session_view",
                 "label": "Session View",
-                "inherits": "config/graphviz/directory_view.json",
+                "inherits": "config/graphviz/heading_view.json",
             }
         ),
         encoding="utf-8",
     )
 
-    directory_config = load_graphviz_config("directory_view", config_dir)
+    directory_config = load_graphviz_config("heading_view", config_dir)
     location_config = load_graphviz_config("location_view", config_dir)
     session_config = load_graphviz_config("session_view", config_dir)
 
-    assert directory_config["view_key"] == "directory_view"
+    assert directory_config["view_key"] == "heading_view"
     assert location_config["view_key"] == "location_view"
     assert session_config["view_key"] == "session_view"
     assert location_config["label"] == "Location View"
@@ -222,7 +222,7 @@ def test_graphviz_view_configs_use_nested_column_arrays(tmp_path):
             ["main_characters"],
             ["secondary_characters", "places"],
         ],
-        "directory_view": [
+        "heading_view": [
             ["source_files", "h1"],
             ["h2"],
             ["h3"],
@@ -273,7 +273,7 @@ def test_graphviz_view_configs_use_nested_column_arrays(tmp_path):
         ["main_characters"],
         ["secondary_characters", "places"],
     ]
-    assert load_graphviz_config("directory_view", config_dir)["columns"] == [
+    assert load_graphviz_config("heading_view", config_dir)["columns"] == [
         ["source_files", "h1"],
         ["h2"],
         ["h3"],

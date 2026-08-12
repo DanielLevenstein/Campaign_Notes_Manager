@@ -4,10 +4,10 @@
   "view_key": "location_view",
   "label": "Location View",
   "description": "Graphviz defaults for Location View directory-style place lore graphs.",
-  "inherits": "config/graphviz/directory_view.json",
+  "inherits": "config/graphviz/heading_view.json",
   "merge_order": [
     "config/graphviz/global_graph_view.json",
-    "config/graphviz/directory_view.json",
+    "config/graphviz/heading_view.json",
     "config/graphviz/location_view.json"
   ],
   "columns": [

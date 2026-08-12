@@ -4,10 +4,10 @@
   "view_key": "session_view",
   "label": "Session View",
   "description": "Graphviz defaults for Session View directory-style session-note lore graphs.",
-  "inherits": "config/graphviz/directory_view.json",
+  "inherits": "config/graphviz/heading_view.json",
   "merge_order": [
     "config/graphviz/global_graph_view.json",
-    "config/graphviz/directory_view.json",
+    "config/graphviz/heading_view.json",
     "config/graphviz/session_view.json"
   ],
   "columns": [

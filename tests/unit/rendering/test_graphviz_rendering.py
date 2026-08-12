@@ -694,7 +694,7 @@ def test_directory_place_lore_dot_keeps_source_documents_in_column_zero():
         graph,
         main_character_ids=set(graph.characters),
         graphviz_config={
-            **load_graphviz_config("directory_view", TEST_GRAPHVIZ_CONFIG_DIR),
+            **load_graphviz_config("heading_view", TEST_GRAPHVIZ_CONFIG_DIR),
             "column_layout": "place_lore_directory",
         },
     )
@@ -777,7 +777,7 @@ def test_directory_session_lore_dot_keeps_groups_with_sub_places_and_places_in_h
         graph,
         main_character_ids=set(graph.characters),
         graphviz_config={
-            **load_graphviz_config("directory_view", TEST_GRAPHVIZ_CONFIG_DIR),
+            **load_graphviz_config("heading_view", TEST_GRAPHVIZ_CONFIG_DIR),
             "column_layout": "session_note_lore_directory",
         },
     )
@@ -1261,7 +1261,7 @@ def test_complex_session_graph_hidden_semantic_heading_bridge_does_not_duplicate
 def copy_main_session_view_graphviz_config(tmp_path: Path) -> Path:
     config_dir = tmp_path / "graphviz"
     config_dir.mkdir()
-    for filename in ("global_graph_view.json", "directory_view.json", "session_view.json"):
+    for filename in ("global_graph_view.json", "heading_view.json", "session_view.json"):
         shutil.copy2(TEST_GRAPHVIZ_CONFIG_DIR / filename, config_dir / filename)
     return config_dir
 

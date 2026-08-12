@@ -101,7 +101,7 @@ CHARACTER_DATA_ONLY_VIEW = KnowledgeGraphView(
     label="Character Data Only",
 )
 LORE_GRAPH_CONFIG = KnowledgeGraphView(
-    key="directory_view",
+    key="heading_view",
     label="Lore Graph",
 )
 SESSION_MONTH_VIEW = KnowledgeGraphView(
