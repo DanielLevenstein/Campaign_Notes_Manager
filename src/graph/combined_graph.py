@@ -1610,8 +1610,22 @@ def configured_column_group(
     column_specs: list[list[str]],
 ) -> str:
     categories = configured_node_categories(node_id, node, main_character_keys, main_place_keys, column_layout)
+    heading_group = configured_heading_column_group(node, column_specs)
+    if heading_group:
+        return heading_group
     for index, column in enumerate(column_specs):
         if categories & set(column):
+            return configured_column_group_name(index, column)
+    return ""
+
+
+def configured_heading_column_group(node: CombinedCharacterNode, column_specs: list[list[str]]) -> str:
+    heading_level = source_heading_level_for_node(node)
+    if heading_level is None:
+        return ""
+    heading_category = f"h{min(3, heading_level)}"
+    for index, column in enumerate(column_specs):
+        if heading_category in column:
             return configured_column_group_name(index, column)
     return ""
 

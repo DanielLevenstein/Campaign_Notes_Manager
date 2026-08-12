@@ -39,6 +39,7 @@ class LoreGraphViewDefinition:
     source_predicate: Callable[[CombinedCharacterNode], bool]
     projection: Callable[..., CombinedCharacterGraph]
     column_layout: str
+    graphviz_config_key: str
     source_empty_message: str
     graph_empty_message: str
     source_key: str
@@ -126,6 +127,7 @@ def lore_graph_view_definitions(active_main_tab: str, *, default_session_source_
             source_predicate=is_place_source_document_node,
             projection=place_lore_graph,
             column_layout="place_lore_directory",
+            graphviz_config_key="location_view",
             source_empty_message="Add Place Lore To Use Location View.",
             heading_empty_message="Add Markdown Headings To Place Lore To Use Location View.",
             graph_empty_message="No Place Lore Connections Were Found For This File.",
@@ -141,6 +143,7 @@ def lore_graph_view_definitions(active_main_tab: str, *, default_session_source_
             source_predicate=is_session_note_node,
             projection=markdown_header_lore_graph,
             column_layout="session_note_lore_directory",
+            graphviz_config_key="session_view",
             source_empty_message="Add Session Notes To Use Session View.",
             heading_empty_message="Add Markdown Headings To Session Notes To Use Session View.",
             graph_empty_message="No Session Note Connections Were Found For This File.",
@@ -315,6 +318,7 @@ def render_lore_graph_view(
         projected_graph,
         label_font_color=label_font_color,
         column_layout=definition.column_layout,
+        graphviz_config_key=definition.graphviz_config_key,
         show_lore_notes=definition.show_lore_notes,
         hide_source_document_roots=selection.hide_source_document_roots,
     )
@@ -433,6 +437,7 @@ def render_place_file_view_tab(
             source_predicate=is_place_source_document_node,
             projection=place_lore_graph,
             column_layout=column_layout,
+            graphviz_config_key="location_view",
             source_empty_message="Add Place Lore To Use File View.",
             graph_empty_message="No Place Lore Connections Were Found For This File.",
             source_key=key,
@@ -460,6 +465,7 @@ def render_place_heading_view_tab(
             source_predicate=is_place_source_document_node,
             projection=place_lore_graph,
             column_layout=column_layout,
+            graphviz_config_key="location_view",
             source_empty_message="Add Place Lore To Use Heading View.",
             heading_empty_message="Add Markdown Headings To Place Lore To Use Heading View.",
             graph_empty_message="No Place Lore Connections Were Found For This Heading.",
@@ -478,11 +484,12 @@ def render_lore_graph(
     *,
     label_font_color: str,
     column_layout: str,
+    graphviz_config_key: str = LORE_GRAPH_CONFIG.key,
     show_lore_notes: bool = False,
     hide_source_document_roots: bool = False,
 ) -> None:
     graphviz_config = {
-        **load_graphviz_config(LORE_GRAPH_CONFIG.key),
+        **load_graphviz_config(graphviz_config_key),
         "column_layout": column_layout,
     }
     deduplicate_source_document_nodes(lore_graph)
@@ -516,6 +523,7 @@ def render_session_file_view_tab(
             source_predicate=is_session_note_node,
             projection=markdown_header_lore_graph,
             column_layout=column_layout,
+            graphviz_config_key="session_view",
             source_empty_message="Add Session Notes To Use File View.",
             graph_empty_message="No Session Note Connections Were Found For This File.",
             source_key=key,
@@ -545,6 +553,7 @@ def render_session_heading_view_tab(
             source_predicate=is_session_note_node,
             projection=markdown_header_lore_graph,
             column_layout=column_layout,
+            graphviz_config_key="session_view",
             source_empty_message="Add Session Notes To Use Heading View.",
             heading_empty_message="Add Markdown Headings To Session Notes To Use Heading View.",
             graph_empty_message="No Session Note Connections Were Found For This Heading.",
@@ -962,7 +971,24 @@ def place_lore_graph(
             connected_ids.add(edge_target)
             if edge_target == place_id:
                 connected_ids.add(place_id)
-            if edge_source != edge_target:
+            if (
+                edge_source == edge_target
+                and heading is not None
+                and edge_target in projected_nodes
+                and not has_non_heading_edge_to(projected_edges, edge_target)
+            ):
+                append_projected_edge(
+                    projected_edges,
+                    CombinedRelationshipEdge(
+                        source=source_id,
+                        target=edge_target,
+                        relationship_type=edge.relationship_type,
+                        relationship_label=edge.relationship_label,
+                        evidence=list(edge.evidence),
+                        bidirectional=edge.bidirectional,
+                    ),
+                )
+            elif edge_source != edge_target:
                 append_projected_edge(
                     projected_edges,
                     CombinedRelationshipEdge(
@@ -1815,7 +1841,11 @@ def markdown_heading_entity_type(text: str, graph: CombinedCharacterGraph) -> st
     display_name = semantic_heading_display_name(text)
     display_key = compact(display_name)
     for node in graph.characters.values():
-        if compact(node.name) == display_key and node.node_type in SEMANTIC_LORE_NODE_TYPES:
+        if (
+            not node.is_source
+            and compact(node.name) == display_key
+            and node.node_type in SEMANTIC_LORE_NODE_TYPES
+        ):
             return node.node_type
     if looks_like_artifact_heading(display_name):
         return "artifact"
@@ -2000,6 +2030,10 @@ def retarget_semantic_heading_place_edges(
             ),
         )
     return retargeted
+
+
+def has_non_heading_edge_to(edges: list[CombinedRelationshipEdge], target_id: str) -> bool:
+    return any(edge.target == target_id and edge.relationship_type != "heading" for edge in edges)
 
 
 def is_source_root_place(place: CombinedCharacterNode, source: CombinedCharacterNode | None) -> bool:

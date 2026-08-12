@@ -1,6 +1,14 @@
 import pytest
 
-from src.extraction.config import character_extraction_config_from_payload, load_character_extraction_config
+from src.extraction.config import (
+    DEFAULT_EXTRACTION_CONFIG,
+    character_extraction_config_from_payload,
+    load_character_extraction_config,
+)
+
+
+def test_character_extraction_config_uses_normalization_config_name():
+    assert DEFAULT_EXTRACTION_CONFIG.name == "normalization.json"
 
 
 def test_character_extraction_config_loads_constants_from_json():

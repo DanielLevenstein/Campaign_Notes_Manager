@@ -221,20 +221,22 @@ def load_graph(path: Path | str) -> CharacterGraph | None:
 
 def graph_for_persistence(graph: CharacterGraph) -> CharacterGraph:
     from src.graph.schema import CharacterGraph
+    from src.graph.node_normalization import normalize_graph_nodes
 
+    normalized_graph = normalize_graph_nodes(graph)
     return CharacterGraph(
-        schema_version=graph.schema_version,
-        primary_character=graph.primary_character,
-        characters=graph.characters,
-        attributes=graph.attributes,
-        places=graph.places,
+        schema_version=normalized_graph.schema_version,
+        primary_character=normalized_graph.primary_character,
+        characters=normalized_graph.characters,
+        attributes=normalized_graph.attributes,
+        places=normalized_graph.places,
         relationships=[
             relationship
-            for relationship in graph.relationships
+            for relationship in normalized_graph.relationships
             if not is_synthetic_edge(relationship)
         ],
-        embeddings=graph.embeddings,
-        metadata=graph.metadata,
+        embeddings=normalized_graph.embeddings,
+        metadata=normalized_graph.metadata,
     )
 
 

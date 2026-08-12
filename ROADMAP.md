@@ -42,32 +42,32 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Moved graph node and edge allow-lists into split config files under `config/nodes` and `config/edges`.
 - [x] Derived lore edge values from the combined evidence block for the two connected nodes, while preserving configured and dominant relationship labels.
 - [ ] Fix bugs in node deduplication
-- [ ] Fix artifact edge direction bug
+- [x] Fix artifact edge direction bug
 
 ## Phase 3.1 – Decouple UI rendering from graph internals
 - [x] Replace direct graph reads in graphviz_rendering.py and streamlit_app.py with projection API calls.
 - [ ] Make the UI consume projection results rather than infer behavior from internal node-type heuristics.
-- [ ] Unify the rendering behavior for Characters Graph, Places Graph, Session Notes Graph, and Full Structured Graph so they share the same layout and routing rules.
+- [x] Unify the rendering behavior for Characters Graph, Places Graph, Session Notes Graph, and Full Structured Graph so they share the same layout and routing rules.
 
 ### Phase 3.2 Graph UI Improvements
-- [ ] Graphviz views must not change depending on what tab they are displayed under.
-- [ ] Views should take two parameters ("View Name", "Source File", "Heading Selected") Streamlit should handle code determining what files are present in dropdowns.
-- [ ] Streamlit should handle filtering based on files while graph projection should handle filtering based on heading. Only nodes from the selected source file should be sent to projection module.
-- [ ] In streamlit heading filters should be displayed as a separate dropdown from the "Source File" dropdown.
+- [x] Graphviz views must not change depending on what tab they are displayed under.
+- [x] Views should take two parameters ("View Name", "Source File", "Heading Selected") Streamlit should handle code determining what files are present in dropdowns.
+- [x] Streamlit should handle filtering based on files while graph projection should handle filtering based on heading. Only nodes from the selected source file should be sent to projection module.
+- [x] In streamlit heading filters should be displayed as a separate dropdown from the "Source File" dropdown.
 
-## Phase 4 – Implement the tab parity work
-- [ ] Add the Characters Graph views with Single Character and Party View and preserve the three-column layout.
-- [ ] Add the Places Graph views with Location View and Heading View and support document/heading grouping.
-- [ ] Add the Session Notes Graph views with Location View and Directory File View and align them with the same projection behavior.
-- [ ] Implement the Full Structured Graph view with straight-line routing, stable columns, and the family-name trapezoid shape.
+## Phase 3.3 Implement the tab parity work
+- [x] Add the Characters Graph views with Single Character and Party View and preserve the three-column layout.
+- [x] Add the Places Graph views with Location View and Heading View and support document/heading grouping.
+- [x] Add the Session Notes Graph views with Location View and Directory File View and align them with the same projection behavior.
+- [x] Implement the Full Structured Graph view with straight-line routing, stable columns, and the family-name trapezoid shape.
 
-## Phase 5 – Add the deduplication review workflow
+## Phase 4 – Add the deduplication review workflow
 - [ ] Add a Character Deduplication view that groups likely duplicate characters and supports canonical/alias decisions.
 - [ ] Add a Place Deduplication view that groups likely duplicate places and supports canonical/alias decisions.
 - [ ] Add a Node Removal view for low-confidence nodes that should be hidden from rendered graphs while preserving evidence.
 - [ ] Store review decisions separately from generated graph JSON so they can be reapplied during regeneration.
 
-## Phase 6 – Testing, migration, and rollout
+## Phase 5 – Testing, migration, and rollout
 - [ ] Add unit tests for canonicalization adapters, projection results, and review-rule application.
 - [ ] Add integration tests covering ingestion -> canonical store -> projection -> UI rendering for session-note imports.
 - [ ] Add UI contract tests and a small e2e flow for deduplication and graph rendering.
@@ -84,3 +84,4 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [ ] Move all code under the character_graph directory into the new source directory using modules extract, ingest, and deduplication.
 - [ ] Move the world_building folder out of source code. Let user choose the local directory they want to save their project files.
 - [ ] Change the import test lore UI to a proper file picker which defaults to the test fixtures directory.
+

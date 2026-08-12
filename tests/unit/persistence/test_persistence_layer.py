@@ -228,6 +228,38 @@ def test_save_lore_graph_updates_canonical_store_and_replaces_stale_source_rows(
     assert [(edge.source_id, edge.target_id) for edge in service.get_edges()] == [("atlantia", "mara_voss")]
 
 
+def test_save_lore_graph_normalizes_place_lore_root_before_json_and_canonical_store(tmp_path):
+    lore_root = tmp_path / "world_building" / "lore"
+    meta_root = tmp_path / "world_building" / "meta_data"
+    source = lore_root / "places" / "Atlantia_Lore.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("# Atlantia Lore\n", encoding="utf-8")
+    graph = relationship_graph(
+        str(source),
+        "atlantia_lore",
+        "Atlantia Lore",
+        "mara_voss",
+        "Mara Voss",
+    )
+
+    graph_path = save_lore_graph(graph, source, lore_root=lore_root, meta_data_root=meta_root)
+    persisted = load_graph(graph_path)
+    service = CanonicalGraphService(canonical_graph_database_path(meta_data_root=meta_root))
+
+    assert persisted is not None
+    assert persisted.primary_character.name == "Atlantia"
+    assert persisted.primary_character.node_type == "place"
+    assert persisted.characters["atlantia_lore"].name == "Atlantia"
+    assert persisted.characters["atlantia_lore"].node_type == "place"
+    assert [
+        (node.id, node.display_name, node.canonical_type)
+        for node in service.get_nodes({"source_file": "world_building/lore/places/Atlantia_Lore.md"})
+    ] == [
+        ("atlantia_lore", "Atlantia", "place"),
+        ("mara_voss", "Mara Voss", "character"),
+    ]
+
+
 def test_save_lore_graph_uses_same_metadata_tree_for_all_source_kinds(tmp_path):
     lore_root = tmp_path / "world_building" / "lore"
     meta_root = tmp_path / "world_building" / "meta_data"

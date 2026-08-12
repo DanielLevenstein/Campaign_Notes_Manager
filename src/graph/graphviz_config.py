@@ -18,11 +18,17 @@ def load_graphviz_config(view_key: str, config_dir: Path = GRAPHVIZ_CONFIG_DIR) 
     if not view_config_path.exists():
         return global_config
     view_config = read_graphviz_config(view_config_path)
-    inherited_config = inherited_graphviz_config(view_config, config_dir) or global_config
-    return deep_merge(inherited_config, view_config)
+    inherited_config = inherited_graphviz_config(view_config, config_dir, seen={view_config_path.resolve()})
+    base_config = deep_merge(global_config, inherited_config) if inherited_config is not None else global_config
+    return deep_merge(base_config, view_config)
 
 
-def inherited_graphviz_config(view_config: dict[str, Any], config_dir: Path) -> dict[str, Any] | None:
+def inherited_graphviz_config(
+    view_config: dict[str, Any],
+    config_dir: Path,
+    *,
+    seen: set[Path] | None = None,
+) -> dict[str, Any] | None:
     inherited_path = view_config.get("inherits")
     if not isinstance(inherited_path, str) or not inherited_path:
         return None
@@ -33,7 +39,13 @@ def inherited_graphviz_config(view_config: dict[str, Any], config_dir: Path) -> 
     ]
     for candidate in candidates:
         if candidate.exists():
-            return read_graphviz_config(candidate)
+            resolved_candidate = candidate.resolve()
+            if seen is not None and resolved_candidate in seen:
+                raise ValueError(f"Graphviz config inheritance cycle includes {candidate}.")
+            parent_config = read_graphviz_config(candidate)
+            parent_seen = {*seen, resolved_candidate} if seen is not None else {resolved_candidate}
+            inherited_parent = inherited_graphviz_config(parent_config, config_dir, seen=parent_seen)
+            return deep_merge(inherited_parent, parent_config) if inherited_parent is not None else parent_config
     return None
 
 

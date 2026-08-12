@@ -1,7 +1,5 @@
-# Bugs Found
-- [ ] Header and file filters got lost in graphviz refactoring. 
-- [ ] Fix bugs in node deduplication
-- [ ] Fix the artifact edge direction bug
+# TODO
+- [ ] Rename the graph schema root from `primary_character` to a type-neutral primary node after node-type normalization is stable, and migrate validation, persistence, projections, fixtures, and generated `.graph.json` files to the new field.
 
 Identify other potential bugs from Phase 2.3 code changes. 
 

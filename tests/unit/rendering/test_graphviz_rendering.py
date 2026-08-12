@@ -51,12 +51,14 @@ def test_lore_view_definitions_standardize_source_and_heading_projection_contrac
     assert set(place_views) == {PLACES_FILE_VIEW_TAB, SESSION_FILE_VIEW_TAB}
     assert set(session_views) == {PLACES_FILE_VIEW_TAB, SESSION_FILE_VIEW_TAB}
     assert place_views[PLACES_FILE_VIEW_TAB].view_name == PLACES_FILE_VIEW_TAB
+    assert place_views[PLACES_FILE_VIEW_TAB].graphviz_config_key == "location_view"
     assert place_views[PLACES_FILE_VIEW_TAB].source_key == "location_view_source_file"
     assert place_views[PLACES_FILE_VIEW_TAB].heading_key == "location_view_heading"
     assert place_views[PLACES_FILE_VIEW_TAB].supports_heading_filter is True
     assert place_views[PLACES_FILE_VIEW_TAB].supports_directory_hide_options is True
     assert place_views[PLACES_FILE_VIEW_TAB].include_all_heading_option is True
     assert session_views[SESSION_FILE_VIEW_TAB].view_name == SESSION_FILE_VIEW_TAB
+    assert session_views[SESSION_FILE_VIEW_TAB].graphviz_config_key == "session_view"
     assert session_views[SESSION_FILE_VIEW_TAB].source_key == "session_view_source_file"
     assert session_views[SESSION_FILE_VIEW_TAB].heading_key == "session_view_heading"
     assert session_views[SESSION_FILE_VIEW_TAB].default_source_file == "Session_Notes.md"
@@ -773,6 +775,122 @@ def test_directory_session_lore_dot_keeps_groups_with_sub_places_and_places_in_h
     assert labels_by_edge[("session_1", "ravenmark_family")] == ""
 
 
+def test_markdown_heading_level_takes_precedence_over_semantic_node_type_columns():
+    graph = CombinedCharacterGraph(
+        characters={
+            "source_heading__atlantia__harbor": CombinedCharacterNode(
+                id="source_heading__atlantia__harbor",
+                name="Harbor",
+                source_file="world_building/lore/places/Atlantia_Lore.md",
+                node_type="source_heading_place_2",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="source_heading__atlantia__harbor",
+                target="jory_ravenmark",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+            )
+        ],
+    )
+
+    dot = combined_relationship_dot(
+        graph,
+        main_character_ids=set(graph.characters),
+        graphviz_config={
+            "column_layout": "place_lore_directory",
+            "columns": [
+                ["source_files"],
+                ["places"],
+                ["h2"],
+                ["linked_characters"],
+            ],
+        },
+    )
+
+    places_column = dot[dot.index('subgraph "cluster_column_1_places"') :]
+    h2_column = dot[dot.index('subgraph "cluster_column_2_h2"') :]
+
+    assert '"source_heading__atlantia__harbor"' not in places_column[: places_column.index('subgraph "cluster_column_2_h2"')]
+    assert h2_column.index('"source_heading__atlantia__harbor"') < h2_column.index('subgraph "cluster_column_3_linked_characters"')
+
+
+def test_session_view_graphviz_config_keeps_lore_nodes_before_linked_characters():
+    graph = CombinedCharacterGraph(
+        characters={
+            "session_4": CombinedCharacterNode(
+                id="session_4",
+                name="Session 4",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_document",
+            ),
+            "session_4_h1": CombinedCharacterNode(
+                id="session_4_h1",
+                name="Session 4",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="source_heading_1",
+            ),
+            "indigo_cult": CombinedCharacterNode(
+                id="indigo_cult",
+                name="Indigo Cult",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="group",
+            ),
+            "moon_blade": CombinedCharacterNode(
+                id="moon_blade",
+                name="Moon Blade",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type="artifact",
+            ),
+            "moon_gate": CombinedCharacterNode(
+                id="moon_gate",
+                name="Moon Gate",
+                source_file="world_building/lore/places/Moon_Gate.md",
+                node_type="place",
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge("session_4", "session_4_h1", "heading", ""),
+            CombinedRelationshipEdge("session_4_h1", "indigo_cult", "mentions", ""),
+            CombinedRelationshipEdge("indigo_cult", "moon_gate", "mentioned", "Mentioned"),
+            CombinedRelationshipEdge("indigo_cult", "jory_ravenmark", "investigate", "Investigate"),
+            CombinedRelationshipEdge("session_4_h1", "moon_blade", "mentioned", "Mentioned"),
+        ],
+    )
+
+    dot = combined_relationship_dot(
+        graph,
+        main_character_ids=set(graph.characters),
+        graphviz_config={**load_graphviz_config("session_view"), "column_layout": "session_note_lore_directory"},
+    )
+
+    assert 'subgraph "cluster_column_1_h1_places"' in dot
+    assert 'subgraph "cluster_column_2_h2_groups_artifacts"' in dot
+    assert 'subgraph "cluster_column_4_linked_characters"' in dot
+    h1_place_column = dot[dot.index('subgraph "cluster_column_1_h1_places"') :]
+    lore_column = dot[dot.index('subgraph "cluster_column_2_h2_groups_artifacts"') :]
+    character_column = dot[dot.index('subgraph "cluster_column_4_linked_characters"') :]
+
+    assert h1_place_column.index('"session_4_h1"') < h1_place_column.index('subgraph "cluster_column_2_h2_groups_artifacts"')
+    assert h1_place_column.index('"moon_gate"') < h1_place_column.index('subgraph "cluster_column_2_h2_groups_artifacts"')
+    assert lore_column.index('"indigo_cult"') < lore_column.index('subgraph "cluster_column_3_h3"')
+    assert lore_column.index('"moon_blade"') < lore_column.index('subgraph "cluster_column_3_h3"')
+    assert character_column.index('"jory_ravenmark"') < character_column.index("}")
+
+
 def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_path):
     session_dir = tmp_path / "session_notes"
     session_dir.mkdir()
@@ -1370,6 +1488,81 @@ def test_source_heading_artifact_nodes_use_artifact_shape():
         '"source_heading__session_notes__relics" [label="Recovered Relics", '
         'fillcolor="#fce7f3", color="#94a3b8", shape="hexagon"'
     ) in dot
+
+
+def test_place_lore_h1_heading_stays_folder_and_exact_place_heading_deduplicates(tmp_path):
+    source_path = tmp_path / "Atlantia_Lore.md"
+    source_path.write_text(
+        "\n".join(
+            [
+                "# Atlantia Lore",
+                "",
+                "## Sunstone Mage College",
+                "",
+                "Sunstone Mage College sits above Atlantia.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    graph = CombinedCharacterGraph(
+        characters={
+            "atlantia_lore": CombinedCharacterNode(
+                id="atlantia_lore",
+                name="Atlantia Lore",
+                source_file=str(source_path),
+                node_type="place",
+                is_source=True,
+            ),
+            "sunstone_mage_college": CombinedCharacterNode(
+                id="sunstone_mage_college",
+                name="Sunstone Mage College",
+                source_file=str(source_path),
+                node_type="place",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="atlantia_lore",
+                target="sunstone_mage_college",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["Sunstone Mage College sits above Atlantia."],
+            )
+        ],
+    )
+
+    projected = place_lore_graph(graph, source_file=str(source_path))
+    dot = combined_relationship_dot(
+        projected,
+        main_character_ids=set(projected.characters),
+        graphviz_config={**load_graphviz_config("location_view"), "column_layout": "place_lore_directory"},
+    )
+
+    h1_id = next(
+        node_id
+        for node_id, node in projected.characters.items()
+        if node.name == "Atlantia Lore" and node.is_heading and node.heading_level == 1
+    )
+    assert projected.characters[h1_id].name == "Atlantia Lore"
+    assert projected.characters[h1_id].node_type == "note"
+    assert projected.characters[h1_id].is_heading is True
+    assert projected.characters[h1_id].heading_level == 1
+    h1_line = next(line for line in dot.splitlines() if f'"{h1_id}" [label="Atlantia Lore"' in line)
+    assert 'shape="folder"' in h1_line
+    assert [
+        node.name
+        for node in projected.characters.values()
+        if node.name == "Sunstone Mage College"
+    ] == ["Sunstone Mage College"]
+    sunstone_id = next(
+        node_id
+        for node_id, node in projected.characters.items()
+        if node.name == "Sunstone Mage College"
+    )
+    h2_column = dot[dot.index('subgraph "cluster_column_1_h2"') :]
+    places_column = dot[dot.index('subgraph "cluster_column_3_places"') :]
+    assert h2_column.index(f'"{sunstone_id}"') < h2_column.index('subgraph "cluster_column_2_h3"')
+    assert f'"{sunstone_id}"' not in places_column[: places_column.index('subgraph "cluster_column_4_groups"')]
 
 
 def test_hiding_file_name_and_h1_preserves_all_direct_h1_connections():

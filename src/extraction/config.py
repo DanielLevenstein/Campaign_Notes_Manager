@@ -8,7 +8,7 @@ from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_EXTRACTION_CONFIG = PROJECT_ROOT / "config" / "extraction" / "character_graph.json"
+DEFAULT_EXTRACTION_CONFIG = PROJECT_ROOT / "config" / "extraction" / "normalization.json"
 
 
 @dataclass(frozen=True)

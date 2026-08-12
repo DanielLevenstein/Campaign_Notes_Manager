@@ -4,7 +4,7 @@
   "view_key": "character_view",
   "label": "Single Character",
   "description": "Focused graph for a selected character or place root.",
-  "inherits": "config/graphviz/default_global_view.json",
+  "inherits": "config/graphviz/global_graph_view.json",
   "merge_order": [
     "config/graphviz/global_graph_view.json",
     "config/graphviz/character_view.json"

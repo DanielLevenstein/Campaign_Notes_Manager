@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CHARACTER_GRAPH_CONFIG = PROJECT_ROOT / "config" / "character_graph.json"
 DEFAULT_EDGE_CONFIG = PROJECT_ROOT / "config" / "edges" / "character_graph.json"
 DEFAULT_NODE_CONFIG = PROJECT_ROOT / "config" / "nodes" / "character_graph.json"
+DEFAULT_NODE_NORMALIZATION_CONFIG = PROJECT_ROOT / "config" / "extraction" / "normalization.json"
 DEFAULT_COMBINED_GRAPH_ALIAS_CONFIG = PROJECT_ROOT / "config" / "aliases" / "combined_graph.json"
 CONFIG_BUCKETS = ("relationships", "attributes", "places")
 
@@ -62,6 +63,52 @@ class CharacterGraphConfig:
         if matches:
             return sorted(matches, reverse=True)[0][1]
         return self.canonical_edge_type(fallback) or "reference"
+
+
+@dataclass(frozen=True)
+class NodeNormalizationConfig:
+    schema_version: str
+    descriptor_suffixes: tuple[str, ...]
+    type_precedence: dict[str, int]
+
+
+@lru_cache(maxsize=1)
+def load_node_normalization_config(path: Path = DEFAULT_NODE_NORMALIZATION_CONFIG) -> NodeNormalizationConfig:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid node normalization config JSON at {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"Node normalization config at {path} must contain a JSON object.")
+    return node_normalization_config_from_payload(payload.get("normalization", payload))
+
+
+def node_normalization_config_from_payload(payload: dict[str, Any]) -> NodeNormalizationConfig:
+    schema_version = payload.get("schema_version")
+    if not isinstance(schema_version, str) or not schema_version.strip():
+        raise ValueError("Node normalization config must include a non-empty schema_version.")
+    raw_suffixes = payload.get("descriptor_suffixes")
+    if not isinstance(raw_suffixes, list) or not raw_suffixes:
+        raise ValueError("Node normalization config must include a non-empty descriptor_suffixes list.")
+    descriptor_suffixes = tuple(str(suffix).strip() for suffix in raw_suffixes if str(suffix).strip())
+    if not descriptor_suffixes:
+        raise ValueError("Node normalization descriptor_suffixes must contain non-empty strings.")
+    raw_precedence = payload.get("type_precedence")
+    if not isinstance(raw_precedence, dict) or not raw_precedence:
+        raise ValueError("Node normalization config must include a non-empty type_precedence object.")
+    type_precedence: dict[str, int] = {}
+    for raw_node_type, raw_rank in raw_precedence.items():
+        node_type = normalize_edge_key(str(raw_node_type))
+        if not node_type:
+            raise ValueError("Node normalization type_precedence keys must be non-empty strings.")
+        if not isinstance(raw_rank, int):
+            raise ValueError(f"Node normalization precedence for `{raw_node_type}` must be an integer.")
+        type_precedence[node_type] = raw_rank
+    return NodeNormalizationConfig(
+        schema_version=schema_version.strip(),
+        descriptor_suffixes=descriptor_suffixes,
+        type_precedence=type_precedence,
+    )
 
 
 @lru_cache(maxsize=1)

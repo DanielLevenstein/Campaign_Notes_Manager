@@ -1,5 +1,28 @@
 {
-  "schema_version": "0.1.0",
+  "schema_version": "0.3.0",
+  "normalization": {
+    "schema_version": "0.3.0",
+    "descriptor_suffixes": [
+      "Lore",
+      "Investigation",
+      "Investigations",
+      "Note",
+      "Notes",
+      "Report",
+      "Reports"
+    ],
+    "type_precedence": {
+      "source_document": 50,
+      "note": 45,
+      "place": 40,
+      "group": 30,
+      "family": 25,
+      "artifact": 20,
+      "character": 10,
+      "attribute": 5,
+      "entity": 0
+    }
+  },
   "patterns": {
     "name": "\\b([A-Z][a-z]+(?:[ \\t]+(?:the[ \\t]+)?[A-Z][a-z]+){0,3})\\b",
     "heading": "^#\\s+(.+?)\\s*$",
