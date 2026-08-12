@@ -16,7 +16,6 @@ CONFIG_DIR = ROOT_DIR / "config"
 
 @dataclass(frozen=True)
 class PathSettings:
-    test_fixtures_directory: Path
     world_building_dir: Path
     world_building_import_dir: Path
     world_building_backup_dir: Path
@@ -57,7 +56,6 @@ def load_path_settings() -> PathSettings:
     )
     generated_lore_dir = env_path("LOCAL_CHATBOT_GENERATED_LORE_DIR", lore_dir)
     return PathSettings(
-        test_fixtures_directory=env_path("LOCAL_CHATBOT_LORE_FIXTURES_DIR", ROOT_DIR / "tests" / "fixtures"),
         world_building_dir=world_building_dir,
         world_building_import_dir=env_path("LOCAL_CHATBOT_WORLD_BUILDING_IMPORT_DIR", world_building_dir / "import"),
         world_building_backup_dir=env_path("LOCAL_CHATBOT_WORLD_BUILDING_BACKUP_DIR", world_building_dir / "backup"),
@@ -81,7 +79,6 @@ def refresh_paths() -> PathSettings:
     settings = load_path_settings()
     globals().update(
         {
-            "TEST_FIXTURES_DIRECTORY": settings.test_fixtures_directory,
             "WORLD_BUILDING_DIR": settings.world_building_dir,
             "WORLD_BUILDING_IMPORT_DIR": settings.world_building_import_dir,
             "WORLD_BUILDING_BACKUP_DIR": settings.world_building_backup_dir,

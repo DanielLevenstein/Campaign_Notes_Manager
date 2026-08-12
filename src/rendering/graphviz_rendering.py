@@ -87,7 +87,6 @@ GRAPH_VIEW_TABS = [
     PARTY_VIEW_TAB,
     PLACES_FILE_VIEW_TAB,
     SESSION_FILE_VIEW_TAB,
-    FULL_KNOWLEDGE_GRAPH_TAB,
 ]
 
 DIRECTORY_SESSION_VIEW_TAB = "Directory Section View"
@@ -113,8 +112,11 @@ STRUCTURED_KNOWLEDGE_VIEW = KnowledgeGraphView(
     label=FULL_KNOWLEDGE_GRAPH_TAB,
 )
 
-def graph_tab_names(active_main_tab: str) -> list[str]:
-    return list(GRAPH_VIEW_TABS)
+def graph_tab_names(active_main_tab: str, *, include_full_knowledge_graph: bool = False) -> list[str]:
+    tabs = list(GRAPH_VIEW_TABS)
+    if include_full_knowledge_graph:
+        tabs.append(FULL_KNOWLEDGE_GRAPH_TAB)
+    return tabs
 
 
 def lore_graph_view_definitions(active_main_tab: str, *, default_session_source_file: str | None = None) -> dict[str, LoreGraphViewDefinition]:
@@ -226,13 +228,17 @@ def render_knowledge_graph_tabs(
     graph_revision: int,
     label_font_color: str,
     active_main_tab: str = "Characters",
+    include_full_knowledge_graph: bool = False,
 ) -> None:
     pending_import_source_file = st.session_state.pop("session_notes_imported_source_file", None)
     lore_view_definitions = lore_graph_view_definitions(
         active_main_tab,
         default_session_source_file=pending_import_source_file,
     )
-    tab_names = graph_tab_names(active_main_tab)
+    tab_names = graph_tab_names(
+        active_main_tab,
+        include_full_knowledge_graph=include_full_knowledge_graph,
+    )
     tabs = st.tabs(tab_names)
     for tab, tab_name in zip(tabs, tab_names):
         with tab:
@@ -1621,7 +1627,7 @@ def lore_context_edge_direction(
     source_node = nodes.get(source)
     target_node = nodes.get(target)
     if source_node is not None and target_node is not None:
-        if source_node.node_type in {"artifact", "group"} and target_node.node_type == "character":
+        if source_node.node_type in SEMANTIC_LORE_NODE_TYPES and target_node.node_type == "character":
             return target, source
     return source, target
 

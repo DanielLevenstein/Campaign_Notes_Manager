@@ -53,7 +53,6 @@ from src.writing.rewrite_model import (
 from src.extraction.raw_txt_import import (
     child_markdown_sections,
     combine_markdown_section,
-    hide_markdown_section_heading,
     import_markdown_text,
     delete_session_note,
     insert_markdown_section,
@@ -85,18 +84,27 @@ from src.persistence.lore_import import (
 from src.graph.presentation import party_view_presentation
 from src.graph.projections import build_combined_graph_projection
 from paths import (
-    TEST_FIXTURES_DIRECTORY,
+    WORLD_BUILDING_IMPORT_DIR,
     WORLD_BUILDING_BACKUP_DIR,
 )
 
 ENABLE_ATTRIBUTE_GRAPH_OVERRIDE = "LOCAL_CHATBOT_ENABLE_ATTRIBUTE_GRAPH_OVERRIDE"
+ENABLE_FULL_KNOWLEDGE_GRAPH = "LOCAL_CHATBOT_ENABLE_FULL_KNOWLEDGE_GRAPH"
 DISABLE_LORE_BACKUPS = "LOCAL_CHATBOT_DISABLE_LORE_BACKUPS"
 MAIN_NAVIGATION_TABS = ["Characters", "Places", "Session Notes"]
 LORE_BACKUP_IMPORT_SOURCE_KEY = "lore_backup_import_source"
 
 
+def env_flag_enabled(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def lore_backups_disabled() -> bool:
-    return os.environ.get(DISABLE_LORE_BACKUPS, "").strip().lower() in {"1", "true", "yes", "on"}
+    return env_flag_enabled(DISABLE_LORE_BACKUPS)
+
+
+def full_knowledge_graph_enabled() -> bool:
+    return env_flag_enabled(ENABLE_FULL_KNOWLEDGE_GRAPH)
 
 
 st.set_page_config(page_title="Character Builder", page_icon=":material/forum:", layout="wide")
@@ -645,6 +653,7 @@ def render_combined_character_graph(active_main_tab: str = "Characters") -> None
             graph_revision=graph_revision,
             label_font_color=graph_edge_label_font_color(),
             active_main_tab=active_main_tab,
+            include_full_knowledge_graph=full_knowledge_graph_enabled(),
         )
 
 
@@ -1020,7 +1029,7 @@ def render_lore_import_tools() -> None:
         st.subheader("Bulk Lore Directory")
         source_dir = st.text_input(
             "Source Directory",
-            value=str(TEST_FIXTURES_DIRECTORY),
+            value=str(WORLD_BUILDING_IMPORT_DIR),
             help="Choose a directory under world_building/import that contains character_sheets, places, and session_notes folders.",
             key="lore_directory_import_source",
         )
@@ -1030,7 +1039,7 @@ def render_lore_import_tools() -> None:
             key="lore_directory_import_overwrite",
         )
         action_cols = st.columns(4)
-        if action_cols[0].button("Import Testing Lore", icon=":material/folder_copy:", key="import_testing_lore"):
+        if action_cols[0].button("Import Lore Directory", icon=":material/folder_copy:", key="import_testing_lore"):
             try:
                 summary = import_lore_directory(Path(source_dir), overwrite=overwrite_existing)
             except FileNotFoundError:
@@ -1306,14 +1315,7 @@ def render_session_note_editor(path, show_dates: bool = False, section_key: str 
         st.subheader(note_label)
     if selected_section:
         top_action_cols = st.columns(3)
-        if selected_section.level == 1:
-            if top_action_cols[0].button(
-                "Hide Heading",
-                icon=":material/visibility_off:",
-                key=f"top_hide_heading_{path.name}_{section_key}",
-            ):
-                st.session_state["pending_hide_session_heading"] = {"path": path.name, "section": section_key}
-        elif not is_first_title_section and top_action_cols[0].button(
+        if not is_first_title_section and top_action_cols[0].button(
             "Add Previous Section",
             icon=":material/vertical_align_top:",
             key=f"add_previous_section_{path.name}_{section_key}",
@@ -1348,38 +1350,6 @@ def render_session_note_editor(path, show_dates: bool = False, section_key: str 
             st.session_state["active_session_note_editor"] = f"{path.name}:{new_section_key or 'full'}"
             st.session_state["session_notes_status"] = "Next Section Added."
             st.rerun()
-        pending_hide = st.session_state.get("pending_hide_session_heading", {})
-        if pending_hide.get("path") == path.name and pending_hide.get("section") == section_key:
-            promoted_section = next(iter(child_markdown_sections(read_session_note(path), section_key)), None)
-            st.warning(f'Are you sure you want to hide "{selected_section.text}" heading')
-            if promoted_section:
-                st.write(
-                    f'Hiding this heading will promote "{promoted_section.text}" heading top level heading for this document'
-                )
-            else:
-                st.write("Hiding this heading will leave this document without a top level heading.")
-            confirm_cols = st.columns(2)
-            if confirm_cols[0].button(
-                "Hide Heading",
-                icon=":material/visibility_off:",
-                key=f"confirm_hide_heading_{path.name}_{section_key}",
-            ):
-                push_session_notes_undo()
-                hide_markdown_section_heading(path, section_key)
-                set_active_session_note(path)
-                set_active_session_note_section()
-                st.session_state.pop("active_session_note_editor", None)
-                st.session_state.pop("pending_hide_session_heading", None)
-                mark_combined_graph_dirty()
-                st.session_state["session_notes_status"] = "Heading Hidden."
-                st.rerun()
-            if confirm_cols[1].button(
-                "Cancel",
-                icon=":material/close:",
-                key=f"cancel_hide_heading_{path.name}_{section_key}",
-            ):
-                st.session_state.pop("pending_hide_session_heading", None)
-                st.rerun()
     if display_body:
         st.markdown(display_body)
     if selected_section:
@@ -1473,21 +1443,17 @@ def render_session_note_editor(path, show_dates: bool = False, section_key: str 
             action_cols = st.columns(3)
             save_requested = action_cols[0].form_submit_button("Save Session Note", icon=":material/save:")
             delete_requested = action_cols[1].form_submit_button(
-                "Hide Heading"
-                if selected_section and selected_section.level == 1
-                else "Delete Section"
+                "Delete Section"
                 if section_key
                 else "Delete Session Note",
-                icon=":material/visibility_off:" if selected_section and selected_section.level == 1 else ":material/delete_forever:",
+                icon=":material/delete_forever:",
             )
             undo_requested = action_cols[2].form_submit_button("Undo Changes", icon=":material/undo:")
             if undo_requested:
                 undo_session_notes_changes()
             if delete_requested:
                 if section_key:
-                    if selected_section and selected_section.level == 1:
-                        st.session_state["pending_hide_session_heading"] = {"path": path.name, "section": section_key}
-                    elif removing_markdown_section_removes_file(read_session_note(path), section_key):
+                    if removing_markdown_section_removes_file(read_session_note(path), section_key):
                         st.session_state["pending_delete_session_note_file"] = {"path": path.name, "section": section_key}
                     else:
                         push_session_notes_undo()

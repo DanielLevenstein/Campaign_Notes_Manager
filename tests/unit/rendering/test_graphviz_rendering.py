@@ -14,6 +14,7 @@ from src.rendering.graphviz_rendering import (
     graph_without_lore_source_knots,
     graph_tab_names,
     lore_graph_view_definitions,
+    lore_context_edge_direction,
     place_lore_connection_rows,
     lore_graph_connection_rows,
     place_lore_graph,
@@ -34,12 +35,13 @@ def test_graph_tabs_follow_active_main_tab():
         PARTY_VIEW_TAB,
         PLACES_FILE_VIEW_TAB,
         SESSION_FILE_VIEW_TAB,
-        FULL_KNOWLEDGE_GRAPH_TAB,
     ]
+    experimental_tabs = [*expected_tabs, FULL_KNOWLEDGE_GRAPH_TAB]
 
     assert graph_tab_names("Characters") == expected_tabs
     assert graph_tab_names("Places") == expected_tabs
     assert graph_tab_names("Session Notes") == expected_tabs
+    assert graph_tab_names("Characters", include_full_knowledge_graph=True) == experimental_tabs
 
 
 def test_lore_view_definitions_standardize_source_and_heading_projection_contracts():
@@ -60,6 +62,29 @@ def test_lore_view_definitions_standardize_source_and_heading_projection_contrac
     assert session_views[SESSION_FILE_VIEW_TAB].default_source_file == "Session_Notes.md"
     assert session_views[SESSION_FILE_VIEW_TAB].supports_heading_filter is True
     assert session_views[SESSION_FILE_VIEW_TAB].supports_directory_hide_options is True
+
+
+def test_lore_context_edges_point_from_character_to_semantic_lore_nodes():
+    for node_type in ("place", "group", "artifact"):
+        nodes = {
+            "semantic_node": CombinedCharacterNode(
+                id="semantic_node",
+                name="Semantic Node",
+                source_file="world_building/lore/session_notes/Session_Notes.md",
+                node_type=node_type,
+            ),
+            "jory_ravenmark": CombinedCharacterNode(
+                id="jory_ravenmark",
+                name="Jory Ravenmark",
+                source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
+                node_type="character",
+            ),
+        }
+
+        assert lore_context_edge_direction("semantic_node", "jory_ravenmark", nodes) == (
+            "jory_ravenmark",
+            "semantic_node",
+        )
 
 
 def test_heading_view_projection_applies_source_file_before_heading_filter(tmp_path):
@@ -939,7 +964,8 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
     assert session_heading_id not in projected.characters
     assert "pixi_kingdom" in projected.characters
     assert "tharevon" in projected.characters
-    assert labels_by_edge[("pixi_kingdom", "tharevon")] == "Session 4"
+    assert ("pixi_kingdom", "tharevon") not in labels_by_edge
+    assert labels_by_edge[("tharevon", "pixi_kingdom")] == "Session 4"
 
     all_headings_hidden = markdown_header_lore_graph(
         graph,
@@ -960,8 +986,10 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
     assert "moon_blade" in all_headings_hidden.characters
     assert all_headings_hidden.characters["moon_blade"].node_type == "artifact"
     assert "empty_cult" not in all_headings_hidden.characters
-    assert all_hidden_labels_by_edge[("pixi_kingdom", "tharevon")] == "Session 4"
-    assert all_hidden_labels_by_edge[("pixi_kingdom", "mira_vale")] == "Pixi Kingdom"
+    assert ("pixi_kingdom", "tharevon") not in all_hidden_labels_by_edge
+    assert all_hidden_labels_by_edge[("tharevon", "pixi_kingdom")] == "Session 4"
+    assert ("pixi_kingdom", "mira_vale") not in all_hidden_labels_by_edge
+    assert all_hidden_labels_by_edge[("mira_vale", "pixi_kingdom")] == "Pixi Kingdom"
     assert ("ignis_cult", "jory_ravenmark") not in all_hidden_labels_by_edge
     assert ("ignis_cult", "neal_lovington") not in all_hidden_labels_by_edge
     assert all_hidden_labels_by_edge[("jory_ravenmark", "ignis_cult")] == "Indigo Cult"
@@ -969,6 +997,8 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
     assert all_hidden_labels_by_edge[("ignis_cult", "moon_gate")] == "Indigo Cult"
     assert ("moon_blade", "arlen_voss") not in all_hidden_labels_by_edge
     assert all_hidden_labels_by_edge[("arlen_voss", "moon_blade")] == "Moon Blade"
+    assert ("moon_blade", "neal_lovington") not in all_hidden_labels_by_edge
+    assert all_hidden_labels_by_edge[("neal_lovington", "moon_blade")] == "Moon Blade"
 
 
 def test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nodes(tmp_path):

@@ -1,15 +1,14 @@
 from pathlib import Path
 
 import paths as paths
-from paths import ROOT_DIR, TEST_FIXTURES_DIRECTORY
+from paths import ROOT_DIR
 
 
-def test_default_test_lore_import_directory_points_to_project_fixtures():
+def test_default_paths_point_to_project_root_and_world_building_directories():
     project_root = Path(__file__).resolve().parents[3]
 
     assert ROOT_DIR == project_root
-    assert TEST_FIXTURES_DIRECTORY == project_root / "tests" / "fixtures"
-    assert (TEST_FIXTURES_DIRECTORY / "character_sheets" / "Jory_Ravenmark.md").exists()
+    assert paths.WORLD_BUILDING_IMPORT_DIR == project_root / "world_building" / "import"
     assert ROOT_DIR.name == "Campaign_Notes_Manager"
     assert ROOT_DIR.name not in {"src", "persistence"}
 

@@ -1,7 +1,7 @@
 # Session Note Upload E2E Can Lose The Staged File
 
 ## Status
-Open
+Resolved
 
 ## Summary
 Session note upload e2e tests intermittently reach the app-level validation error `Choose A Markdown Or Text File Before Uploading.` even after Playwright has attached a file to the Streamlit file uploader. The failure appears most often when running the whole session-notes e2e module and is not consistently reproducible when the same tests run in isolation.
@@ -18,3 +18,12 @@ The tests often upload files created inside the app's configured lore tree. Stre
 
 ## Suggested Follow-Up
 Move upload-source fixtures outside watched lore/session-note directories for these e2e tests, or add a dedicated test fixture path for upload sources under an unwatched temporary directory.
+
+## Fix Summary
+Session-note e2e fixtures now provide a dedicated `upload_sources` directory outside the app's watched lore/session-note tree. Upload tests that create mutable source files write there before attaching them to the Streamlit file uploader.
+
+The recursive reload recovery path in `import_session_note_file` was removed after the upload source path was moved out of watched directories.
+
+## Test Evidence
+- `tests/e2e/test_session_notes_ui.py::test_ui_imports_uploaded_session_notes_as_one_markdown_file`
+- `tests/e2e/test_session_notes_ui.py::test_ui_import_dialog_keeps_month_year_dates_and_hides_h4_headings`

@@ -18,6 +18,7 @@ FIXTURE_CHARACTER_SHEETS_DIR = ROOT_DIR / "tests" / "fixtures" / "character_shee
 HIDDEN_LORE_FIXTURE_ENV = "LOCAL_CHATBOT_E2E_LORE_FIXTURE_DIR"
 KNOWLEDGE_GRAPH_SCREENSHOT_ENV = "LOCAL_CHATBOT_E2E_KNOWLEDGE_GRAPH_SCREENSHOT"
 KNOWLEDGE_GRAPH_SCREENSHOT_NODE_ENV = "LOCAL_CHATBOT_E2E_KNOWLEDGE_GRAPH_NODE"
+FULL_KNOWLEDGE_GRAPH_ENV = "LOCAL_CHATBOT_ENABLE_FULL_KNOWLEDGE_GRAPH"
 STRUCTURED_KNOWLEDGE_GRAPH_FULL_SCREENSHOT = ROOT_DIR / "docs" / "screenshots" / "Structured_Knowledge_Graph_Full.png"
 KNOWLEDGE_VIEW_SCREENSHOT_DIR = ROOT_DIR / "tests" / "fixtures" / "screenshots" / "knowledge_views"
 
@@ -56,6 +57,10 @@ def markdown_title(path: Path) -> str:
         if line.startswith("# "):
             return line[2:].strip()
     return path.stem.replace("_", " ")
+
+
+def full_knowledge_graph_test_enabled() -> bool:
+    return os.environ.get(FULL_KNOWLEDGE_GRAPH_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def seed_lore_fixture(docs_lore_dir: Path, characters_dir: Path, places_dir: Path, session_notes_dir: Path) -> None:
@@ -298,7 +303,7 @@ def create_character_in_section(page, character_path: Path, character_name: str)
 
 
 def knowledge_graph_view_specs() -> list[dict[str, object]]:
-    return [
+    specs = [
         {
             "graph_family": "Characters Graph",
             "view": "Character View",
@@ -319,12 +324,16 @@ def knowledge_graph_view_specs() -> list[dict[str, object]]:
             "view": "Session View",
             "screenshot": "Session_Notes_Graph_Session_View.png",
         },
-        {
-            "graph_family": "Characters Graph",
-            "view": "Full Knowledge Graph",
-            "screenshot": "Structured_Knowledge_Graph_Full.png",
-        },
     ]
+    if full_knowledge_graph_test_enabled():
+        specs.append(
+            {
+                "graph_family": "Characters Graph",
+                "view": "Full Knowledge Graph",
+                "screenshot": "Structured_Knowledge_Graph_Full.png",
+            }
+        )
+    return specs
 
 
 def open_combined_graph_expander(page):
@@ -440,10 +449,11 @@ def assert_graph_view_spec_set(fixtures: list[dict[str, object]]) -> None:
     expected_views = {
         ("Characters Graph", "Character View"),
         ("Characters Graph", "Party View"),
-        ("Characters Graph", "Full Knowledge Graph"),
         ("Places Graph", "Location View"),
         ("Session Notes Graph", "Session View"),
     }
+    if full_knowledge_graph_test_enabled():
+        expected_views.add(("Characters Graph", "Full Knowledge Graph"))
     actual_views = {
         (str(fixture["graph_family"]), str(fixture["view"]))
         for fixture in fixtures
@@ -451,6 +461,14 @@ def assert_graph_view_spec_set(fixtures: list[dict[str, object]]) -> None:
     assert actual_views == expected_views
     screenshots = [fixture["screenshot"] for fixture in fixtures]
     assert len(screenshots) == len(set(screenshots)) == len(expected_views)
+
+
+def expect_full_knowledge_graph_tab_visibility(graph_expander) -> None:
+    tab = graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)
+    if full_knowledge_graph_test_enabled():
+        expect(tab).to_be_visible(timeout=10000)
+    else:
+        expect(tab).not_to_be_visible(timeout=10000)
 
 
 def ensure_character_editor_open(page) -> None:
@@ -838,7 +856,7 @@ def test_capture_knowledge_graph_screenshot(isolated_character_app):
         expect(graph_expander.get_by_role("button", name="sync Regenerate All Lore Graphs")).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Character View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)).to_be_visible(timeout=10000)
+        expect_full_knowledge_graph_tab_visibility(graph_expander)
         expect(graph_expander.get_by_role("tab", name="Place Lore", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Session Note Graph", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_text("Character Data Only", exact=True)).not_to_be_visible(timeout=10000)
@@ -939,7 +957,7 @@ def test_character_top_level_shows_single_character_and_party_view(isolated_char
         graph_expander.get_by_text("Combined Knowledge Graph").click()
         expect(graph_expander.get_by_role("tab", name="Character View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)).to_be_visible(timeout=10000)
+        expect_full_knowledge_graph_tab_visibility(graph_expander)
         expect(graph_expander.get_by_role("tab", name="Place Lore", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_text("Character Data Only", exact=True)).not_to_be_visible(timeout=10000)
         graph_expander.get_by_role("tab", name="Jory Ravenmark", exact=True).click()
@@ -1011,7 +1029,7 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
         expect(graph_expander.get_by_role("tab", name="Party View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Location View", exact=True)).to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Session View", exact=True)).to_be_visible(timeout=10000)
-        expect(graph_expander.get_by_role("tab", name="Full Knowledge Graph", exact=True)).to_be_visible(timeout=10000)
+        expect_full_knowledge_graph_tab_visibility(graph_expander)
         expect(graph_expander.get_by_role("tab", name="Directory View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Heading View", exact=True)).not_to_be_visible(timeout=10000)
         expect(graph_expander.get_by_role("tab", name="Directory File View", exact=True)).not_to_be_visible(timeout=10000)
@@ -1126,6 +1144,10 @@ def graph_edge_label_position_issues(graph_expander) -> list[dict[str, object]]:
     )
 
 
+@pytest.mark.skipif(
+    os.environ.get(FULL_KNOWLEDGE_GRAPH_ENV, "").strip().lower() not in {"1", "true", "yes", "on"},
+    reason=f"Set {FULL_KNOWLEDGE_GRAPH_ENV}=1 to exercise the experimental Full Knowledge Graph.",
+)
 def test_session_note_location_view_edge_labels_are_located_on_their_edges(isolated_character_app):
     app_url, _docs_lore_dir, _characters_dir, _places_dir, session_notes_dir, _data_dir = isolated_character_app
     shutil.copy2(ROOT_DIR / "tests" / "fixtures" / "session_notes" / "Family_Tree.md", session_notes_dir / "Family_Tree.md")
