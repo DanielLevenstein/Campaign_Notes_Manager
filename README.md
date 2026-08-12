@@ -96,6 +96,7 @@ Note: Character Rewrite feature is only enabled if the user has llama.cpp instal
 
 | Version | Summary                                                                                       |
 |---------| --------------------------------------------------------------------------------------------- |
+| v1.3.0  | Route all graph views through single configurable code pathway
 | v1.2.0  | Adds local character rewrite tuning, rewrite quality reports, and safer generated-text saves. |
 | v1.1.0  | Implemented distinct knowledge graph views for character, place and sesison tab               |
 | v1.0.0  | This release adds a dedicated Knowledge Graph UI using graphviz.                              |
