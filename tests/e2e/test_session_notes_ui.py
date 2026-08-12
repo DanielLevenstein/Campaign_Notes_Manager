@@ -311,10 +311,8 @@ def click_staged_session_note_upload(page, uploaded_file_name: str | None = None
 def test_ui_removes_broken_add_session_note_path(isolated_session_notes_app):
     app_url, _docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     app_source = (ROOT_DIR / "streamlit_app.py").read_text(encoding="utf-8")
-    disabled_fixture = (ROOT_DIR / "tests" / "fixtures" / "legacy_add_session_note_ui.py").read_text(encoding="utf-8")
 
     assert "save_new_session_notes" not in app_source
-    assert "save_new_session_notes" in disabled_fixture
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()

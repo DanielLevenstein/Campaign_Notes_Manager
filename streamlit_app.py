@@ -28,6 +28,7 @@ from src.persistence.lore_documents import (
     default_details,
     delete_character_profile,
     delete_place_profile,
+    import_external_character_sheet,
     list_places,
     list_characters,
     read_place_markdown,
@@ -234,8 +235,6 @@ def session_note_select_options(paths, show_dates: bool = False) -> list[dict[st
             continue
         section_option_count = 0
         for section in sections:
-            if section.level == 1:
-                continue
             label = f"H{section.level}: {section.text}"
             options.append({"label": label, "path": path.name, "section": section.key})
             section_option_count += 1
@@ -268,7 +267,7 @@ def attribute_graph_override_enabled() -> bool:
     return os.environ.get(ENABLE_ATTRIBUTE_GRAPH_OVERRIDE) == "1"
 
 def external_character_import_enabled() -> bool:
-    return  False
+    return True
 
 
 def parse_list_field(value: str) -> list[str]:
@@ -1530,6 +1529,36 @@ def render_character_panel() -> None:
     st.subheader("New Character")
     with st.expander("Create Character", expanded=not characters):
         render_character_creator("main_new_character")
+    if external_character_import_enabled():
+        render_external_character_sheet_import()
+
+
+def render_external_character_sheet_import() -> None:
+    with st.expander("Import External Character Sheet", expanded=False):
+        uploaded_sheet = st.file_uploader(
+            "Character Sheet File",
+            type=["pdf", "png", "jpg", "jpeg", "webp"],
+            key="external_character_sheet_file",
+        )
+        display_name = st.text_input(
+            "Display Name",
+            value=Path(uploaded_sheet.name).stem if uploaded_sheet is not None else "",
+            key="external_character_sheet_display_name",
+        )
+        if st.button("Import Character Sheet", icon=":material/upload_file:", key="import_external_character_sheet"):
+            if uploaded_sheet is None:
+                st.error("Choose A Character Sheet File.")
+                return
+            try:
+                imported = import_external_character_sheet(
+                    uploaded_sheet.name,
+                    uploaded_sheet.getvalue(),
+                    display_name=display_name,
+                )
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                st.success(f"Imported External Character Sheet: {imported.path.name}.")
 
 def render_character_editor(character: Character) -> None:
     profile = read_character_profile(character)

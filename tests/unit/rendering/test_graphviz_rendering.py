@@ -33,6 +33,7 @@ from src.rendering.graphviz_rendering import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+TEST_GRAPHVIZ_CONFIG_DIR = PROJECT_ROOT / "tests" / "fixtures" / "graphviz"
 
 
 def test_graph_tabs_follow_active_main_tab():
@@ -496,6 +497,16 @@ def test_place_lore_graph_keeps_source_place_and_character_connections(tmp_path)
     )
     assert "source_document__atlantia_lore" not in directory_file_view_graph.characters
     assert "mrs_nightbloom" in directory_file_view_graph.characters
+    assert "stone" not in directory_file_view_graph.characters
+    assert "students" not in directory_file_view_graph.characters
+    assert "Stone" not in {
+        row["Connection"]
+        for row in place_lore_connection_rows(directory_file_view_graph)
+    }
+    assert "Students" not in {
+        row["Connection"]
+        for row in place_lore_connection_rows(directory_file_view_graph)
+    }
 
     heading_view_graph = place_lore_graph(graph, heading_id=college_heading_id)
     assert set(heading_view_graph.characters) == {
@@ -682,7 +693,10 @@ def test_directory_place_lore_dot_keeps_source_documents_in_column_zero():
     dot = combined_relationship_dot(
         graph,
         main_character_ids=set(graph.characters),
-        graphviz_config={**load_graphviz_config("directory_view"), "column_layout": "place_lore_directory"},
+        graphviz_config={
+            **load_graphviz_config("directory_view", TEST_GRAPHVIZ_CONFIG_DIR),
+            "column_layout": "place_lore_directory",
+        },
     )
 
     source_column = dot[dot.index('subgraph "cluster_column_0_source_files_h1"') :]
@@ -762,7 +776,10 @@ def test_directory_session_lore_dot_keeps_groups_with_sub_places_and_places_in_h
     dot = combined_relationship_dot(
         graph,
         main_character_ids=set(graph.characters),
-        graphviz_config={**load_graphviz_config("directory_view"), "column_layout": "session_note_lore_directory"},
+        graphviz_config={
+            **load_graphviz_config("directory_view", TEST_GRAPHVIZ_CONFIG_DIR),
+            "column_layout": "session_note_lore_directory",
+        },
     )
 
     source_column = dot[dot.index('subgraph "cluster_column_0_source_files_h1"') :]
@@ -1245,7 +1262,7 @@ def copy_main_session_view_graphviz_config(tmp_path: Path) -> Path:
     config_dir = tmp_path / "graphviz"
     config_dir.mkdir()
     for filename in ("global_graph_view.json", "directory_view.json", "session_view.json"):
-        shutil.copy2(PROJECT_ROOT / "config" / "graphviz" / filename, config_dir / filename)
+        shutil.copy2(TEST_GRAPHVIZ_CONFIG_DIR / filename, config_dir / filename)
     return config_dir
 
 

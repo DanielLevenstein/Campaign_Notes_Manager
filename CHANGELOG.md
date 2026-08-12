@@ -32,6 +32,7 @@
 - Fixed Session Notes directory projection so extracted entities from `Family_Tree.md` are not treated as source documents, preventing duplicate `Family Tree` H1 nodes.
 - Collapsed graph tabs to the supported `Character View`, `Party View`, and `Directory View` set, and restored Directory View header controls with source-file, heading, and H1/H2/H3 hide filters.
 - Replaced the temporary Directory View tab with the final shared tab set: `Character View`, `Party View`, `Location View`, and `Session View` on every graph section. Location View and Session View now share the Directory View rendering pipeline through `config/graphviz/directory_view.json`.
+- Split renderer configs from graph-view scenario fixtures: `config/graphviz` and `tests/fixtures/graphviz` now hold loadable Graphviz settings, while `tests/fixtures/graph_views` keeps source-fixture and screenshot metadata.
 
 # experimental/knowledge_rewrite_phase3
 ## Phase 3 Descoped

@@ -1005,6 +1005,9 @@ def place_lore_graph(
                     ),
                 )
         else:
+            adjacent = graph.characters.get(edge.target if edge.source in place_ids else edge.source)
+            if adjacent is not None and adjacent.node_type == "character" and is_disallowed_place_graph_character(adjacent):
+                continue
             append_projected_edge(projected_edges, place_character_edge_from_place(edge, graph, place_ids))
     for edge in graph.edges:
         if edge.source in place_ids or edge.target in place_ids:
@@ -1017,6 +1020,9 @@ def place_lore_graph(
             place_id = edge.source if edge.source in place_ids else edge.target
             if source_file is not None and place_id not in root_place_ids:
                 continue
+            adjacent = target if edge.source in place_ids else source
+            if adjacent is not None and adjacent.node_type == "character" and is_disallowed_place_graph_character(adjacent):
+                continue
             connected_ids.update({edge.source, edge.target})
     if fanout_linked_characters:
         append_linked_character_fanout(
@@ -1024,6 +1030,7 @@ def place_lore_graph(
             root_ids=root_place_ids,
             connected_ids=connected_ids,
             projected_edges=projected_edges,
+            include_character=lambda node: not is_disallowed_place_graph_character(node),
         )
     for edge in graph.edges:
         if edge.source not in source_document_ids and edge.target not in source_document_ids:
@@ -1637,6 +1644,7 @@ def append_linked_character_fanout(
     root_ids: set[str],
     connected_ids: set[str],
     projected_edges: list[CombinedRelationshipEdge],
+    include_character: Callable[[CombinedCharacterNode], bool] | None = None,
 ) -> None:
     if not root_ids:
         return
@@ -1647,6 +1655,8 @@ def append_linked_character_fanout(
         adjacent_id = edge.target if edge.source in root_ids else edge.source
         adjacent = graph.characters.get(adjacent_id)
         if adjacent is None or adjacent.node_type != "character":
+            continue
+        if include_character is not None and not include_character(adjacent):
             continue
         connected_ids.update({root_id, adjacent_id})
         append_projected_edge(

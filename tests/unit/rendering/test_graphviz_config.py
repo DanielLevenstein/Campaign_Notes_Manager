@@ -1,6 +1,12 @@
 import json
+from pathlib import Path
 
 from src.graph.graphviz_config import load_graphviz_config
+
+
+TEST_FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures"
+TEST_GRAPHVIZ_CONFIG_DIR = TEST_FIXTURES_DIR / "graphviz"
+TEST_GRAPH_VIEW_SCENARIO_DIR = TEST_FIXTURES_DIR / "graph_views"
 
 
 def test_load_graphviz_config_merges_global_then_view_override(tmp_path):
@@ -105,12 +111,39 @@ def test_load_graphviz_config_recursively_merges_parent_view_config(tmp_path):
 
 
 def test_global_graphviz_config_includes_artifact_node_override():
-    config = load_graphviz_config("character_view")
+    config = load_graphviz_config("character_view", TEST_GRAPHVIZ_CONFIG_DIR)
 
     assert config["node_type_overrides"]["artifact"] == {
         "shape": "hexagon",
         "fillcolor": "#fce7f3",
     }
+
+
+def test_graphviz_config_fixtures_are_separate_from_graph_view_scenarios():
+    graphviz_config = load_graphviz_config("session_view", TEST_GRAPHVIZ_CONFIG_DIR)
+    scenario = json.loads(
+        (TEST_GRAPH_VIEW_SCENARIO_DIR / "session_notes_graph_place_lore.json").read_text(
+            encoding="utf-8",
+        )
+    )
+
+    assert graphviz_config["config_scope"] == "knowledge_view"
+    assert graphviz_config["view_key"] == "session_view"
+    assert "source_fixtures" not in graphviz_config
+    assert scenario["fixture_type"] == "knowledge_graph_view"
+    assert scenario["source_fixtures"] == [
+        "tests/fixtures/character_sheets",
+        "tests/fixtures/session_notes/Family_Tree.md",
+    ]
+    assert "config_scope" not in scenario
+
+
+def test_full_structured_graph_config_preserves_legacy_column_grouping():
+    config = load_graphviz_config("full_structured_graph", TEST_GRAPHVIZ_CONFIG_DIR)
+
+    assert config["view_key"] == "full_structured_graph"
+    assert "columns" not in config
+    assert config["graph"]["rankdir"] == "LR"
 
 
 def test_location_and_session_graphviz_configs_inherit_directory_view(tmp_path):
