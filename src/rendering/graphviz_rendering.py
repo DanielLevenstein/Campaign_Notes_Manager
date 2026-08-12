@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 import streamlit as st
 
+from src.extraction.config import CharacterExtractionConfig, load_character_extraction_config
 from src.graph.combined_graph import (
     CombinedCharacterGraph,
     CombinedCharacterNode,
@@ -160,62 +161,6 @@ def lore_graph_view_definitions(active_main_tab: str, *, default_session_source_
 
 DISALLOWED_PLACE_GRAPH_CHARACTER_KEYS = {"family", "stone", "students"}
 PLACE_GRAPH_MARKDOWN_HEADING_RE = re.compile(r"^(?P<marker>#{1,3})\s+(?P<text>.*?)\s*#*\s*$")
-PLACE_HEADING_SUFFIXES = {
-    "Academy",
-    "Bastion",
-    "Cavern",
-    "City",
-    "College",
-    "Coast",
-    "Court",
-    "Fortress",
-    "Forest",
-    "Guild",
-    "Hall",
-    "Halls",
-    "Harbor",
-    "Keep",
-    "Kingdom",
-    "Library",
-    "Mage College",
-    "Monastery",
-    "School",
-    "Sea",
-    "Shore",
-    "Shores",
-    "Temple",
-    "Tower",
-    "Tavern",
-    "University",
-    "Village",
-}
-GROUP_HEADING_SUFFIXES = {
-    "Council",
-    "Cult",
-    "Family",
-    "Guild",
-    "Order",
-}
-ARTIFACT_HEADING_SUFFIXES = {
-    "Amulet",
-    "Blade",
-    "Book",
-    "Crown",
-    "Gem",
-    "Key",
-    "Lantern",
-    "Map",
-    "Mask",
-    "Orb",
-    "Relic",
-    "Ring",
-    "Scroll",
-    "Shard",
-    "Sigil",
-    "Staff",
-    "Stone",
-    "Sword",
-}
 SEMANTIC_LORE_NODE_TYPES = {"place", "group", "artifact"}
 
 
@@ -1939,7 +1884,7 @@ def looks_like_place_heading(text: str) -> bool:
     lowered = text.lower()
     return any(
         lowered == suffix.lower() or lowered.endswith(f" {suffix.lower()}")
-        for suffix in PLACE_HEADING_SUFFIXES
+        for suffix in semantic_heading_config().semantic_place_heading_suffixes
     )
 
 
@@ -1947,7 +1892,7 @@ def looks_like_group_heading(text: str) -> bool:
     lowered = text.lower()
     return any(
         lowered == suffix.lower() or lowered.endswith(f" {suffix.lower()}")
-        for suffix in GROUP_HEADING_SUFFIXES
+        for suffix in semantic_heading_config().semantic_group_heading_suffixes
     )
 
 
@@ -1955,8 +1900,12 @@ def looks_like_artifact_heading(text: str) -> bool:
     lowered = text.lower()
     return any(
         lowered == suffix.lower() or lowered.endswith(f" {suffix.lower()}")
-        for suffix in ARTIFACT_HEADING_SUFFIXES
+        for suffix in semantic_heading_config().semantic_artifact_heading_suffixes
     )
+
+
+def semantic_heading_config() -> CharacterExtractionConfig:
+    return load_character_extraction_config()
 
 
 def semantic_heading_for_node(

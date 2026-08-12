@@ -37,6 +37,9 @@ def test_character_extraction_config_loads_constants_from_json():
     assert config.session_max_derived_places == 9
     assert config.session_max_derived_groups == 6
     assert config.session_max_derived_artifacts == 6
+    assert "Mage College" in config.semantic_place_heading_suffixes
+    assert "Cult" in config.semantic_group_heading_suffixes
+    assert "Blade" in config.semantic_artifact_heading_suffixes
 
 
 def test_character_extraction_config_rejects_missing_relationship_rules():
@@ -75,6 +78,11 @@ def test_character_extraction_config_rejects_missing_relationship_rules():
                     "artifact_words": ["blade"],
                     "canonical_names": {"typhin": "Typhon"},
                     "canonical_family_names": {"nighbloom": "Nightbloom"},
+                },
+                "semantic_heading_normalization": {
+                    "place_suffixes": ["City"],
+                    "group_suffixes": ["Cult"],
+                    "artifact_suffixes": ["Blade"],
                 },
             }
         )

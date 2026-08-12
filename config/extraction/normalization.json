@@ -280,6 +280,64 @@
       "nighbloom": "Nightbloom"
     }
   },
+  "semantic_heading_normalization": {
+    "place_suffixes": [
+      "Academy",
+      "Bastion",
+      "Cavern",
+      "City",
+      "College",
+      "Coast",
+      "Court",
+      "Fortress",
+      "Forest",
+      "Guild",
+      "Hall",
+      "Halls",
+      "Harbor",
+      "Keep",
+      "Kingdom",
+      "Library",
+      "Mage College",
+      "Monastery",
+      "School",
+      "Sea",
+      "Shore",
+      "Shores",
+      "Temple",
+      "Tower",
+      "Tavern",
+      "University",
+      "Village"
+    ],
+    "group_suffixes": [
+      "Council",
+      "Cult",
+      "Family",
+      "Guild",
+      "Order"
+    ],
+    "artifact_suffixes": [
+      "Amulet",
+      "Blade",
+      "Book",
+      "Crown",
+      "Gem",
+      "Key",
+      "Lantern",
+      "Map",
+      "Mask",
+      "Orb",
+      "Relic",
+      "Ring",
+      "Scroll",
+      "Shard",
+      "Sigil",
+      "Staff",
+      "Stone",
+      "Sword"
+    ]
+  },
   "motivation_patterns": [
     "\\b(?:wants|seeks|hopes|needs|tries|trying|adventures)\\s+to\\s+([^.!?;]+)",
     "\\b(?:goal|motivation)\\s+(?:is|was)\\s+to\\s+([^.!?;]+)"

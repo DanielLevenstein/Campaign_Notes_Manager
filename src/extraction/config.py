@@ -47,6 +47,9 @@ class CharacterExtractionConfig:
     session_max_derived_places: int
     session_max_derived_groups: int
     session_max_derived_artifacts: int
+    semantic_place_heading_suffixes: frozenset[str]
+    semantic_group_heading_suffixes: frozenset[str]
+    semantic_artifact_heading_suffixes: frozenset[str]
 
     @property
     def generic_place_names(self) -> frozenset[str]:
@@ -69,6 +72,7 @@ def character_extraction_config_from_payload(payload: dict[str, Any]) -> Charact
     session_entities = object_value(payload, "session_entity_normalization")
     session_patterns = object_value(session_entities, "patterns")
     session_limits = object_value(session_entities, "max_derived")
+    semantic_headings = object_value(payload, "semantic_heading_normalization")
     return CharacterExtractionConfig(
         name_pattern=string_value(patterns, "name"),
         heading_pattern=string_value(patterns, "heading"),
@@ -96,6 +100,9 @@ def character_extraction_config_from_payload(payload: dict[str, Any]) -> Charact
         session_max_derived_places=positive_int(session_limits, "places"),
         session_max_derived_groups=positive_int(session_limits, "groups"),
         session_max_derived_artifacts=positive_int(session_limits, "artifacts"),
+        semantic_place_heading_suffixes=string_set(semantic_headings, "place_suffixes"),
+        semantic_group_heading_suffixes=string_set(semantic_headings, "group_suffixes"),
+        semantic_artifact_heading_suffixes=string_set(semantic_headings, "artifact_suffixes"),
     )
 
 
