@@ -1353,7 +1353,6 @@ def graph_without_markdown_heading_nodes(
         )
         visible_children.extend(visible_markdown_descendant_headings(graph, heading_id, visible_nodes))
         visible_children = list(dict.fromkeys(visible_children))
-        heading_label = heading.name
         for parent_id in visible_parents:
             for child_id in visible_children:
                 if parent_id == child_id:
@@ -1365,7 +1364,7 @@ def graph_without_markdown_heading_nodes(
                         target=child_id,
                         nodes=visible_nodes,
                         relationship_type="heading",
-                        relationship_label=heading_label,
+                        relationship_label=hidden_heading_bridge_label(heading, visible_nodes.get(child_id)),
                         evidence=hidden_heading_bridge_evidence(graph, heading_id, hidden_heading_ids, parent_id, child_id),
                     ),
                 )
@@ -1377,7 +1376,10 @@ def graph_without_markdown_heading_nodes(
                     source=source_id,
                     target=target_id,
                     relationship_type="context",
-                    relationship_label=heading_label,
+                    relationship_label=hidden_heading_bridge_label(
+                        heading,
+                        semantic_hidden_heading_bridge_node(heading, visible_nodes.get(source_id), visible_nodes.get(target_id)),
+                    ),
                     evidence=hidden_heading_bridge_evidence(graph, heading_id, hidden_heading_ids, source_id, target_id),
                 ),
             )
@@ -1395,6 +1397,31 @@ def graph_without_markdown_heading_nodes(
         },
         edges=visible_edges,
     )
+
+
+def hidden_heading_bridge_label(
+    heading: CombinedCharacterNode,
+    visible_node: CombinedCharacterNode | None,
+) -> str:
+    if (
+        visible_node is not None
+        and semantic_heading_entity_type(heading) == visible_node.node_type
+        and compact(heading.name) == compact(visible_node.name)
+    ):
+        return ""
+    return heading.name
+
+
+def semantic_hidden_heading_bridge_node(
+    heading: CombinedCharacterNode,
+    source: CombinedCharacterNode | None,
+    target: CombinedCharacterNode | None,
+) -> CombinedCharacterNode | None:
+    semantic_type = semantic_heading_entity_type(heading)
+    for node in (source, target):
+        if node is not None and node.node_type == semantic_type and compact(node.name) == compact(heading.name):
+            return node
+    return None
 
 
 def visible_markdown_boundary_nodes(

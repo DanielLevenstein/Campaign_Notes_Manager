@@ -13,9 +13,9 @@
   "columns": [
     ["source_files"],
     ["h1", "places"],
+    ["main_characters"],
     ["h2", "groups", "artifacts"],
     ["h3"],
-    ["main_characters"],
     ["secondary_characters"]
   ],
   "editing_notes": [

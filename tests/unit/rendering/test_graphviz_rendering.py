@@ -1,3 +1,6 @@
+import shutil
+from pathlib import Path
+
 from src.graph.combined_graph import (
     CombinedCharacterGraph,
     CombinedCharacterNode,
@@ -27,6 +30,9 @@ from src.rendering.graphviz_rendering import (
     render_lore_graph,
     LoreGraphViewSelection,
 )
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_graph_tabs_follow_active_main_tab():
@@ -1137,6 +1143,110 @@ def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_pat
     assert all_hidden_labels_by_edge[("arlen_voss", "moon_blade")] == "Moon Blade"
     assert ("moon_blade", "neal_lovington") not in all_hidden_labels_by_edge
     assert all_hidden_labels_by_edge[("neal_lovington", "moon_blade")] == "Moon Blade"
+
+
+def test_complex_session_graph_hidden_semantic_heading_bridge_does_not_duplicate_node_label(tmp_path):
+    config_dir = copy_main_session_view_graphviz_config(tmp_path)
+    session_dir = tmp_path / "session_notes"
+    session_dir.mkdir()
+    session_path = session_dir / "complex_session_graph.md"
+    session_path.write_text(
+        "\n".join(
+            [
+                "# Session 4",
+                "Tharevon traveled through the Pixi Kingdom.",
+                "## Pixi Kingdom",
+                "Tharevon met the court.",
+                "Mira Vale mapped the Pixi Kingdom roads.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    graph = CombinedCharacterGraph(
+        characters={
+            "session_notes_fixture": CombinedCharacterNode(
+                id="session_notes_fixture",
+                name="Session Notes Fixture",
+                source_file=str(session_path),
+                node_type="source_document",
+            ),
+            "pixi_kingdom": CombinedCharacterNode(
+                id="pixi_kingdom",
+                name="Pixi Kingdom",
+                source_file="world_building/lore/places/Pixi_Kingdom.md",
+                node_type="place",
+            ),
+            "tharevon": CombinedCharacterNode(
+                id="tharevon",
+                name="Tharevon",
+                source_file="world_building/lore/character_sheets/Tharevon.md",
+                node_type="character",
+            ),
+            "mira_vale": CombinedCharacterNode(
+                id="mira_vale",
+                name="Mira Vale",
+                source_file="world_building/lore/character_sheets/Mira_Vale.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="pixi_kingdom",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["Mira Vale mapped the Pixi Kingdom roads."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="tharevon",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Tharevon traveled through the Pixi Kingdom."],
+            ),
+            CombinedRelationshipEdge(
+                source="session_notes_fixture",
+                target="mira_vale",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Mira Vale mapped the Pixi Kingdom roads."],
+            ),
+        ],
+    )
+
+    projected = markdown_header_lore_graph(
+        graph,
+        source_file=str(session_path),
+        fanout_linked_characters=True,
+        hide_source_document_roots=True,
+        hidden_heading_levels={2},
+    )
+    dot = combined_relationship_dot(
+        projected,
+        main_character_ids={"tharevon"},
+        graphviz_config={
+            **load_graphviz_config("session_view", config_dir),
+            "column_layout": "session_note_lore_directory",
+        },
+    )
+    session_heading_id = "source_heading__sessionnotesfixture__line_1__session4"
+    labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in projected.edges
+    }
+
+    assert labels_by_edge[(session_heading_id, "pixi_kingdom")] == ""
+    assert '"pixi_kingdom" [label="Pixi Kingdom"' in dot
+    assert f'"{session_heading_id}" -> "pixi_kingdom" [label=""' in dot
+    assert f'"{session_heading_id}" -> "pixi_kingdom" [label="Pixi Kingdom"' not in dot
+
+
+def copy_main_session_view_graphviz_config(tmp_path: Path) -> Path:
+    config_dir = tmp_path / "graphviz"
+    config_dir.mkdir()
+    for filename in ("global_graph_view.json", "directory_view.json", "session_view.json"):
+        shutil.copy2(PROJECT_ROOT / "config" / "graphviz" / filename, config_dir / filename)
+    return config_dir
 
 
 def test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nodes(tmp_path):
