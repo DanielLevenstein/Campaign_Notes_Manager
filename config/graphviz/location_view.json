@@ -11,10 +11,9 @@
     "config/graphviz/location_view.json"
   ],
   "columns": [
-    ["source_files", "h1"],
+    ["source_files", "h1", "places"],
     ["h2"],
     ["h3"],
-    ["places"],
     ["groups"],
     ["artifacts"],
     ["linked_characters"]

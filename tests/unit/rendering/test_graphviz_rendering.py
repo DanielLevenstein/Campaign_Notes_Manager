@@ -822,7 +822,7 @@ def test_markdown_heading_level_takes_precedence_over_semantic_node_type_columns
     assert h2_column.index('"source_heading__atlantia__harbor"') < h2_column.index('subgraph "cluster_column_3_linked_characters"')
 
 
-def test_session_view_graphviz_config_keeps_lore_nodes_before_linked_characters():
+def test_session_view_graphviz_config_separates_main_and_secondary_characters():
     graph = CombinedCharacterGraph(
         characters={
             "session_4": CombinedCharacterNode(
@@ -861,34 +861,54 @@ def test_session_view_graphviz_config_keeps_lore_nodes_before_linked_characters(
                 source_file="world_building/lore/character_sheets/Jory_Ravenmark.md",
                 node_type="character",
             ),
+            "neal_lovington": CombinedCharacterNode(
+                id="neal_lovington",
+                name="Neal Lovington",
+                source_file="world_building/lore/character_sheets/Neal_Lovington.md",
+                node_type="character",
+            ),
         },
         edges=[
             CombinedRelationshipEdge("session_4", "session_4_h1", "heading", ""),
             CombinedRelationshipEdge("session_4_h1", "indigo_cult", "mentions", ""),
             CombinedRelationshipEdge("indigo_cult", "moon_gate", "mentioned", "Mentioned"),
             CombinedRelationshipEdge("indigo_cult", "jory_ravenmark", "investigate", "Investigate"),
+            CombinedRelationshipEdge("indigo_cult", "neal_lovington", "investigate", "Investigate"),
             CombinedRelationshipEdge("session_4_h1", "moon_blade", "mentioned", "Mentioned"),
         ],
     )
 
     dot = combined_relationship_dot(
         graph,
-        main_character_ids=set(graph.characters),
-        graphviz_config={**load_graphviz_config("session_view"), "column_layout": "session_note_lore_directory"},
+        main_character_ids={"jory_ravenmark"},
+        graphviz_config={
+            "column_layout": "session_note_lore_directory",
+            "columns": [
+                ["source_files"],
+                ["h1", "places"],
+                ["h2", "groups", "artifacts"],
+                ["h3"],
+                ["main_characters"],
+                ["secondary_characters"],
+            ],
+        },
     )
 
     assert 'subgraph "cluster_column_1_h1_places"' in dot
     assert 'subgraph "cluster_column_2_h2_groups_artifacts"' in dot
-    assert 'subgraph "cluster_column_4_linked_characters"' in dot
+    assert 'subgraph "cluster_column_4_main_characters"' in dot
+    assert 'subgraph "cluster_column_5_secondary_characters"' in dot
     h1_place_column = dot[dot.index('subgraph "cluster_column_1_h1_places"') :]
     lore_column = dot[dot.index('subgraph "cluster_column_2_h2_groups_artifacts"') :]
-    character_column = dot[dot.index('subgraph "cluster_column_4_linked_characters"') :]
+    main_character_column = dot[dot.index('subgraph "cluster_column_4_main_characters"') :]
+    secondary_character_column = dot[dot.index('subgraph "cluster_column_5_secondary_characters"') :]
 
     assert h1_place_column.index('"session_4_h1"') < h1_place_column.index('subgraph "cluster_column_2_h2_groups_artifacts"')
     assert h1_place_column.index('"moon_gate"') < h1_place_column.index('subgraph "cluster_column_2_h2_groups_artifacts"')
     assert lore_column.index('"indigo_cult"') < lore_column.index('subgraph "cluster_column_3_h3"')
     assert lore_column.index('"moon_blade"') < lore_column.index('subgraph "cluster_column_3_h3"')
-    assert character_column.index('"jory_ravenmark"') < character_column.index("}")
+    assert main_character_column.index('"jory_ravenmark"') < main_character_column.index('subgraph "cluster_column_5_secondary_characters"')
+    assert secondary_character_column.index('"neal_lovington"') < secondary_character_column.index("}")
 
 
 def test_directory_session_lore_can_hide_headings_and_keep_context_edges(tmp_path):
@@ -1516,8 +1536,14 @@ def test_place_lore_h1_heading_stays_folder_and_exact_place_heading_deduplicates
             "sunstone_mage_college": CombinedCharacterNode(
                 id="sunstone_mage_college",
                 name="Sunstone Mage College",
-                source_file=str(source_path),
+                source_file="world_building/lore/character_sheets/Orin_Nightbloom.md",
                 node_type="place",
+            ),
+            "orin_nightbloom": CombinedCharacterNode(
+                id="orin_nightbloom",
+                name="Orin Nightbloom",
+                source_file="world_building/lore/character_sheets/Orin_Nightbloom.md",
+                node_type="character",
             ),
         },
         edges=[
@@ -1527,6 +1553,13 @@ def test_place_lore_h1_heading_stays_folder_and_exact_place_heading_deduplicates
                 relationship_type="place",
                 relationship_label="Place",
                 evidence=["Sunstone Mage College sits above Atlantia."],
+            ),
+            CombinedRelationshipEdge(
+                source="orin_nightbloom",
+                target="sunstone_mage_college",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["Orin Nightbloom studied at Sunstone Mage College."],
             )
         ],
     )
@@ -1535,7 +1568,17 @@ def test_place_lore_h1_heading_stays_folder_and_exact_place_heading_deduplicates
     dot = combined_relationship_dot(
         projected,
         main_character_ids=set(projected.characters),
-        graphviz_config={**load_graphviz_config("location_view"), "column_layout": "place_lore_directory"},
+        graphviz_config={
+            "column_layout": "place_lore_directory",
+            "columns": [
+                ["source_files", "h1", "places"],
+                ["h2"],
+                ["h3"],
+                ["groups"],
+                ["artifacts"],
+                ["linked_characters"],
+            ],
+        },
     )
 
     h1_id = next(
@@ -1559,10 +1602,112 @@ def test_place_lore_h1_heading_stays_folder_and_exact_place_heading_deduplicates
         for node_id, node in projected.characters.items()
         if node.name == "Sunstone Mage College"
     )
+    source_h1_places_column = dot[dot.index('subgraph "cluster_column_0_source_files_h1_places"') :]
     h2_column = dot[dot.index('subgraph "cluster_column_1_h2"') :]
-    places_column = dot[dot.index('subgraph "cluster_column_3_places"') :]
+    assert f'"{sunstone_id}"' not in source_h1_places_column[
+        : source_h1_places_column.index('subgraph "cluster_column_1_h2"')
+    ]
     assert h2_column.index(f'"{sunstone_id}"') < h2_column.index('subgraph "cluster_column_2_h3"')
-    assert f'"{sunstone_id}"' not in places_column[: places_column.index('subgraph "cluster_column_4_groups"')]
+
+
+def test_place_lore_artifact_heading_character_edges_point_to_artifact(tmp_path):
+    source_path = tmp_path / "Atlantia_Lore.md"
+    source_path.write_text(
+        "\n".join(
+            [
+                "# Atlantia Lore",
+                "",
+                "## Moon Blade",
+                "",
+                "Arlen Voss recovered the Moon Blade.",
+                "Neal Lovington identified the Moon Blade.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    graph = CombinedCharacterGraph(
+        characters={
+            "atlantia_lore": CombinedCharacterNode(
+                id="atlantia_lore",
+                name="Atlantia Lore",
+                source_file=str(source_path),
+                node_type="place",
+                is_source=True,
+            ),
+            "atlantia": CombinedCharacterNode(
+                id="atlantia",
+                name="Atlantia",
+                source_file=str(source_path),
+                node_type="place",
+            ),
+            "moon_blade": CombinedCharacterNode(
+                id="moon_blade",
+                name="Moon Blade",
+                source_file=str(source_path),
+                node_type="artifact",
+            ),
+            "arlen_voss": CombinedCharacterNode(
+                id="arlen_voss",
+                name="Arlen Voss",
+                source_file="world_building/lore/character_sheets/Arlen_Voss.md",
+                node_type="character",
+            ),
+            "neal_lovington": CombinedCharacterNode(
+                id="neal_lovington",
+                name="Neal Lovington",
+                source_file="world_building/lore/character_sheets/Neal_Lovington.md",
+                node_type="character",
+            ),
+        },
+        edges=[
+            CombinedRelationshipEdge(
+                source="atlantia_lore",
+                target="atlantia",
+                relationship_type="place",
+                relationship_label="Place",
+                evidence=["Atlantia is a small coastal town."],
+            ),
+            CombinedRelationshipEdge(
+                source="atlantia_lore",
+                target="moon_blade",
+                relationship_type="artifact",
+                relationship_label="Artifact",
+                evidence=["Arlen Voss recovered the Moon Blade."],
+            ),
+            CombinedRelationshipEdge(
+                source="atlantia_lore",
+                target="arlen_voss",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Arlen Voss recovered the Moon Blade."],
+            ),
+            CombinedRelationshipEdge(
+                source="atlantia_lore",
+                target="neal_lovington",
+                relationship_type="mentions",
+                relationship_label="Mentions",
+                evidence=["Neal Lovington identified the Moon Blade."],
+            ),
+        ],
+    )
+
+    projected = place_lore_graph(graph, source_file=str(source_path))
+    moon_blade_id = next(
+        node_id
+        for node_id, node in projected.characters.items()
+        if node.name == "Moon Blade"
+    )
+    labels_by_edge = {
+        (edge.source, edge.target): edge.relationship_label
+        for edge in projected.edges
+    }
+
+    assert projected.characters[moon_blade_id].node_type == "artifact"
+    assert projected.characters[moon_blade_id].is_heading is True
+    assert (moon_blade_id, "arlen_voss") not in labels_by_edge
+    assert labels_by_edge[("arlen_voss", moon_blade_id)] == "Mentions"
+    assert (moon_blade_id, "neal_lovington") not in labels_by_edge
+    assert labels_by_edge[("neal_lovington", moon_blade_id)] == "Mentions"
 
 
 def test_hiding_file_name_and_h1_preserves_all_direct_h1_connections():

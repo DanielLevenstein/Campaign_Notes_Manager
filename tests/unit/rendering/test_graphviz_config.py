@@ -113,10 +113,54 @@ def test_global_graphviz_config_includes_artifact_node_override():
     }
 
 
-def test_location_and_session_graphviz_configs_inherit_directory_view():
-    directory_config = load_graphviz_config("directory_view")
-    location_config = load_graphviz_config("location_view")
-    session_config = load_graphviz_config("session_view")
+def test_location_and_session_graphviz_configs_inherit_directory_view(tmp_path):
+    config_dir = tmp_path / "graphviz"
+    config_dir.mkdir()
+    (config_dir / "global_graph_view.json").write_text(
+        json.dumps(
+            {
+                "graph": {"bgcolor": "transparent", "splines": "line"},
+                "node": {"shape": "box"},
+                "edge": {"label_attribute": "label"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (config_dir / "directory_view.json").write_text(
+        json.dumps(
+            {
+                "view_key": "directory_view",
+                "label": "Directory View",
+                "inherits": "config/graphviz/global_graph_view.json",
+                "graph": {"rankdir": "LR"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (config_dir / "location_view.json").write_text(
+        json.dumps(
+            {
+                "view_key": "location_view",
+                "label": "Location View",
+                "inherits": "config/graphviz/directory_view.json",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (config_dir / "session_view.json").write_text(
+        json.dumps(
+            {
+                "view_key": "session_view",
+                "label": "Session View",
+                "inherits": "config/graphviz/directory_view.json",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    directory_config = load_graphviz_config("directory_view", config_dir)
+    location_config = load_graphviz_config("location_view", config_dir)
+    session_config = load_graphviz_config("session_view", config_dir)
 
     assert directory_config["view_key"] == "directory_view"
     assert location_config["view_key"] == "location_view"
@@ -130,18 +174,73 @@ def test_location_and_session_graphviz_configs_inherit_directory_view():
     assert session_config["edge"]["label_attribute"] == "label"
 
 
-def test_graphviz_view_configs_use_nested_column_arrays():
-    assert load_graphviz_config("character_view")["columns"] == [
+def test_graphviz_view_configs_use_nested_column_arrays(tmp_path):
+    config_dir = tmp_path / "graphviz"
+    config_dir.mkdir()
+    (config_dir / "global_graph_view.json").write_text("{}", encoding="utf-8")
+    view_columns = {
+        "character_view": [
+            ["family_names", "artifacts", "groups"],
+            ["main_characters"],
+            ["secondary_characters", "places"],
+        ],
+        "party_view_fixture": [
+            ["family_names", "artifacts", "groups"],
+            ["main_characters"],
+            ["secondary_characters", "places"],
+        ],
+        "directory_view": [
+            ["source_files", "h1"],
+            ["h2"],
+            ["h3"],
+            ["places"],
+            ["groups"],
+            ["artifacts"],
+            ["linked_characters"],
+        ],
+        "location_view": [
+            ["source_files", "h1", "places"],
+            ["h2"],
+            ["h3"],
+            ["groups"],
+            ["artifacts"],
+            ["linked_characters"],
+        ],
+        "session_view": [
+            ["source_files"],
+            ["h1", "places"],
+            ["h2", "groups", "artifacts"],
+            ["h3"],
+            ["main_characters"],
+            ["secondary_characters"],
+        ],
+        "full_knowledge_graph": [
+            ["source_files", "h1"],
+            ["h2"],
+            ["h3"],
+            ["places"],
+            ["groups", "family_names", "artifacts"],
+            ["main_characters"],
+            ["secondary_characters"],
+        ],
+    }
+    for view_key, columns in view_columns.items():
+        (config_dir / f"{view_key}.json").write_text(
+            json.dumps({"columns": columns}),
+            encoding="utf-8",
+        )
+
+    assert load_graphviz_config("character_view", config_dir)["columns"] == [
         ["family_names", "artifacts", "groups"],
         ["main_characters"],
         ["secondary_characters", "places"],
     ]
-    assert load_graphviz_config("party_view_fixture")["columns"] == [
+    assert load_graphviz_config("party_view_fixture", config_dir)["columns"] == [
         ["family_names", "artifacts", "groups"],
         ["main_characters"],
         ["secondary_characters", "places"],
     ]
-    assert load_graphviz_config("directory_view")["columns"] == [
+    assert load_graphviz_config("directory_view", config_dir)["columns"] == [
         ["source_files", "h1"],
         ["h2"],
         ["h3"],
@@ -150,23 +249,23 @@ def test_graphviz_view_configs_use_nested_column_arrays():
         ["artifacts"],
         ["linked_characters"],
     ]
-    assert load_graphviz_config("location_view")["columns"] == [
-        ["source_files", "h1"],
+    assert load_graphviz_config("location_view", config_dir)["columns"] == [
+        ["source_files", "h1", "places"],
         ["h2"],
         ["h3"],
-        ["places"],
         ["groups"],
         ["artifacts"],
         ["linked_characters"],
     ]
-    assert load_graphviz_config("session_view")["columns"] == [
+    assert load_graphviz_config("session_view", config_dir)["columns"] == [
         ["source_files"],
         ["h1", "places"],
         ["h2", "groups", "artifacts"],
         ["h3"],
-        ["linked_characters"],
+        ["main_characters"],
+        ["secondary_characters"],
     ]
-    assert load_graphviz_config("full_knowledge_graph")["columns"] == [
+    assert load_graphviz_config("full_knowledge_graph", config_dir)["columns"] == [
         ["source_files", "h1"],
         ["h2"],
         ["h3"],

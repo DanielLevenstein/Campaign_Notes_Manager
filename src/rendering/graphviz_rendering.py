@@ -260,6 +260,7 @@ def render_knowledge_graph_tabs(
                 render_lore_graph_view(
                     combined,
                     definition=lore_view_definitions[tab_name],
+                    main_character_ids=main_character_ids,
                     label_font_color=label_font_color,
                 )
             elif tab_name == FULL_KNOWLEDGE_GRAPH_TAB:
@@ -304,6 +305,7 @@ def render_lore_graph_view(
     combined: CombinedCharacterGraph,
     *,
     definition: LoreGraphViewDefinition,
+    main_character_ids: set[str] | None = None,
     label_font_color: str,
 ) -> None:
     st.subheader(definition.view_name)
@@ -319,6 +321,7 @@ def render_lore_graph_view(
         label_font_color=label_font_color,
         column_layout=definition.column_layout,
         graphviz_config_key=definition.graphviz_config_key,
+        main_character_ids=main_character_ids,
         show_lore_notes=definition.show_lore_notes,
         hide_source_document_roots=selection.hide_source_document_roots,
     )
@@ -485,6 +488,7 @@ def render_lore_graph(
     label_font_color: str,
     column_layout: str,
     graphviz_config_key: str = LORE_GRAPH_CONFIG.key,
+    main_character_ids: set[str] | None = None,
     show_lore_notes: bool = False,
     hide_source_document_roots: bool = False,
 ) -> None:
@@ -496,7 +500,7 @@ def render_lore_graph(
     note_rows = lore_information_rows(lore_graph) if show_lore_notes else []
     render_relationship_graph(
         lore_graph,
-        main_character_ids=set(lore_graph.characters),
+        main_character_ids=main_character_ids,
         label_font_color=label_font_color,
         graphviz_config=graphviz_config,
         relationship_rows=place_lore_connection_rows(lore_graph),
@@ -1002,13 +1006,6 @@ def place_lore_graph(
                 )
         else:
             append_projected_edge(projected_edges, place_character_edge_from_place(edge, graph, place_ids))
-    semantic_heading_by_place_id = semantic_heading_by_entity_id(
-        graph,
-        source_to_place_ids,
-        projected_nodes,
-        semantic_heading_ids_by_source,
-    )
-    projected_edges = retarget_semantic_heading_place_edges(projected_edges, semantic_heading_by_place_id)
     for edge in graph.edges:
         if edge.source in place_ids or edge.target in place_ids:
             source = graph.characters.get(edge.source)
@@ -1053,17 +1050,32 @@ def place_lore_graph(
             continue
         connected_ids.add(adjacent_id)
         for character_source_id in character_source_ids:
-            append_projected_edge(
-                projected_edges,
-                CombinedRelationshipEdge(
+            projected_edge = CombinedRelationshipEdge(
+                source=character_source_id,
+                target=adjacent_id,
+                relationship_type=edge.relationship_type,
+                relationship_label=edge.relationship_label,
+                evidence=list(edge.evidence),
+                bidirectional=edge.bidirectional,
+            )
+            character_source = projected_nodes.get(character_source_id, graph.characters.get(character_source_id))
+            if character_source is not None and character_source.node_type in {"group", "artifact"}:
+                projected_edge = projected_lore_context_edge(
                     source=character_source_id,
                     target=adjacent_id,
+                    nodes={**graph.characters, **projected_nodes},
                     relationship_type=edge.relationship_type,
                     relationship_label=edge.relationship_label,
                     evidence=list(edge.evidence),
                     bidirectional=edge.bidirectional,
-                ),
-            )
+                )
+            append_projected_edge(projected_edges, projected_edge)
+    semantic_heading_by_entity_id_map = semantic_heading_by_original_entity_id(graph, projected_nodes)
+    projected_edges = retarget_semantic_heading_edges(projected_edges, semantic_heading_by_entity_id_map)
+    connected_ids = {
+        semantic_heading_by_entity_id_map.get(node_id, node_id)
+        for node_id in connected_ids
+    }
     projected_edges = prune_unassociated_markdown_headings(
         connected_ids,
         projected_nodes,
@@ -1987,35 +1999,40 @@ def append_place_heading_root_edges(
                 )
 
 
-def semantic_heading_by_entity_id(
+def semantic_heading_by_original_entity_id(
     graph: CombinedCharacterGraph,
-    source_to_entity_ids: dict[str, set[str]],
     projected_nodes: dict[str, CombinedCharacterNode],
-    semantic_heading_ids_by_source: dict[str, set[str]],
 ) -> dict[str, str]:
+    heading_ids_by_key: dict[tuple[str, str], list[str]] = {}
+    for heading_id, heading in projected_nodes.items():
+        if semantic_heading_entity_type(heading) not in SEMANTIC_LORE_NODE_TYPES:
+            continue
+        heading_ids_by_key.setdefault((heading.node_type, compact(heading.name)), []).append(heading_id)
     mapped: dict[str, str] = {}
-    for source_id, entity_ids in source_to_entity_ids.items():
-        for entity_id in entity_ids:
-            entity = graph.characters.get(entity_id)
-            if entity is None:
-                continue
-            for heading_id in semantic_heading_ids_by_source.get(source_id, set()):
-                heading = projected_nodes.get(heading_id)
-                if heading is None:
-                    continue
-                if semantic_heading_entity_type(heading) == entity.node_type and compact(heading.name) == compact(entity.name):
-                    mapped[entity_id] = heading_id
+    for entity_id, entity in graph.characters.items():
+        if entity.is_source or entity.node_type not in SEMANTIC_LORE_NODE_TYPES:
+            continue
+        heading_ids = heading_ids_by_key.get((entity.node_type, compact(entity.name)), [])
+        if not heading_ids:
+            continue
+        entity_source = normalized_lore_source_file(entity.source_file)
+        same_source_heading_ids = [
+            heading_id
+            for heading_id in heading_ids
+            if normalized_lore_source_file(projected_nodes[heading_id].source_file) == entity_source
+        ]
+        mapped[entity_id] = sorted(same_source_heading_ids or heading_ids)[0]
     return mapped
 
 
-def retarget_semantic_heading_place_edges(
+def retarget_semantic_heading_edges(
     edges: list[CombinedRelationshipEdge],
-    semantic_heading_by_place_id: dict[str, str],
+    semantic_heading_by_entity_id_map: dict[str, str],
 ) -> list[CombinedRelationshipEdge]:
     retargeted: list[CombinedRelationshipEdge] = []
     for edge in edges:
-        source = semantic_heading_by_place_id.get(edge.source, edge.source)
-        target = semantic_heading_by_place_id.get(edge.target, edge.target)
+        source = semantic_heading_by_entity_id_map.get(edge.source, edge.source)
+        target = semantic_heading_by_entity_id_map.get(edge.target, edge.target)
         if source == target:
             continue
         append_projected_edge(
