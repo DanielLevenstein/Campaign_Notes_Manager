@@ -61,13 +61,19 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Add the Session Notes Graph views with Location View and Directory File View and align them with the same projection behavior.
 - [x] Implement the Full Structured Graph view with straight-line routing, stable columns, and the family-name trapezoid shape.
 
-## Phase 4 – Add the deduplication review workflow
+## Phase 4 Context Aware Edges
+- [ ] Create design doc for context-aware edges
+- [ ] Move session-note derived relationships onto the occurrence model
+- [ ] Persist occurrence metadata in canonical graph edges.
+- [ ] Replace hidden-heading bridge creation with visible-anchor selection from occurrence metadata.
+- 
+## Phase 5 Deduplication review workflow
 - [ ] Add a Character Deduplication view that groups likely duplicate characters and supports canonical/alias decisions.
 - [ ] Add a Place Deduplication view that groups likely duplicate places and supports canonical/alias decisions.
 - [ ] Add a Node Removal view for low-confidence nodes that should be hidden from rendered graphs while preserving evidence.
 - [ ] Store review decisions separately from generated graph JSON so they can be reapplied during regeneration.
 
-## Phase 5 – Testing, migration, and rollout
+## Phase 6 Testing, migration, and rollout
 - [ ] Add unit tests for canonicalization adapters, projection results, and review-rule application.
 - [ ] Add integration tests covering ingestion -> canonical store -> projection -> UI rendering for session-note imports.
 - [ ] Add UI contract tests and a small e2e flow for deduplication and graph rendering.

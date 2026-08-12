@@ -4,183 +4,14 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+from src.extraction.config import CharacterExtractionConfig, load_character_extraction_config
 
-MAX_DERIVED_CHARACTERS = 18
-MAX_DERIVED_PLACES = 9
-MAX_DERIVED_GROUPS = 6
-MAX_DERIVED_ARTIFACTS = 6
 
-ENTITY_PATTERN = re.compile(
-    r"\b(?:(?:Mr|Mrs|Ms|Mx|Dr)\.?\s+)?[A-Z][A-Za-z]+(?:\s+(?:the\s+)?[A-Z][A-Za-z]+){0,3}\b"
-)
-GROUP_PATTERN = re.compile(
-    r"\b(?:(?:the|The)\s+)?(?:(?P<of>cult)\s+of\s+(?P<of_name>[A-Z][A-Za-z]+)|(?P<prefix>[A-Z][A-Za-z]+)\s+(?P<suffix>cult))\b",
-    flags=re.IGNORECASE,
-)
-FAMILY_HEADING_PATTERN = re.compile(r"^\s{0,3}#{1,6}\s+(?:The\s+)?(?P<name>[A-Z][A-Za-z]+)\s+Family\b", re.MULTILINE)
-SENTENCE_PATTERN = re.compile(r"[^.!?\n]+[.!?]?")
-
-NON_ENTITY_STARTS = {
-    "A",
-    "After",
-    "Along",
-    "An",
-    "And",
-    "As",
-    "At",
-    "Basically",
-    "Before",
-    "By",
-    "Couldn",
-    "Did",
-    "During",
-    "Eventually",
-    "Even",
-    "Everyone",
-    "Finally",
-    "For",
-    "Formally",
-    "From",
-    "Going",
-    "He",
-    "Her",
-    "His",
-    "I",
-    "In",
-    "Inside",
-    "It",
-    "Later",
-    "Mention",
-    "Most",
-    "No",
-    "On",
-    "Once",
-    "Only",
-    "Or",
-    "Sadly",
-    "Session",
-    "She",
-    "Since",
-    "Some",
-    "Sometime",
-    "Thanks",
-    "That",
-    "The",
-    "Their",
-    "There",
-    "They",
-    "This",
-    "Those",
-    "To",
-    "Together",
-    "Until",
-    "Upon",
-    "What",
-    "When",
-    "Where",
-    "Which",
-    "While",
-    "Within",
-    "With",
-    "Without",
-    "You",
-}
-GENERIC_ENTITIES = {
-    "Almiraj Ring Toss",
-    "Basilisk",
-    "Big Top Extravaganza",
-    "Carnival",
-    "Centaur Jousting",
-    "Combat",
-    "CULT",
-    "Cult",
-    "Cultist",
-    "Drow Mage",
-    "Drider",
-    "Ettercap",
-    "Ettercaps",
-    "Epic Poem",
-    "Faerie Dragon",
-    "Fey",
-    "Gnoll",
-    "Gnolls",
-    "Goblin Wrestling",
-    "Guardian",
-    "Hags",
-    "Human",
-    "Ignan",
-    "Ignis",
-    "Lampad",
-    "Light",
-    "Nymphs",
-    "Party",
-    "Satyr",
-    "Sean",
-    "Smoke",
-    "OOZE",
-    "Solanthous Tea",
-    "Vicious Mockery",
-}
-PLACE_WORDS = {
-    "academy",
-    "big top",
-    "carnival",
-    "cave",
-    "church",
-    "city",
-    "college",
-    "craigwood",
-    "desert",
-    "dominaria",
-    "feydark",
-    "feywild",
-    "forest",
-    "hall",
-    "inn",
-    "kingdom",
-    "mentha",
-    "mountain",
-    "oasis",
-    "orchard",
-    "pinewilds",
-    "plane",
-    "ruins",
-    "tavern",
-    "town",
-    "underdark",
-    "village",
-}
-ARTIFACT_WORDS = {
-    "amulet",
-    "blade",
-    "book",
-    "crown",
-    "gem",
-    "key",
-    "lantern",
-    "map",
-    "mask",
-    "orb",
-    "relic",
-    "ring",
-    "scroll",
-    "shard",
-    "sigil",
-    "staff",
-    "stone",
-    "sword",
-}
-CANONICAL_NAMES = {
-    "dizelvad": "Dizlevad",
-    "moningstar": "Morningstar",
-    "surriv": "Sauriv",
-    "typheb": "Typhon",
-    "typhen": "Typhon",
-    "typhin": "Typhon",
-}
-CANONICAL_FAMILY_NAMES = {
-    "nighbloom": "Nightbloom",
-}
+SESSION_ENTITY_CONFIG = load_character_extraction_config()
+ENTITY_PATTERN = re.compile(SESSION_ENTITY_CONFIG.session_entity_pattern)
+GROUP_PATTERN = re.compile(SESSION_ENTITY_CONFIG.session_group_pattern, flags=re.IGNORECASE)
+FAMILY_HEADING_PATTERN = re.compile(SESSION_ENTITY_CONFIG.session_family_heading_pattern, re.MULTILINE)
+SENTENCE_PATTERN = re.compile(SESSION_ENTITY_CONFIG.session_sentence_pattern)
 
 
 @dataclass
@@ -204,11 +35,16 @@ def derived_lore_entity_relationships(
     text: str,
     known_character_names: list[str] | None = None,
     known_place_names: list[str] | None = None,
-    max_characters: int = MAX_DERIVED_CHARACTERS,
-    max_places: int = MAX_DERIVED_PLACES,
-    max_groups: int = MAX_DERIVED_GROUPS,
-    max_artifacts: int = MAX_DERIVED_ARTIFACTS,
+    max_characters: int | None = None,
+    max_places: int | None = None,
+    max_groups: int | None = None,
+    max_artifacts: int | None = None,
 ) -> list[dict[str, str]]:
+    config = session_entity_config()
+    max_characters = max_characters if max_characters is not None else config.session_max_derived_characters
+    max_places = max_places if max_places is not None else config.session_max_derived_places
+    max_groups = max_groups if max_groups is not None else config.session_max_derived_groups
+    max_artifacts = max_artifacts if max_artifacts is not None else config.session_max_derived_artifacts
     candidates = extract_lore_entity_candidates(
         text,
         known_character_names=known_character_names or [],
@@ -290,7 +126,7 @@ def family_heading_relationships(
 
 def canonical_family_name(name: str) -> str:
     cleaned = clean_candidate(name).title()
-    return CANONICAL_FAMILY_NAMES.get(compact(cleaned), cleaned)
+    return session_entity_config().session_canonical_family_names.get(compact(cleaned), cleaned)
 
 
 def extract_lore_entity_candidates(
@@ -319,6 +155,8 @@ def extract_lore_entity_candidates(
         if not is_candidate_entity(candidate):
             continue
         key = compact(candidate)
+        if key in group_counts:
+            continue
         display_names.setdefault(key, known_characters.get(key) or known_places.get(key) or candidate)
         aliases_by_key.setdefault(key, set()).update({raw_name, candidate, display_names[key]})
         counts[key] += 1
@@ -400,14 +238,15 @@ def clean_candidate(value: str) -> str:
 
 
 def is_candidate_entity(value: str) -> bool:
+    config = session_entity_config()
     parts = value.split()
     if not parts:
         return False
-    if parts[0] in NON_ENTITY_STARTS:
+    if parts[0] in config.session_non_entity_starts:
         return False
-    if value in GENERIC_ENTITIES:
+    if value in config.session_generic_entities:
         return False
-    if any(part in {"Ignis"} for part in parts):
+    if any(part in config.session_rejected_name_parts for part in parts):
         return False
     if any(part.lower() == "bickering" for part in parts):
         return False
@@ -419,19 +258,23 @@ def is_candidate_entity(value: str) -> bool:
 
 
 def canonical_entity_name(name: str) -> str:
-    if compact(name) == "mrdoctor":
-        return "John Doctor"
-    return CANONICAL_NAMES.get(compact(name), name)
+    return session_entity_config().session_canonical_names.get(compact(name), name)
 
 
 def looks_like_place(name: str) -> bool:
+    place_words = session_entity_config().session_place_words
     lowered = name.lower()
-    return any(word in lowered for word in PLACE_WORDS)
+    return any(word in lowered for word in place_words)
 
 
 def looks_like_artifact(name: str) -> bool:
+    artifact_words = session_entity_config().session_artifact_words
     lowered = name.lower()
-    return any(lowered == word or lowered.endswith(f" {word}") for word in ARTIFACT_WORDS)
+    return any(lowered == word or lowered.endswith(f" {word}") for word in artifact_words)
+
+
+def session_entity_config() -> CharacterExtractionConfig:
+    return load_character_extraction_config()
 
 
 def evidence_for_entity(
@@ -443,9 +286,10 @@ def evidence_for_entity(
 ) -> list[str]:
     refs = {name, *(aliases or set())}
     if include_short_aliases:
+        honorifics = {word.lower().rstrip(".") for word in session_entity_config().honorific_words}
         for alias in list(refs):
             parts = alias.split()
-            if len(parts) > 1 and parts[0].lower().rstrip(".") not in {"mr", "mrs", "ms", "mx", "dr"}:
+            if len(parts) > 1 and parts[0].lower().rstrip(".") not in honorifics:
                 refs.add(parts[0])
     return [
         sentence

@@ -1086,6 +1086,31 @@ def test_session_note_entity_extraction_promotes_group_names_to_family_column():
     assert '"indigocult"' in family_column
 
 
+def test_session_note_entity_extraction_keeps_cult_names_out_of_character_candidates():
+    candidates = extract_lore_entity_candidates(
+        "They traced the Indigo Cult to the Moon Gate. Mr Light questioned an Indigo Cult member.",
+        known_character_names=["Mr Light"],
+    )
+
+    indigo_types = {
+        candidate.entity_type
+        for candidate in candidates
+        if candidate.name == "Indigo Cult"
+    }
+
+    assert indigo_types == {"group"}
+
+
+def test_session_note_entity_extraction_treats_gate_names_as_places():
+    candidates = extract_lore_entity_candidates(
+        "They traced the Indigo Cult to the Moon Gate.",
+    )
+
+    moon_gate = next(candidate for candidate in candidates if candidate.name == "Moon Gate")
+
+    assert moon_gate.entity_type == "place"
+
+
 def test_combined_graph_uses_vertical_layout_for_broad_session_note_hubs():
     relationships = [
         {

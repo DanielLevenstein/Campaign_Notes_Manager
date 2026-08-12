@@ -32,6 +32,21 @@ class CharacterExtractionConfig:
     relationship_rules: tuple[RelationshipRuleConfig, ...]
     trait_words: frozenset[str]
     generated_evidence_max_length: int
+    session_non_entity_starts: frozenset[str]
+    session_generic_entities: frozenset[str]
+    session_rejected_name_parts: frozenset[str]
+    session_place_words: frozenset[str]
+    session_artifact_words: frozenset[str]
+    session_canonical_names: dict[str, str]
+    session_canonical_family_names: dict[str, str]
+    session_entity_pattern: str
+    session_group_pattern: str
+    session_family_heading_pattern: str
+    session_sentence_pattern: str
+    session_max_derived_characters: int
+    session_max_derived_places: int
+    session_max_derived_groups: int
+    session_max_derived_artifacts: int
 
     @property
     def generic_place_names(self) -> frozenset[str]:
@@ -51,6 +66,9 @@ def load_character_extraction_config(path: Path = DEFAULT_EXTRACTION_CONFIG) -> 
 
 def character_extraction_config_from_payload(payload: dict[str, Any]) -> CharacterExtractionConfig:
     patterns = object_value(payload, "patterns")
+    session_entities = object_value(payload, "session_entity_normalization")
+    session_patterns = object_value(session_entities, "patterns")
+    session_limits = object_value(session_entities, "max_derived")
     return CharacterExtractionConfig(
         name_pattern=string_value(patterns, "name"),
         heading_pattern=string_value(patterns, "heading"),
@@ -63,6 +81,21 @@ def character_extraction_config_from_payload(payload: dict[str, Any]) -> Charact
         relationship_rules=relationship_rules(payload),
         trait_words=string_set(payload, "trait_words"),
         generated_evidence_max_length=positive_int(payload, "generated_evidence_max_length"),
+        session_non_entity_starts=string_set(session_entities, "non_entity_starts"),
+        session_generic_entities=string_set(session_entities, "generic_entities"),
+        session_rejected_name_parts=string_set(session_entities, "rejected_name_parts"),
+        session_place_words=string_set(session_entities, "place_words"),
+        session_artifact_words=string_set(session_entities, "artifact_words"),
+        session_canonical_names=string_map(session_entities, "canonical_names"),
+        session_canonical_family_names=string_map(session_entities, "canonical_family_names"),
+        session_entity_pattern=string_value(session_patterns, "entity"),
+        session_group_pattern=string_value(session_patterns, "group"),
+        session_family_heading_pattern=string_value(session_patterns, "family_heading"),
+        session_sentence_pattern=string_value(session_patterns, "sentence"),
+        session_max_derived_characters=positive_int(session_limits, "characters"),
+        session_max_derived_places=positive_int(session_limits, "places"),
+        session_max_derived_groups=positive_int(session_limits, "groups"),
+        session_max_derived_artifacts=positive_int(session_limits, "artifacts"),
     )
 
 
@@ -111,6 +144,20 @@ def string_set(payload: dict[str, Any], key: str) -> frozenset[str]:
     if not cleaned:
         raise ValueError(f"Character extraction config `{key}` must include non-empty strings.")
     return frozenset(cleaned)
+
+
+def string_map(payload: dict[str, Any], key: str) -> dict[str, str]:
+    values = payload.get(key)
+    if not isinstance(values, dict) or not values:
+        raise ValueError(f"Character extraction config must include a non-empty `{key}` object.")
+    cleaned = {
+        str(raw_key).strip(): str(raw_value).strip()
+        for raw_key, raw_value in values.items()
+        if str(raw_key).strip() and str(raw_value).strip()
+    }
+    if not cleaned:
+        raise ValueError(f"Character extraction config `{key}` must include non-empty strings.")
+    return cleaned
 
 
 def positive_int(payload: dict[str, Any], key: str) -> int:

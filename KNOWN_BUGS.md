@@ -4,10 +4,10 @@ This roadmap covers every bug currently documented in `docs/bugs`. The order is 
 
 ## Bug Inventory
 
-- [ ] `docs/bugs/bug_session_note_upload_e2e_flaky_staged_file.md` - session-note upload e2e can lose the staged file.
+- [x] `docs/bugs/bug_session_note_upload_e2e_flaky_staged_file.md` - session-note upload e2e can lose the staged file.
 - [x] `docs/bugs/bug_session_note_hide_h1_unreachable.md` - H1 hide-heading action cannot be reached from the session-note editor.
-- [ ] `docs/bugs/node_type_bugs.md` - `Moon Gate` is inferred as a character instead of a place.
-- [ ] `docs/bugs/bug_groups_in_character_column.md` - `Indigo Cult` renders as both a group and a character.
+- [x] `docs/bugs/node_type_bugs.md` - `Moon Gate` is inferred as a character instead of a place.
+- [x] `docs/bugs/bug_groups_in_character_column.md` - `Indigo Cult` renders as both a group and a character.
 - [ ] `docs/bugs/bug_group_connection_context_transfer.md` - groups lose correct visible heading context when headings are hidden.
 
 ## Test Harness And Baseline Evidence
@@ -40,16 +40,25 @@ This roadmap covers every bug currently documented in `docs/bugs`. The order is 
 
 ## Canonical Node Type And Identity Fixes
 
-- [ ] Add fixture-backed unit tests for `complex_session_graph.md` proving `Moon Gate` is a place.
-- [ ] Review node type inference and configured node/edge allow-lists for place-like names extracted from session notes.
-- [ ] Ensure `Indigo Cult` is canonicalized as one group node, not a duplicate character plus group.
-- [ ] Add regression coverage showing group members render as character connections, while the group remains in the group column.
-- [ ] Confirm canonical identity decisions happen before projection, layout, and deduplication.
+- [x] Add fixture-backed unit tests proving `Moon Gate` is a place before projection.
+- [x] Review node type inference for place-like names extracted from session notes.
+- [x] Ensure `Indigo Cult` is canonicalized as one group node, not a duplicate character plus group.
+- [x] Add regression coverage showing group members render as character connections, while the group remains in the group column.
+- [x] Confirm canonical identity decisions happen before projection, layout, and deduplication.
 
 ### Acceptance Criteria
 
 - `Moon Gate` appears as a place in session-note and location graph projections.
 - `Indigo Cult` appears once as a group, with member/related characters connected separately.
+
+### Test Evidence
+
+- `tests/unit/graph/test_combined_character_graph.py::test_session_note_entity_extraction_keeps_cult_names_out_of_character_candidates`
+- `tests/unit/graph/test_combined_character_graph.py::test_session_note_entity_extraction_treats_gate_names_as_places`
+- `tests/unit/graph/test_context_aware_edges.py::test_moon_gate_is_typed_as_a_place_before_projection`
+- `tests/unit/graph/test_context_aware_edges.py::test_group_mentions_do_not_create_duplicate_character_nodes_for_the_same_name`
+- `tests/unit/graph/test_node_normalization.py`
+- `tests/unit/rendering/test_graphviz_rendering.py::test_session_note_group_heading_and_entity_are_not_rendered_as_duplicate_nodes`
 
 ## Heading And Source Deduplication
 

@@ -1,6 +1,12 @@
 
 # feature/knowledge_graph3
 
+## Context-Aware Edge Design
+- Added failing graph-creation tests for context-aware edge occurrence metadata, direct co-mentioned entity edges, group context preservation under hidden headings, `Moon Gate` place typing, and `Indigo Cult` group deduplication.
+- Added `docs/design/DESIGN_CONTEXT_AWARE_EDGES.md` to define the occurrence model, direct context edge derivation, projection behavior, implementation plan, and acceptance criteria for fixing heading-dependent graph edges.
+- Fixed the pre-context-aware session-note extraction bugs for `Moon Gate` place typing and `Indigo Cult` group/character duplication, updated TODO/bug-roadmap tracking, and documented test evidence in the resolved bug notes.
+- Moved session-note entity normalization constants, regex patterns, extraction limits, and typo maps out of `session_entities.py` and into `config/extraction/normalization.json`.
+
 ## Phase 0
 - Added the Phase 0 persistence layer for mirrored graph metadata paths, centralized Markdown/JSON/bytes file writes, and graph serialization that excludes synthetic edges.
 - Routed character, place, and session-note Markdown save/delete flows through the persistence helpers so lore edits update the corresponding graph JSON.

@@ -21,6 +21,22 @@ def test_character_extraction_config_loads_constants_from_json():
     assert config.generated_evidence_max_length == 240
     assert config.relationship_rules[0].relationship_type == "betrayer"
     assert "betray" in config.relationship_rules[0].keywords
+    assert "They" in config.session_non_entity_starts
+    assert "Cultist" in config.session_generic_entities
+    assert "Ignis" in config.session_rejected_name_parts
+    assert "gate" in config.session_place_words
+    assert "blade" in config.session_artifact_words
+    assert config.session_canonical_names["typhin"] == "Typhon"
+    assert config.session_canonical_names["mrdoctor"] == "John Doctor"
+    assert config.session_canonical_family_names["nighbloom"] == "Nightbloom"
+    assert config.session_entity_pattern.startswith("\\b")
+    assert "?P<prefix>" in config.session_group_pattern
+    assert "?P<name>" in config.session_family_heading_pattern
+    assert config.session_sentence_pattern == "[^.!?\\n]+[.!?]?"
+    assert config.session_max_derived_characters == 18
+    assert config.session_max_derived_places == 9
+    assert config.session_max_derived_groups == 6
+    assert config.session_max_derived_artifacts == 6
 
 
 def test_character_extraction_config_rejects_missing_relationship_rules():
@@ -39,5 +55,26 @@ def test_character_extraction_config_rejects_missing_relationship_rules():
                 "motivation_patterns": ["motivation"],
                 "trait_words": ["brave"],
                 "generated_evidence_max_length": 240,
+                "session_entity_normalization": {
+                    "patterns": {
+                        "entity": "entity",
+                        "group": "group",
+                        "family_heading": "family",
+                        "sentence": "sentence",
+                    },
+                    "max_derived": {
+                        "characters": 1,
+                        "places": 1,
+                        "groups": 1,
+                        "artifacts": 1,
+                    },
+                    "non_entity_starts": ["The"],
+                    "generic_entities": ["Cultist"],
+                    "rejected_name_parts": ["Ignis"],
+                    "place_words": ["gate"],
+                    "artifact_words": ["blade"],
+                    "canonical_names": {"typhin": "Typhon"},
+                    "canonical_family_names": {"nighbloom": "Nightbloom"},
+                },
             }
         )
