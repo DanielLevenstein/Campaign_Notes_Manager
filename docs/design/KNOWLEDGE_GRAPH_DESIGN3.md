@@ -49,6 +49,7 @@ This keeps the combined graph strict while preserving potentially useful extract
 | Character | `box` | `#dbeafe` | None |
 | Place | `component` | `#dcfce7` | None |
 | Group | `trapezium` | `#e9d5ff` | None |
+| Artifact | `hexagon` | `#fce7f3` | None |
 | Family | `ellipse` | `#fef3c7` | `width=1.9`, `height=0.8`, `margin="0.14,0.06"` |
 | Source document | `folder` | `#fde68a` | `width=1.65`, `height=0.7`, `margin="0.12,0.06"` |
 

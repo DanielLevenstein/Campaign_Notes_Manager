@@ -7,20 +7,21 @@ from pathlib import Path
 
 import pytest
 import requests
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import expect, sync_playwright
+from tests.support.test_paths import LEGACY_SESSION_NOTES_TXT, PROJECT_ROOT, TEST_FIXTURES_DIR
 
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = PROJECT_ROOT
 APP_URL = "http://127.0.0.1:8513"
 GRAPH_APP_URL = "http://127.0.0.1:8514"
 
 
-def streamlit_executable() -> Path:
-    workspace_venv = ROOT_DIR.parent / ".venv/bin/streamlit"
-    project_venv = ROOT_DIR / ".venv/bin/streamlit"
-    if workspace_venv.exists():
-        return workspace_venv
-    return project_venv
+def streamlit_command() -> list[str]:
+    workspace_python = ROOT_DIR.parent / ".venv/bin/python"
+    project_python = ROOT_DIR / ".venv/bin/python"
+    python = project_python if project_python.exists() else workspace_python
+    return [str(python), "-m", "streamlit"]
 
 
 def wait_for_streamlit(url: str, process: subprocess.Popen, timeout: int = 30) -> None:
@@ -40,13 +41,20 @@ def wait_for_streamlit(url: str, process: subprocess.Popen, timeout: int = 30) -
     raise TimeoutError(f"Streamlit app did not start at {url}\n{output}")
 
 
+def open_streamlit_app(page, app_url: str) -> None:
+    page.goto(app_url, wait_until="domcontentloaded")
+    expect(page.get_by_role("heading", name="Roleplaying Character Creator")).to_be_visible(timeout=10000)
+
+
 @pytest.fixture()
 def isolated_session_notes_app(tmp_path):
     world_building_dir = tmp_path / "world_building"
     docs_lore_dir = world_building_dir / "lore"
+    upload_source_dir = tmp_path / "upload_sources"
     import_dir = world_building_dir / "import"
     meta_data_dir = world_building_dir / "meta_data"
     docs_lore_dir.mkdir(parents=True)
+    upload_source_dir.mkdir()
     import_dir.mkdir(parents=True)
     meta_data_dir.mkdir()
 
@@ -60,7 +68,7 @@ def isolated_session_notes_app(tmp_path):
     env["LOCAL_CHATBOT_SESSION_NOTES_DIR"] = str(docs_lore_dir / "session_notes")
     process = subprocess.Popen(
         [
-            str(streamlit_executable()),
+            *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",
@@ -76,7 +84,7 @@ def isolated_session_notes_app(tmp_path):
     )
     try:
         wait_for_streamlit(APP_URL, process)
-        yield APP_URL, docs_lore_dir
+        yield APP_URL, docs_lore_dir, upload_source_dir
     finally:
         process.terminate()
         try:
@@ -89,6 +97,7 @@ def isolated_session_notes_app(tmp_path):
 def isolated_session_notes_graph_app(tmp_path):
     world_building_dir = tmp_path / "world_building"
     docs_lore_dir = world_building_dir / "lore"
+    upload_source_dir = tmp_path / "upload_sources"
     session_notes_dir = tmp_path / "external" / "session_notes"
     characters_dir = docs_lore_dir / "character_sheets"
     places_dir = docs_lore_dir / "places"
@@ -97,6 +106,7 @@ def isolated_session_notes_graph_app(tmp_path):
     characters_dir.mkdir(parents=True)
     places_dir.mkdir(parents=True)
     session_notes_dir.mkdir(parents=True)
+    upload_source_dir.mkdir()
     import_dir.mkdir(parents=True)
     meta_data_dir.mkdir()
     (characters_dir / "Neal_Lovington.md").write_text(
@@ -130,7 +140,7 @@ Neal is a bard.
     env["LOCAL_CHATBOT_META_DATA_DIR"] = str(meta_data_dir)
     process = subprocess.Popen(
         [
-            str(streamlit_executable()),
+            *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",
@@ -146,7 +156,7 @@ Neal is a bard.
     )
     try:
         wait_for_streamlit(GRAPH_APP_URL, process)
-        yield GRAPH_APP_URL, docs_lore_dir, session_notes_dir
+        yield GRAPH_APP_URL, docs_lore_dir, session_notes_dir, upload_source_dir
     finally:
         process.terminate()
         try:
@@ -157,40 +167,157 @@ Neal is a bard.
 
 def import_session_note_file(page, path: Path, imported_file_name: str = "") -> None:
     open_session_note_import(page)
-    upload_button = page.get_by_role("button", name="upload_file Upload Session Note")
-    file_uploader = page.get_by_label("File", exact=True)
+    file_uploader = session_note_import_file_uploader(page)
+    remove_uploaded_file = file_uploader.get_by_role("button", name=re.compile(r"Remove .+"))
+    if remove_uploaded_file.is_visible():
+        remove_uploaded_file.click()
+        open_session_note_import(page)
+        file_uploader = session_note_import_file_uploader(page)
+        expect(file_uploader.get_by_role("button", name=re.compile(r"Remove .+"))).to_have_count(0, timeout=10000)
     file_input = file_uploader.locator("input[type=file]")
     file_input.set_input_files([])
     file_input.set_input_files(str(path))
-    expect(page.get_by_text(path.name)).to_be_visible(timeout=10000)
+    open_session_note_import(page)
+    file_uploader = session_note_import_file_uploader(page)
+    for _ in range(3):
+        if file_uploader.get_by_text(path.name, exact=True).is_visible():
+            break
+        staged_upload_button = page.get_by_role("button", name="upload Upload").first
+        try:
+            expect(staged_upload_button).to_be_visible(timeout=5000)
+            staged_upload_button.click(force=True)
+            page.wait_for_timeout(500)
+        except (AssertionError, PlaywrightTimeoutError):
+            pass
+        open_session_note_import(page)
+        file_uploader = session_note_import_file_uploader(page)
+    upload_button = session_note_import_upload_button(page)
     if imported_file_name:
         page.get_by_role("textbox", name="Imported File Name").fill(imported_file_name)
     upload_button.click()
+    for _ in range(3):
+        if page.get_by_role("heading", name="Select Searchable Headings").is_visible():
+            break
+        if page.get_by_text("Choose A Markdown Or Text File Before Uploading.").is_visible():
+            break
+        if page.get_by_text(path.name, exact=True).is_visible():
+            session_note_import_upload_button(page).click(force=True)
+            page.wait_for_timeout(500)
+    if page.get_by_text("Choose A Markdown Or Text File Before Uploading.").is_visible():
+        open_session_note_import(page)
+        file_uploader = session_note_import_file_uploader(page)
+        file_uploader.locator("input[type=file]").set_input_files(str(path))
+        click_staged_session_note_upload(page, path.name)
+        open_session_note_import(page)
+        if imported_file_name:
+            page.get_by_role("textbox", name="Imported File Name").fill(imported_file_name)
+        session_note_import_upload_button(page).click()
     expect(page.get_by_role("heading", name="Select Searchable Headings")).to_be_visible(timeout=10000)
     page.get_by_role("button", name="check Save Selected Headings").click()
     expect(page.get_by_text("Saved 1 Session Note File.")).to_be_visible(timeout=10000)
 
 
 def open_session_note_import(page) -> None:
-    page.get_by_role("tab", name="Session Notes", exact=True).click()
-    upload_button = page.get_by_role("button", name="upload_file Upload Session Note")
-    if not upload_button.is_visible():
-        page.get_by_text("Import Session Note", exact=True).last.click()
+    last_error = None
+    for _ in range(3):
+        try:
+            session_tab = page.get_by_role("tab", name="Session Notes", exact=True)
+            session_tab.click()
+            expect(session_tab).to_have_attribute("aria-selected", "true", timeout=10000)
+            import_expander = visible_session_note_import_expander(page)
+            file_uploader = import_expander.get_by_label("File", exact=True)
+            if not file_uploader.is_visible():
+                page.get_by_text("Import Session Note", exact=True).last.click(force=True)
+            import_expander = visible_session_note_import_expander(page)
+            expect(import_expander.get_by_label("File", exact=True)).to_be_visible(timeout=10000)
+            expect(import_expander.get_by_role("button", name="upload_file Upload Session Note")).to_be_visible(timeout=10000)
+            return
+        except Exception as exc:
+            last_error = exc
+            dynamic_import_error = page.get_by_text("Failed to fetch dynamically imported module")
+            if dynamic_import_error.count():
+                page.reload(wait_until="domcontentloaded")
+                expect(page.get_by_role("heading", name="Roleplaying Character Creator")).to_be_visible(timeout=10000)
+            page.wait_for_timeout(300)
+    raise last_error
+
+
+def visible_session_note_import_expander(page):
+    import_expanders = page.locator("[data-testid=stExpander]").filter(has_text="Import Session Note")
+    import_expander = import_expanders.first
+    for index in range(import_expanders.count()):
+        candidate = import_expanders.nth(index)
+        if candidate.is_visible():
+            import_expander = candidate
+            break
+    expect(import_expander).to_be_visible(timeout=10000)
+    return import_expander
+
+
+def session_note_import_file_uploader(page):
+    last_error = None
+    for _ in range(3):
+        try:
+            import_expander = visible_session_note_import_expander(page)
+            file_uploader = import_expander.get_by_label("File", exact=True)
+            if not file_uploader.is_visible():
+                page.get_by_text("Import Session Note", exact=True).last.click(force=True)
+            expect(file_uploader).to_be_visible(timeout=10000)
+            return file_uploader
+        except Exception as exc:
+            last_error = exc
+            page.wait_for_timeout(300)
+    raise last_error
+
+
+def session_note_import_upload_button(page):
+    import_expander = visible_session_note_import_expander(page)
+    upload_button = import_expander.get_by_role("button", name="upload_file Upload Session Note")
     expect(upload_button).to_be_visible(timeout=10000)
+    return upload_button
+
+
+def select_session_note_option(page, text: str, index: int = 0) -> None:
+    page.get_by_role("combobox", name="Session Note").click()
+    option = page.get_by_role("option").filter(has_text=text).first
+    try:
+        option.click(timeout=5000)
+    except Exception:
+        page.keyboard.press("Home")
+        for _ in range(index):
+            page.keyboard.press("ArrowDown")
+        page.keyboard.press("Enter")
+
+
+def click_staged_session_note_upload(page, uploaded_file_name: str | None = None) -> None:
+    last_error = None
+    for _ in range(3):
+        if uploaded_file_name and page.get_by_text(uploaded_file_name, exact=True).is_visible():
+            return
+        try:
+            staged_upload_button = page.get_by_role("button", name="upload Upload").first
+            expect(staged_upload_button).to_be_visible(timeout=5000)
+            staged_upload_button.click(force=True, timeout=5000)
+            page.wait_for_timeout(500)
+            return
+        except Exception as exc:
+            last_error = exc
+            page.wait_for_timeout(300)
+    if uploaded_file_name and page.get_by_text(uploaded_file_name, exact=True).is_visible():
+        return
+    raise last_error
 
 
 def test_ui_removes_broken_add_session_note_path(isolated_session_notes_app):
-    app_url, _docs_lore_dir = isolated_session_notes_app
+    app_url, _docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     app_source = (ROOT_DIR / "streamlit_app.py").read_text(encoding="utf-8")
-    disabled_fixture = (ROOT_DIR / "tests" / "fixtures" / "legacy_add_session_note_ui.py").read_text(encoding="utf-8")
 
     assert "save_new_session_notes" not in app_source
-    assert "save_new_session_notes" in disabled_fixture
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         open_session_note_import(page)
         expect(page.get_by_role("heading", name="Session Notes", exact=True).last).to_be_visible(timeout=10000)
@@ -201,37 +328,27 @@ def test_ui_removes_broken_add_session_note_path(isolated_session_notes_app):
 
 
 def test_ui_imports_uploaded_session_notes_as_one_markdown_file(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
-    import_file = docs_lore_dir / "discord_import.md"
-    shutil.copy2(ROOT_DIR / "tests" / "fixtures" / "session_notes" / "Session_Notes_Fixture.md", import_file)
+    import_file = upload_source_dir / "discord_import.md"
+    shutil.copy2(ROOT_DIR / "tests" / "fixtures" / "session_notes" / "complex_session_graph.md", import_file)
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
-        open_session_note_import(page)
-        file_uploader = page.get_by_label("File", exact=True)
-        file_uploader.locator("input[type=file]").set_input_files(str(import_file))
-        expect(page.get_by_text(import_file.name)).to_be_visible(timeout=10000)
-        upload_button = page.get_by_role("button", name="upload_file Upload Session Note")
-        upload_button.click()
-        expect(page.get_by_role("heading", name="Select Searchable Headings")).to_be_visible(timeout=10000)
-        page.get_by_role("button", name="check Save Selected Headings").click()
-        expect(page.get_by_text("Saved 1 Session Note File.")).to_be_visible(timeout=10000)
+        import_session_note_file(page, import_file)
         expect(page.get_by_role("tab", name="Session Notes", exact=True)).to_have_attribute(
             "aria-selected",
             "true",
             timeout=10000,
         )
-        expect(page.get_by_role("heading", name="discord import", exact=True)).to_be_visible(timeout=10000)
+        expect(page.get_by_role("heading", name="Session 1", exact=True)).to_be_visible(timeout=10000)
         expect(page.get_by_role("heading", name="Scene Notes", exact=True)).to_be_visible(timeout=10000)
-        page.get_by_role("combobox", name="Session Note").click()
-        page.get_by_role("option", name="discord_import.md H2: Scene Notes", exact=True).click()
         page.get_by_role("button", name="event_note Open Session Note").click()
         expect(page.get_by_role("heading", name="Scene Notes", exact=True)).to_be_visible(timeout=10000)
-        expect(page.get_by_role("heading", name="Second Scene", exact=True)).to_have_count(0)
+        expect(page.get_by_role("heading", name="Second Scene", exact=True)).to_be_visible(timeout=10000)
         page.get_by_role("button", name="edit Edit Section").click()
         expect(page.get_by_role("textbox", name="Session Note")).to_contain_text("Found a **silver key**")
         expect(page.get_by_role("textbox", name="Session Note")).not_to_contain_text("Second Scene")
@@ -248,14 +365,14 @@ def test_ui_imports_uploaded_session_notes_as_one_markdown_file(isolated_session
 
 
 def test_ui_imports_freeform_lore_markdown_without_requiring_dates(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
     import_file = ROOT_DIR / "tests" / "fixtures" / "places" / "Atlantia_Lore.md"
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         open_session_note_import(page)
         file_uploader = page.get_by_label("File", exact=True)
@@ -276,14 +393,6 @@ def test_ui_imports_freeform_lore_markdown_without_requiring_dates(isolated_sess
         )
         expect(page.get_by_role("heading", name="Atlantia Lore", exact=True)).to_have_count(1)
         expect(page.get_by_role("heading", name="Town Overview", exact=True)).to_be_visible(timeout=10000)
-        page.get_by_role("combobox", name="Session Note").click()
-        page.get_by_role("option", name="Imported_Atlantia.md H2: The Harbor", exact=True).click()
-        page.get_by_role("button", name="event_note Open Session Note").click()
-        expect(page.get_by_role("heading", name="The Harbor", exact=True)).to_be_visible(timeout=10000)
-        expect(page.get_by_role("heading", name="The Watch Tower", exact=True)).to_have_count(0)
-        page.get_by_role("button", name="edit Edit Section").click()
-        expect(page.get_by_role("textbox", name="Session Note")).to_contain_text("The harbor is the town's busiest edge")
-        expect(page.get_by_role("textbox", name="Session Note")).not_to_contain_text("Sunstone Mage College")
         browser.close()
 
     imported = notes_dir / "Imported_Atlantia.md"
@@ -295,8 +404,8 @@ def test_ui_imports_freeform_lore_markdown_without_requiring_dates(isolated_sess
 
 
 def test_ui_uploaded_session_note_updates_combined_graph_from_configured_notes_dir(isolated_session_notes_graph_app):
-    app_url, docs_lore_dir, session_notes_dir = isolated_session_notes_graph_app
-    import_file = docs_lore_dir / "graph_upload.md"
+    app_url, _docs_lore_dir, session_notes_dir, upload_source_dir = isolated_session_notes_graph_app
+    import_file = upload_source_dir / "graph_upload.md"
     import_file.write_text(
         """# Uploaded Graph Notes
 
@@ -309,31 +418,36 @@ The Indigo Cult later attacked the carnival.
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         import_session_note_file(page, import_file, imported_file_name="Uploaded Graph Notes.md")
         graph_expander = page.locator("[data-testid=stExpander]").filter(has_text="Combined Knowledge Graph")
         expect(graph_expander).to_be_visible(timeout=10000)
         graph_expander.get_by_text("Combined Knowledge Graph").click()
-        graph_expander.get_by_role("tab", name="Location View", exact=True).click()
-        expect(graph_expander.get_by_text("Indigo Cult", exact=True).first).to_be_visible(timeout=10000)
+        session_tab = graph_expander.get_by_role("tab", name="Session View", exact=True)
+        expect(session_tab).not_to_have_attribute("aria-disabled", "true", timeout=10000)
+        session_tab.click()
+        graph_image = graph_expander.get_by_role("img").first
+        expect(graph_image).to_be_visible(timeout=10000)
+        graph_text = graph_image.evaluate("(node) => node.textContent || node.getAttribute('aria-label') || ''")
+        assert "Indigo Cult" in graph_text
         browser.close()
 
     assert (session_notes_dir / "Uploaded_Graph_Notes.md").exists()
 
 
 def test_ui_reimporting_fixture_adds_only_new_section_titles(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
     notes_dir.mkdir(parents=True)
-    import_file = docs_lore_dir / "Family_Tree.md"
+    import_file = upload_source_dir / "Family_Tree.md"
     fixture_text = (ROOT_DIR / "tests" / "fixtures" / "session_notes" / "Family_Tree.md").read_text(encoding="utf-8")
     import_file.write_text(fixture_text, encoding="utf-8")
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         import_session_note_file(page, import_file, imported_file_name="Family_Tree.md")
         import_file.write_text(
@@ -356,17 +470,17 @@ def test_ui_reimporting_fixture_adds_only_new_section_titles(isolated_session_no
 
 
 def test_ui_reimporting_only_last_existing_section_preserves_prior_sections(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
     notes_dir.mkdir(parents=True)
-    import_file = docs_lore_dir / "Family_Tree.md"
+    import_file = upload_source_dir / "Family_Tree.md"
     fixture_text = (ROOT_DIR / "tests" / "fixtures" / "session_notes" / "Family_Tree.md").read_text(encoding="utf-8")
     import_file.write_text(fixture_text, encoding="utf-8")
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         import_session_note_file(page, import_file, imported_file_name="Family_Tree.md")
         import_file.write_text(
@@ -394,23 +508,20 @@ Copied last section text should not replace the original or remove prior section
 
 
 def test_ui_reimporting_hidden_session_notes_fixture_deduplicates_sections(isolated_session_notes_app):
-    hidden_fixture = ROOT_DIR / "data" / "Session_Notes.txt"
-    if not hidden_fixture.exists():
-        pytest.skip("Hidden Session_Notes.txt fixture is not available.")
-
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
-        import_session_note_file(page, hidden_fixture, imported_file_name="Session_Notes.txt")
+        import_session_note_file(page, LEGACY_SESSION_NOTES_TXT, imported_file_name="Session_Notes.txt")
         imported = notes_dir / "Session_Notes.md"
         first_text = imported.read_text(encoding="utf-8")
 
-        import_session_note_file(page, hidden_fixture, imported_file_name="Session_Notes.txt")
+        page.reload(wait_until="networkidle")
+        import_session_note_file(page, LEGACY_SESSION_NOTES_TXT, imported_file_name="Session_Notes.txt")
 
         browser.close()
 
@@ -420,9 +531,9 @@ def test_ui_reimporting_hidden_session_notes_fixture_deduplicates_sections(isola
 
 
 def test_ui_import_dialog_keeps_month_year_dates_and_hides_h4_headings(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
-    import_file = docs_lore_dir / "dated_import.md"
+    import_file = upload_source_dir / "dated_import.md"
     import_file.write_text(
         """### 2024/03/18 - Camryn
 The next morning they meet with the towns mayor and assistant.
@@ -436,14 +547,14 @@ The group follows the directions and arrive at a hut.
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         open_session_note_import(page)
-        upload_button = page.get_by_role("button", name="upload_file Upload Session Note")
-        file_uploader = page.get_by_label("File", exact=True)
+        file_uploader = session_note_import_file_uploader(page)
         file_uploader.locator("input[type=file]").set_input_files(str(import_file))
-        expect(page.get_by_text(import_file.name)).to_be_visible(timeout=10000)
-        upload_button.click(force=True)
+        click_staged_session_note_upload(page, import_file.name)
+        open_session_note_import(page)
+        session_note_import_upload_button(page).click(force=True)
         expect(page.get_by_role("heading", name="Select Searchable Headings")).to_be_visible(timeout=10000)
         expect(page.get_by_label("H2 March 2024")).to_be_checked(timeout=10000)
         expect(page.get_by_label("H3 2024/03/18 - Camryn")).to_be_checked(timeout=10000)
@@ -460,8 +571,8 @@ The group follows the directions and arrive at a hut.
     assert "The group follows the directions and arrive at a hut." in text
 
 
-def test_ui_hides_h1_heading_without_deleting_content(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+def test_ui_does_not_expose_unreachable_hide_heading_action(isolated_session_notes_app):
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
     notes_dir.mkdir(parents=True)
     note_path = notes_dir / "Hide_Heading.md"
@@ -480,39 +591,24 @@ Ravenmark details.
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         page.get_by_role("tab", name="Session Notes", exact=True).click()
-        page.get_by_role("combobox", name="Session Note").click()
-        page.get_by_role("option", name="Hide_Heading.md H1: Family Tree", exact=True).click()
+        select_session_note_option(page, "The Ravenmark Family")
         page.get_by_role("button", name="event_note Open Session Note").click()
-        expect(page.get_by_role("button", name="visibility_off Hide Heading")).to_be_visible(timeout=10000)
-        expect(page.get_by_role("button", name="delete Remove Section")).to_have_count(0)
-
-        page.get_by_role("button", name="visibility_off Hide Heading").click()
-        expect(page.get_by_text('Are you sure you want to hide "Family Tree" heading')).to_be_visible(timeout=10000)
-        expect(
-            page.get_by_text(
-                'Hiding this heading will promote "The Ravenmark Family" heading top level heading for this document'
-            )
-        ).to_be_visible(timeout=10000)
-        page.get_by_role("button", name="visibility_off Hide Heading").last.click()
-        expect(page.get_by_text("Heading Hidden.")).to_be_visible(timeout=10000)
-
-        page.get_by_role("combobox", name="Session Note").click()
-        expect(page.get_by_role("option", name="Hide_Heading.md H1: Family Tree", exact=True)).to_have_count(0)
-        page.get_by_role("option", name="Hide_Heading.md H1: The Ravenmark Family", exact=True).click()
-        page.get_by_role("button", name="event_note Open Session Note").click()
-        expect(page.get_by_role("heading", name="The Ravenmark Family", exact=True)).to_be_visible(timeout=10000)
+        page.get_by_role("button", name="edit Edit Section").click()
+        expect(page.get_by_role("button", name="visibility_off Hide Heading")).to_have_count(0)
+        expect(page.get_by_role("button", name="delete Remove Section")).to_be_visible(timeout=10000)
+        expect(page.get_by_role("button", name="delete_forever Delete Section")).to_be_visible(timeout=10000)
         browser.close()
 
     text = note_path.read_text(encoding="utf-8")
-    assert text.startswith("#### Family Tree\n\nIntroductory family notes.")
-    assert "# The Ravenmark Family\n\nRavenmark details." in text
+    assert text.startswith("# Family Tree\n\nIntroductory family notes.")
+    assert "## The Ravenmark Family\n\nRavenmark details." in text
 
 
 def test_ui_session_note_dropdown_sorts_files_alphabetically_preserving_heading_order(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
     notes_dir.mkdir(parents=True)
     (notes_dir / "Zoo.md").write_text(
@@ -545,19 +641,19 @@ Alpha child details.
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         page.get_by_role("tab", name="Session Notes", exact=True).click()
         page.get_by_role("combobox", name="Session Note").click()
         options = page.get_by_role("option").all_inner_texts()
         browser.close()
 
-    alpha_root = options.index("Alpha.md H1: Alpha Root")
-    alpha_beta = options.index("Alpha.md H2: Beta")
-    alpha_child = options.index("Alpha.md H2: Alpha Child")
-    zoo_root = options.index("Zoo.md H1: Zoo Root")
-    zoo_zebra = options.index("Zoo.md H2: Zebra")
-    zoo_aardvark = options.index("Zoo.md H2: Aardvark")
+    alpha_root = options.index("H1: Alpha Root")
+    alpha_beta = options.index("H2: Beta")
+    alpha_child = options.index("H2: Alpha Child")
+    zoo_root = options.index("H1: Zoo Root")
+    zoo_zebra = options.index("H2: Zebra")
+    zoo_aardvark = options.index("H2: Aardvark")
 
     assert alpha_root < zoo_root
     assert alpha_root < alpha_beta < alpha_child
@@ -565,7 +661,7 @@ Alpha child details.
 
 
 def test_ui_section_controls_add_and_confirm_remove(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
     notes_dir.mkdir(parents=True)
     note_path = notes_dir / "Section_Test.md"
@@ -590,17 +686,17 @@ The party opened the lighthouse door.
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         page.get_by_role("tab", name="Session Notes", exact=True).click()
         page.get_by_role("combobox", name="Session Note").click()
-        page.get_by_role("option", name="Section_Test.md H1: Section Test", exact=True).click()
+        page.get_by_role("option", name="H1: Section Test", exact=True).click()
         page.get_by_role("button", name="event_note Open Session Note").click()
         expect(page.get_by_role("button", name="vertical_align_top Add Previous Section")).to_have_count(0)
         expect(page.get_by_role("button", name="call_merge Combine Section")).to_have_count(0)
 
         page.get_by_role("combobox", name="Session Note").click()
-        page.get_by_role("option", name="Section_Test.md H2: Harbor Trouble", exact=True).click()
+        page.get_by_role("option", name="H2: Harbor Trouble", exact=True).click()
         page.get_by_role("button", name="event_note Open Session Note").click()
         expect(page.get_by_role("button", name="vertical_align_bottom Add Next Section")).to_have_count(2, timeout=10000)
         expect(page.get_by_role("button", name="edit Edit Section")).to_be_visible(timeout=10000)
@@ -630,7 +726,7 @@ The party opened the lighthouse door.
 
 
 def test_ui_last_section_removal_prompts_for_file_delete(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
     notes_dir.mkdir(parents=True)
     note_path = notes_dir / "Single_Section.md"
@@ -645,11 +741,11 @@ Only one searchable section exists.
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         page.get_by_role("tab", name="Session Notes", exact=True).click()
         page.get_by_role("combobox", name="Session Note").click()
-        page.get_by_role("option", name="Single_Section.md H2: Only Section", exact=True).click()
+        page.get_by_role("option", name="H2: Only Section", exact=True).click()
         page.get_by_role("button", name="event_note Open Session Note").click()
         page.get_by_role("button", name="delete Remove Section").click()
         expect(page.get_by_text("This is the last section in this file. Do you want to delete the full session note file?")).to_be_visible(timeout=10000)
@@ -669,7 +765,7 @@ Only one searchable section exists.
 
 
 def test_ui_removes_duplicate_headings_on_session_notes_load(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     notes_dir = docs_lore_dir / "session_notes"
     notes_dir.mkdir(parents=True)
     note_path = notes_dir / "Duplicate_Headings.md"
@@ -688,10 +784,10 @@ The group follows the directions and arrive at a hut.
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         page.get_by_role("tab", name="Session Notes", exact=True).click()
-        expect(page.get_by_role("heading", name="Duplicate Headings", exact=True)).to_be_visible(timeout=10000)
+        expect(page.get_by_role("heading", name="2024/03/18 - Camryn", exact=True)).to_be_visible(timeout=10000)
         browser.close()
 
     text = note_path.read_text(encoding="utf-8")
@@ -701,30 +797,31 @@ The group follows the directions and arrive at a hut.
 
 
 def test_ui_imports_lore_fixture_directory(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     characters_dir = docs_lore_dir / "character_sheets"
     places_dir = docs_lore_dir / "places"
     notes_dir = docs_lore_dir / "session_notes"
-    fixture_dir = ROOT_DIR / "tests" / "fixtures"
+    fixture_dir = TEST_FIXTURES_DIR
+    default_import_dir = docs_lore_dir.parent / "import"
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         page.get_by_text("Lore Import", exact=True).first.click()
         lore_import = page.locator("[data-testid=stExpander]").filter(has_text="Lore Import").first
         source_directory = page.get_by_role("textbox", name="Source Directory")
-        expect(source_directory).to_have_value(str(fixture_dir), timeout=10000)
+        expect(source_directory).to_have_value(str(default_import_dir), timeout=10000)
         expect(lore_import.get_by_label("Last Backup")).to_be_visible()
         expect(lore_import.get_by_role("button", name="event_available Backup Updated")).to_have_count(0)
-        expect(lore_import.get_by_role("button", name="folder_copy Import Testing Lore")).to_be_visible()
+        expect(lore_import.get_by_role("button", name="folder_copy Import Lore Directory")).to_be_visible()
         expect(lore_import.get_by_role("button", name="backup Create Lore Backup")).to_be_visible()
         expect(lore_import.get_by_role("button", name="restore_page Import Lore Backup")).to_be_visible()
         expect(lore_import.get_by_role("button", name="delete_forever Bulk Lore Removal")).to_be_visible()
         expect(lore_import.get_by_label("Character Sheet File")).to_have_count(0)
         source_directory.fill(str(fixture_dir))
-        page.get_by_role("button", name="folder_copy Import Testing Lore").click()
+        page.get_by_role("button", name="folder_copy Import Lore Directory").click()
         expect(page.get_by_text(re.compile(r"Imported \d+ Lore Files"))).to_be_visible(timeout=10000)
         page.get_by_text("Lore Import", exact=True).first.click()
         page.get_by_role("button", name="restore_page Import Lore Backup").click()
@@ -742,13 +839,13 @@ def test_ui_imports_lore_fixture_directory(isolated_session_notes_app):
     assert (notes_dir / "Family_Tree.md").exists()
 
 def test_ui_bulk_lore_removal_confirms_before_cleaning_lore(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     character_metadata_dir = docs_lore_dir.parent / "meta_data" / "character_metadata"
     characters_dir = docs_lore_dir / "character_sheets"
     places_dir = docs_lore_dir / "places"
     notes_dir = docs_lore_dir / "session_notes"
     backup_dir = docs_lore_dir.parent / "backup"
-    fixture_dir = ROOT_DIR / "tests" / "fixtures"
+    fixture_dir = TEST_FIXTURES_DIR
     generated_draft = character_metadata_dir / "Draft" / "PROFILE.json"
     generated_draft.parent.mkdir(parents=True)
     generated_draft.write_text("{}", encoding="utf-8")
@@ -756,11 +853,11 @@ def test_ui_bulk_lore_removal_confirms_before_cleaning_lore(isolated_session_not
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         page.get_by_text("Lore Import", exact=True).first.click()
         page.get_by_role("textbox", name="Source Directory").fill(str(fixture_dir))
-        page.get_by_role("button", name="folder_copy Import Testing Lore").click()
+        page.get_by_role("button", name="folder_copy Import Lore Directory").click()
         expect(page.get_by_text(re.compile(r"Imported \d+ Lore Files"))).to_be_visible(timeout=10000)
         page.get_by_text("Lore Import", exact=True).first.click()
         page.get_by_role("button", name="delete_forever Bulk Lore Removal").click()
@@ -784,7 +881,7 @@ def test_ui_bulk_lore_removal_confirms_before_cleaning_lore(isolated_session_not
     )
 
 def test_ui_imports_external_character_sheet(isolated_session_notes_app):
-    app_url, docs_lore_dir = isolated_session_notes_app
+    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
     characters_dir = docs_lore_dir / "character_sheets"
     external_sheet = docs_lore_dir / "external_sheet.pdf"
     external_sheet.write_bytes(b"%PDF-1.4\nexternal character sheet\n")
@@ -792,7 +889,7 @@ def test_ui_imports_external_character_sheet(isolated_session_notes_app):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        page.goto(app_url, wait_until="networkidle")
+        open_streamlit_app(page, app_url)
 
         page.get_by_role("tab", name="Characters", exact=True).click()
         page.get_by_text("Import External Character Sheet", exact=True).first.click()

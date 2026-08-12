@@ -7,9 +7,9 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
-from character_graph.extraction import extract_character_graph
-from character_graph.ingest import load_backstory
-from language_model.character_rewrites import (
+from src.extraction.extraction import extract_character_graph
+from src.ingest.ingest import load_backstory
+from src.writing.character_rewrites import (
     RewriteClient,
     graph_generated_backstory,
     graph_generated_summary,
@@ -17,9 +17,9 @@ from language_model.character_rewrites import (
     rewrite_required_terms,
     semantic_rewrite_score,
 )
-from language_model.rewrite_model import LOCAL_REWRITE_MODEL_ENGINE, LocalRewriteModelClient, load_local_config
-from language_model.rewrite_quality import writing_quality_score
-from language_model.storage import Character, CharacterProfile, read_character_profile
+from src.writing.rewrite_model import LOCAL_REWRITE_MODEL_ENGINE, LocalRewriteModelClient, load_local_config
+from src.writing.rewrite_quality import writing_quality_score
+from src.persistence.lore_documents import Character, CharacterProfile, read_character_profile
 from scripts.generate_single_character_backstory_rewrite_report import (
     backstory_length_score,
     candidate_rejection_reason,

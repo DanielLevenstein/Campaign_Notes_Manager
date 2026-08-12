@@ -1,16 +1,16 @@
 from pathlib import Path
 
-from character_graph.extraction import extract_character_graph
-from character_graph.ingest import load_backstory
-from character_graph.schema import CharacterGraph, CharacterNode, PrimaryCharacterRef, RelationshipEdge
-from language_model.character_rewrites import (
+from src.extraction.extraction import extract_character_graph
+from src.graph.schema import CharacterGraph, CharacterNode, PrimaryCharacterRef, RelationshipEdge
+from src.ingest.ingest import load_backstory
+from src.writing.character_rewrites import (
     graph_generated_backstory,
     graph_generated_summary,
     rewrite_quality_context,
     rewrite_required_terms,
     semantic_rewrite_score,
 )
-from language_model.storage import Character, read_character_profile
+from src.persistence.lore_documents import Character, read_character_profile
 from scripts.generate_single_character_backstory_rewrite_report import build_report
 
 
@@ -131,9 +131,9 @@ def test_semantic_improvement_report_includes_scores_and_result():
 
     assert "# Semantic Improvement Report: Orin Nightbloom" in report
     assert "semantic similarity, sentence length fit, and sentence quality" in report
-    assert "Local model rewrite" in report
+    assert "Model Rewrite" in report
     assert "Existing Generated Section" in report
-    assert "Original section" in report
+    assert "Original Backstory" in report
     assert "## Sentence Lengths" in report
     assert "Sentence Length Score" in report
     assert "Coverage" not in report.split("## Scores", 1)[1].split("## Sentence Lengths", 1)[0]

@@ -1,0 +1,48 @@
+{
+  "schema_version": "0.1.0",
+  "config_scope": "knowledge_view",
+  "view_key": "heading_view",
+  "label": "Directory View",
+  "description": "Shared Graphviz defaults for Location View and Session View directory-style lore graphs.",
+  "inherits": "config/graphviz/global_graph_view.json",
+  "merge_order": [
+    "config/graphviz/global_graph_view.json",
+    "config/graphviz/heading_view.json"
+  ],
+  "graph": {
+    "rankdir": "LR",
+    "vertical_rankdir": "TB"
+  },
+  "spacing": {
+    "small_graph": {
+      "max_nodes": 8,
+      "ranksep": 1.15,
+      "nodesep": 0.4
+    },
+    "column_layout": {
+      "ranksep": 0.75,
+      "nodesep": 0.4
+    },
+    "vertical_layout": {
+      "ranksep": 0.65,
+      "nodesep": 0.35
+    },
+    "default": {
+      "ranksep": 0.75,
+      "nodesep": 0.4
+    }
+  },
+  "columns": [
+    ["source_files", "h1"],
+    ["h2"],
+    ["h3"],
+    ["places"],
+    ["groups"],
+    ["artifacts"],
+    ["linked_characters"]
+  ],
+  "editing_notes": [
+    "Location View and Session View both use this config and select their concrete column layout in the rendering pipeline.",
+    "Source-file filtering belongs in Streamlit controls; heading filtering belongs in the graph projection layer."
+  ]
+}

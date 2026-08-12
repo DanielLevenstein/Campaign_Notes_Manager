@@ -1,8 +1,10 @@
-# Commit Working Changes
-- Between each section in a TODO list commit working changes to create a stable checkpoint. 
-- Do not commit changes until testing for each section is complete.
-- If test cases contradict manual changes, update the test case. 
-- If tests depend on deprecated or removed code, move the deprecated code to tests/fixtures/deprecated_features.py
+# Project Description
+- We are implementing a full rewrite of the `Campaign_Notes_Manager` project using proper software engineering principals.
+- Project Specifications are in `docs/specs`
+- Project Design Documents are under `docs/design`
+- Known project bugs are in `docs/bugs`
+- Application screenshots are split between `docs/screenshots` and `tests/screenshots`
+- A new source root should be created for the new project code.
 
 ##  Change log
 The changelog has been moved to the bottom of CHANGELOG.md

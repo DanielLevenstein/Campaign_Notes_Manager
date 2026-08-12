@@ -36,6 +36,40 @@ pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
+## Testing
+
+Install the Python test dependencies from `requirements.txt`:
+
+```bash
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+The test suite currently depends on:
+
+- `pytest` for unit and e2e test execution
+- `playwright` for browser-driven e2e tests
+- `requests` for Streamlit startup checks in e2e fixtures
+- `streamlit` for launching the app during e2e tests
+- `scikit-learn` and `matplotlib` for graph/rewrite scoring and report tests
+
+Playwright also needs a browser binary before e2e tests can run:
+
+```bash
+.venv/bin/python -m playwright install chromium
+```
+
+Run unit tests with:
+
+```bash
+./run_unit_tests.sh
+```
+
+Run e2e tests with:
+
+```bash
+./run_e2e_tests.sh
+```
+
 ## Running App
 
 Note: Character Rewrite feature is only enabled if the user has llama.cpp installed on their local machine. 

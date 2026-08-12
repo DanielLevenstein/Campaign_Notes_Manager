@@ -12,6 +12,13 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 APP_URL = "http://127.0.0.1:8511"
 
 
+def streamlit_command() -> list[str]:
+    workspace_python = ROOT_DIR.parent / ".venv/bin/python"
+    project_python = ROOT_DIR / ".venv/bin/python"
+    python = project_python if project_python.exists() else workspace_python
+    return [str(python), "-m", "streamlit"]
+
+
 def wait_for_streamlit(url: str, process: subprocess.Popen, timeout: int = 30) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -40,7 +47,7 @@ def streamlit_app():
     env["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
     process = subprocess.Popen(
         [
-            str(ROOT_DIR / ".venv/bin/streamlit"),
+            *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",
@@ -63,4 +70,3 @@ def streamlit_app():
             process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             process.kill()
-

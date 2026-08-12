@@ -12,16 +12,31 @@ fi
 
 cd "$SCRIPT_DIR"
 
+find_python() {
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return
+  fi
+  if command -v python >/dev/null 2>&1; then
+    command -v python
+    return
+  fi
+  echo "Could not find python3 or python on PATH." >&2
+  exit 1
+}
+
 if [[ ! -x "$VENV_DIR/bin/python" ]]; then
+  PYTHON_BIN="$(find_python)"
   echo "Creating virtual environment in $VENV_DIR"
-  python3 -m venv "$VENV_DIR"
+  "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
 
 # shellcheck disable=SC1091
 source "$VENV_DIR/bin/activate"
 
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+VENV_PYTHON="$VENV_DIR/bin/python"
+"$VENV_PYTHON" -m pip install --upgrade pip
+"$VENV_PYTHON" -m pip install -r requirements.txt
 
 if [[ "$USE_STRUCTURED_GRAPH_FIXTURE" == "1" ]]; then
   FIXTURE_WORLD_BUILDING_DIR="$SCRIPT_DIR/.tmp/structured_graph_fixture/world_building"
@@ -40,4 +55,4 @@ if [[ "$USE_STRUCTURED_GRAPH_FIXTURE" == "1" ]]; then
 fi
 
 echo "Starting Streamlit app..."
-exec streamlit run streamlit_app.py "$@"
+exec "$VENV_PYTHON" -m streamlit run streamlit_app.py "$@"

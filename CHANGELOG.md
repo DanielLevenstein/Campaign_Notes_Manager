@@ -1,60 +1,53 @@
 
-# feature/knowledge_graph
+# feature/knowledge_graph3
 
-## 2026-07-18
+## Context-Aware Edge Design
+- Added failing graph-creation tests for context-aware edge occurrence metadata, direct co-mentioned entity edges, group context preservation under hidden headings, `Moon Gate` place typing, and `Indigo Cult` group deduplication.
+- Added `docs/design/DESIGN_CONTEXT_AWARE_EDGES.md` to define the occurrence model, direct context edge derivation, projection behavior, implementation plan, and acceptance criteria for fixing heading-dependent graph edges.
+- Fixed the pre-context-aware session-note extraction bugs for `Moon Gate` place typing and `Indigo Cult` group/character duplication, updated TODO/bug-roadmap tracking, and documented test evidence in the resolved bug notes.
+- Moved session-note entity normalization constants, regex patterns, extraction limits, and typo maps out of `session_entities.py` and into `config/extraction/normalization.json`.
+- Moved semantic heading suffixes for place, group, and artifact heading detection out of Graphviz rendering code and into `config/extraction/normalization.json`.
 
-### Knowledge Graph UI Review And Detail Panel
-- Added the graph-node detail table, removed the duplicate Combined Knowledge Graph heading, and merged the v2 design notes into the main knowledge graph design document.
+## Phase 0
+- Added the Phase 0 persistence layer for mirrored graph metadata paths, centralized Markdown/JSON/bytes file writes, and graph serialization that excludes synthetic edges.
+- Routed character, place, and session-note Markdown save/delete flows through the persistence helpers so lore edits update the corresponding graph JSON.
+## Phase 1
+- Implemented skipped Phase 1.1 and 1.2 work: character forms now use `Character Name`, `Player Name`, and read-only alias metadata; first/family names are derived; graph regeneration is skipped for unchanged Markdown hashes; and automatic lore backups no-op when the lore folder hash is unchanged.
+- Copied the persistence module into the new `src/persistence` source root with matching `tests/persistence` coverage for mirrored paths, file helpers, deletes, and synthetic-edge filtering.
+- Added `run_unit_tests.sh` and `run_e2e_tests.sh` wrappers for the top-level unit and e2e suites.
+- Renamed the legacy `language_model.storage` domain module to `language_model.lore_documents`, removed the duplicate `character_graph.storage` module, and documented the path toward one canonical persistence implementation.
+- Added the initial Phase 1 canonical graph layer with typed node/edge models, legacy combined-graph adapters, deterministic source-file normalization, and a lightweight SQLite-backed graph service with versioned upserts.
+- Added a raw initial graph debug snapshot under character metadata so generated edges can be compared against the production persisted graph and inspected as native or derived.
+- Routed Streamlit undo writes and graph-view loading through the persistence read model so UI changes update mirrored graph metadata and graph rendering reads persisted metadata files.
+- Routed markdown graph regeneration through a single lore-graph persistence helper that writes mirrored graph JSON under `world_building/meta_data`, replaces the matching source slice in the canonical SQLite store, and keeps synthetic edges out of persisted graph structures.
+- Added character-graph canonical adapters and source-scoped canonical graph replacement coverage so edited Markdown files cannot leave stale graph nodes or edges behind.
+- Expanded Phase 1 regression coverage for metadata tree mirroring, synthetic-edge filtering in both JSON and canonical SQLite, source-scoped replacement, regeneration from missing graph metadata, and architectural guardrails that keep graph database access behind persistence.
+- Fixed the default test lore import directory so it resolves to `tests/fixtures` from the project root instead of the `src` tree, with regression coverage for the path constant.
 
-### Session Note Graph Projection
-- Reworked session-note graph extraction around internal evidence sources, authored entities, and a 2-3 screen graph target for larger imported campaigns.
+## Phase 2 Projection And Presentation Layer
+- Established the first projection-read model for combined graph rendering, including lore graph loading, source scanning, place source rows, derived lore relationships, character-sheet graph filtering, and root-node selection outside the Streamlit entry point.
+- Added projection tests that verify combined graph contracts, character-sheet filtering, graph loading through the projection layer, and guardrails that prevent `streamlit_app.py` from reintroducing direct graph assembly calls.
+- Introduced a render-ready presentation contract for relationship graph views and routed Party View through it as the first working end-to-end presentation-layer graph view.
+- Kept legacy Graphviz tab behavior in place for non-Party views while creating a stable vertical slice for the new architecture, so later work can migrate one view at a time instead of rewriting every tab at once.
+- Preserved tab-specific behavior for the current UI while narrowing the intended Phase 3 finish line to a single stable view backed by projection and presentation data.
+- Added artifact node styling to the Graphviz UI with a distinct hexagon border and matching heading-node support.
+- Completed Phase 2.2 by adding artifact graph-edge configuration, artifact extraction/projection support, and Playwright coverage for artifact nodes in Places heading view and Session Notes directory view fixtures.
+- Completed Phase 2.3 by moving graph node and edge allow-lists into split `config/nodes` and `config/edges` files, splitting compound connection labels into edge/node pairs, and deriving lore edge labels from combined evidence between connected nodes.
 
-### Party-Centered Graph Layout
-- Added party-centered rendering with authored main characters and places as graph roots, family/group/source columns, compact source labels, and refreshed graph state after lore changes.
+## Phase 3 Graph View Improvements
+- Standardized Places and Session Notes Graphviz view inputs around `View Name`, `Source File`, and `Heading Selected`, moved source-file selection into the shared Streamlit rendering pipeline, kept heading filtering in the projection call, and added Session Notes Heading View to the visible graph views.
+- Fixed Session Notes directory projection so extracted entities from `Family_Tree.md` are not treated as source documents, preventing duplicate `Family Tree` H1 nodes.
+- Collapsed graph tabs to the supported `Character View`, `Party View`, and `Directory View` set, and restored Directory View header controls with source-file, heading, and H1/H2/H3 hide filters.
+- Replaced the temporary Directory View tab with the final shared tab set: `Character View`, `Party View`, `Location View`, and `Session View` on every graph section. Location View and Session View now share the Directory View rendering pipeline through `config/graphviz/heading_view.json`.
+- Split renderer configs from graph-view scenario fixtures: `config/graphviz` and `tests/fixtures/graphviz` now hold loadable Graphviz settings, while `tests/fixtures/graph_views` keeps source-fixture and screenshot metadata.
 
-# develop
-
-## 2026-07-19
-
-### Graph JSON Saves And Character Form Improvements
-- Added graph JSON save/backfill paths for places, session notes, imports, and restores, while making character display names editable and allowing saves without Race or Class.
-
-### UI Validation Follow-Up
-- Added Playwright coverage for minimal character creation appearing in the graph, fixed repeated character undo state, and confirmed graph clarity grades stay out of the UI.
-
-# feature/knowledge_graph2
-
-## 2026-07-19
-
-### Knowledge Graph Display Columns
-- Added focused and whole-graph display modes with ordered columns, de-duplicated relationship labels, cleaner evidence rows, family/group source handling, and theme-aware graph text.
-
-### Screenshot-Era Graph UI Restore
-- Restored the screenshot-era Combined Knowledge Graph UI for verification, added the migration path report, and reintroduced the temporary structured graph comparison view.
-
-### Broad Knowledge Graph Source Filtering
-- Treated place-lore roots as source-document provenance, hid source-document knots from broad graph views, and preserved matching extracted places as entity nodes.
+# experimental/knowledge_rewrite_phase3
+## Phase 3 Descoped
+- Began Phase 3 by introducing a pure combined-graph projection read model, moving lore graph loading and combined graph assembly out of `streamlit_app.py`, and adding guardrail tests so the Streamlit entry point consumes the projection API instead of direct graph internals.
+- Added the first presentation-layer graph view by routing Party View through a render-ready presentation contract, keeping the Phase 3 target focused on one stable working view rather than perfecting every graph tab.
+- Finished the manual source-root split by replacing stale `src.character_graph` imports with concrete `src.graph`, `src.extraction`, `src.ingest`, and `src.persistence` module imports, fixing Graphviz config path resolution after the move, and preserving hidden-heading evidence rows for character-only session sections.
 
 # tag/v1.1.0
-## 2026-07-20
-
-### Graph Rendering Refactor
-- Moved Streamlit knowledge graph rendering into `graphviz_rendering.py`, split graph rendering by top-level knowledge tabs, and locked the existing full renderer behind `Structured Knowledge View`.
-
-### Place And Session Lore Graphs
-- Added Place Lore and Session Notes lore graph layouts with source/group columns, Markdown H1-H3 heading columns, place and character connection columns, hidden empty headings, straight-line edges, and connection-count sorting.
-
-### Secondary Entity Creation Removal
-- Removed graph-based secondary character/place creation controls, draft state, and unused stub creation helpers, with e2e coverage to keep those controls absent.
-
-### Graph View Defaults And Fixtures
-- Defaulted the Places tab to the place-lore view, renamed the party fixture config, and added six dedicated graph-view fixture JSON files for screenshot coverage.
-
-### Graph Screenshot Coverage
-- Added an end-to-end screenshot test for Characters `Single Character` and `Party View`, Places `Place Lore` and `Party View`, and Session Notes `Place Lore` and `Party View`, with distinct output filenames.
-
-### Lore Connection Tables
-- Limited lore-view connection tables to rows with character connections, so non-character heading and document edges stay out of the table.
 
 ### Screenshot Fixture Cleanup And Deduplication Design
 - Changed graph-view screenshot capture to use full-page screenshots at a larger viewport so e2e artifacts are not clipped.
@@ -121,9 +114,3 @@
 
 ### Supporting Graph Cleanup
 - Included post-`knowledge_graph2` fixture and graph cleanup where it affected character rewrite inputs and report stability.
-
-# feature/knowledge_graph2
-## 2026-08-02
-### Feature Implementation
-- Fixed session-note directory graphs so `Session_Notes.md` imports are treated as document roots, added a [File_Name] heading selector option, and added H1-H3 hide controls that preserve labeled child/context connections.
-

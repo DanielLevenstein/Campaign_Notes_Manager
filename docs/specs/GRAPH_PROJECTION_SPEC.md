@@ -10,8 +10,17 @@ This document specifies the projection API needed to support the current knowled
 - Enable future extension for deduplication, migration, and canonical graph layering.
 
 ## Current Supported View Patterns
+### New Design
+Every top-level section displays the same four graph tabs:
 
-The existing app exposes the following main views and subviews:
+- Character View
+- Party View
+- Location View
+- Session View
+
+Location View uses the shared Directory View presentation pipeline with source-file drop-downs filtered to place lore. Session View uses the same Directory View pipeline with source-file drop-downs filtered to session notes.
+
+### Old Design
 
 1. Characters
    - Character View (focused graph by root character)
@@ -33,6 +42,7 @@ The existing app exposes the following main views and subviews:
 - Views should take two parameters ("View Name", "Source File", "Heading Selected") Streamlit should handle code determining what files are present in dropdowns.
 - Streamlit should handle filtering based on files while graph projection should handle filtering based on heading. Only nodes from the selected source file should be sent to projection module.
 - In streamlit heading filters should be displayed as a separate dropdown from the "Source File" dropdown. 
+- Location View and Session View are separate visible tabs backed by the shared Directory View rendering pipeline and `heading_view` Graphviz config.
 
 ## Document View Improvement
 - UI buttons should be added to the Directory view to hide elements with a checkbox next to each node element which we support hiding. 

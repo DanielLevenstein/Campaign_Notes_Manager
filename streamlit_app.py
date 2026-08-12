@@ -1,40 +1,34 @@
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import datetime
+import inspect
 from pathlib import Path
 import os
 import re
 
 import streamlit as st
 
-from character_graph.combined_graph import (
-    build_combined_character_graph,
-    combined_attribute_rows,
+from src.graph.combined_graph import (
     clean_evidence_text,
-    graph_view_root_nodes,
     compact,
 )
-from character_graph.extraction import extract_character_graph
-from character_graph.graph_view import (
+from src.graph.graph_view import (
     evidence_rows,
 )
-from character_graph.ingest import load_backstory
-from character_graph.session_entities import derived_lore_entity_relationships
-from character_graph.storage import load_graph
-from graphviz_rendering import render_knowledge_graph_tabs
+from src.persistence import storage as persistence
+from src.rendering.graphviz_rendering import render_knowledge_graph_tabs
 
 
-from language_model.storage import (
+from src.persistence.lore_documents import (
     Character,
     CharacterProfile,
     Place,
     PlaceProfile,
-    character_family_name,
-    character_first_name,
     create_character,
     create_place_markdown,
     default_details,
     delete_character_profile,
     delete_place_profile,
+    import_external_character_sheet,
     list_places,
     list_characters,
     read_place_markdown,
@@ -47,20 +41,19 @@ from language_model.storage import (
     write_place_markdown,
 )
 
-from language_model.character_rewrites import (
+from src.writing.character_rewrites import (
     graph_generated_backstory as build_graph_generated_backstory,
     graph_generated_summary as build_graph_generated_summary,
 )
-from language_model.rewrite_model import (
+from src.writing.rewrite_model import (
     LocalRewriteModelClient,
     LocalRewriteModelError,
     LocalRewriteModelLifecycle,
     load_local_config,
 )
-from language_model.session_notes import (
+from src.extraction.raw_txt_import import (
     child_markdown_sections,
     combine_markdown_section,
-    hide_markdown_section_heading,
     import_markdown_text,
     delete_session_note,
     insert_markdown_section,
@@ -80,7 +73,7 @@ from language_model.session_notes import (
     write_markdown_section,
     write_session_note,
 )
-from language_model.lore_import import (
+from src.persistence.lore_import import (
     BACKUP_KIND_SNAPSHOT,
     backup_lore_files,
     clear_local_lore,
@@ -89,23 +82,30 @@ from language_model.lore_import import (
     read_lore_backup_date,
     restore_lore_backup,
 )
-from language_model.paths import (
-    CHARACTERS_DIR,
-    LORE_DIR,
-    PLACES_DIR,
-    SESSION_NOTES_DIR,
-    TEST_FIXTURES_DIRECTORY,
+from src.graph.presentation import party_view_presentation
+from src.graph.projections import build_combined_graph_projection
+from paths import (
+    WORLD_BUILDING_IMPORT_DIR,
     WORLD_BUILDING_BACKUP_DIR,
 )
 
 ENABLE_ATTRIBUTE_GRAPH_OVERRIDE = "LOCAL_CHATBOT_ENABLE_ATTRIBUTE_GRAPH_OVERRIDE"
+ENABLE_FULL_KNOWLEDGE_GRAPH = "LOCAL_CHATBOT_ENABLE_FULL_KNOWLEDGE_GRAPH"
 DISABLE_LORE_BACKUPS = "LOCAL_CHATBOT_DISABLE_LORE_BACKUPS"
 MAIN_NAVIGATION_TABS = ["Characters", "Places", "Session Notes"]
 LORE_BACKUP_IMPORT_SOURCE_KEY = "lore_backup_import_source"
 
 
+def env_flag_enabled(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def lore_backups_disabled() -> bool:
-    return os.environ.get(DISABLE_LORE_BACKUPS, "").strip().lower() in {"1", "true", "yes", "on"}
+    return env_flag_enabled(DISABLE_LORE_BACKUPS)
+
+
+def full_knowledge_graph_enabled() -> bool:
+    return env_flag_enabled(ENABLE_FULL_KNOWLEDGE_GRAPH)
 
 
 st.set_page_config(page_title="Character Builder", page_icon=":material/forum:", layout="wide")
@@ -233,11 +233,13 @@ def session_note_select_options(paths, show_dates: bool = False) -> list[dict[st
             if not note_date:
                 options.append({"label": display_session_note_option(path, show_dates=show_dates), "path": path.name, "section": ""})
             continue
+        section_option_count = 0
         for section in sections:
-            if section.level == 1:
-                continue
             label = f"H{section.level}: {section.text}"
             options.append({"label": label, "path": path.name, "section": section.key})
+            section_option_count += 1
+        if section_option_count == 0 and not note_date:
+            options.append({"label": display_session_note_option(path, show_dates=show_dates), "path": path.name, "section": ""})
     return options
 
 
@@ -265,7 +267,7 @@ def attribute_graph_override_enabled() -> bool:
     return os.environ.get(ENABLE_ATTRIBUTE_GRAPH_OVERRIDE) == "1"
 
 def external_character_import_enabled() -> bool:
-    return  False
+    return True
 
 
 def parse_list_field(value: str) -> list[str]:
@@ -316,10 +318,10 @@ def graph_generated_summary(character: Character, profile: CharacterProfile) -> 
 
 
 def character_graph_or_regenerate(character: Character):
-    graph = load_graph(character.graph_path)
+    graph = persistence.load_graph(character.graph_path)
     if graph is None:
         regenerate_character_graph(character)
-        graph = load_graph(character.graph_path)
+        graph = persistence.load_graph(character.graph_path)
     if graph is None:
         raise ValueError("No Character Graph Is Available. Regenerate The Graph First.")
     return graph
@@ -401,25 +403,40 @@ def undo_character_changes(character: Character) -> None:
         return
     previous = snapshots.pop()
     if isinstance(previous, dict):
-        character.backstory_path.write_text(previous.get("backstory", "").rstrip() + "\n", encoding="utf-8")
         profile_text = previous.get("profile", "")
         if profile_text:
-            character.profile_path.parent.mkdir(parents=True, exist_ok=True)
-            character.profile_path.write_text(profile_text.rstrip() + "\n", encoding="utf-8")
+            persistence.write_text(character.profile_path, profile_text.rstrip() + "\n")
         else:
-            character.profile_path.unlink(missing_ok=True)
+            persistence.delete_file(character.profile_path)
+        persistence.write_markdown(
+            character.backstory_path,
+            previous.get("backstory", "").rstrip() + "\n",
+            update_graph=lambda _path: regenerate_character_graph(character),
+        )
     else:
-        character.backstory_path.write_text(str(previous).rstrip() + "\n", encoding="utf-8")
+        persistence.write_markdown(
+            character.backstory_path,
+            str(previous).rstrip() + "\n",
+            update_graph=lambda _path: regenerate_character_graph(character),
+        )
     st.session_state[key] = snapshots
-    regenerate_character_graph(character)
+    bump_character_editor_revision(character)
     mark_combined_graph_dirty()
     st.session_state[f"character_status_{character.name}"] = "Character Changes Undone."
     st.rerun()
 
 
+def bump_character_editor_revision(character: Character) -> None:
+    st.session_state[f"character_editor_revision_{character.name}"] = st.session_state.get(
+        f"character_editor_revision_{character.name}",
+        0,
+    ) + 1
+
+
 def save_character_update(character: Character, updated: CharacterProfile) -> None:
     push_character_undo(character)
     write_character_profile(character, updated)
+    bump_character_editor_revision(character)
     mark_combined_graph_dirty()
     st.session_state[f"character_status_{character.name}"] = "Character Saved."
     st.session_state.pop(f"pending_character_save_{character.name}", None)
@@ -465,7 +482,7 @@ def undo_place_changes(place: Place) -> None:
         st.warning("No Place Changes To Undo.")
         return
     previous = snapshots.pop()
-    place.path.write_text(previous.rstrip() + "\n", encoding="utf-8")
+    write_place_markdown(place, previous.rstrip() + "\n")
     st.session_state[key] = snapshots
     sync_place_editor_values(place, previous.rstrip())
     bump_place_editor_revision(place)
@@ -496,10 +513,10 @@ def undo_session_notes_changes() -> None:
     current_paths = {path.name: path for path in list_session_notes()}
     for name, path in current_paths.items():
         if name not in previous:
-            path.unlink(missing_ok=True)
+            delete_session_note(path)
     for path in current_paths.values():
         if path.name in previous:
-            path.write_text(previous[path.name].rstrip() + "\n", encoding="utf-8")
+            write_lore_document(path, previous[path.name].rstrip())
     st.session_state["session_notes_undo"] = snapshots
     for name in set(current_paths) | set(previous):
         st.session_state[f"session_note_editor_revision_{name}"] = st.session_state.get(
@@ -515,7 +532,7 @@ def render_relationship_graph(character: Character) -> None:
     with st.expander("Character Attribute Graph", expanded=False):
         graph = None
         try:
-            graph = load_graph(character.graph_path)
+            graph = persistence.load_graph(character.graph_path)
         except (OSError, ValueError) as exc:
             st.warning(f"Could Not Load Relationship Graph: {exc}")
 
@@ -604,12 +621,7 @@ def attribute_graph_display_rows(profile: CharacterProfile) -> list[dict[str, st
 def render_combined_character_graph(active_main_tab: str = "Characters") -> None:
     characters = list_characters()
     places = list_places()
-    graphs = load_lore_graphs()
-
-    place_sources = [
-        (lore_source_document_id(place.path), display_place_name(place), str(place.path), "source_document")
-        for place in places
-    ]
+    projection = build_combined_graph_projection(characters=characters, places=places)
     with (st.expander(f"Combined Knowledge Graph", expanded=False)):
         if st.button("Regenerate All Lore Graphs", icon=":material/sync:", key="regen_all_lore_graphs"):
             failures = []
@@ -625,258 +637,28 @@ def render_combined_character_graph(active_main_tab: str = "Characters") -> None
                 st.success("All Lore Graphs Regenerated.")
                 st.rerun()
 
-        if not graphs and not place_sources:
+        if not projection.has_lore:
             st.info("Add Character Or Place Lore To See The Combined Graph.")
             return
-        combined = build_combined_character_graph(
-            graphs,
-            place_sources,
-            place_lore_relationships(places) + derived_lore_relationships(characters, places, graphs),
-        )
-        character_nodes = combined_main_tab_nodes(combined, characters, places)
         graph_revision = st.session_state.get("combined_graph_revision", 0)
-        main_character_ids = {node.id for node in character_nodes if node.node_type == "character"}
-        main_place_ids = {node.id for node in character_nodes if node.node_type == "place"}
-        character_sheet_graphs = character_sheet_lore_graphs(graphs)
-        render_knowledge_graph_tabs(
-            combined=combined,
-            character_sheet_combined=build_combined_character_graph(character_sheet_graphs),
-            character_sheet_detail_rows=combined_attribute_rows(character_sheet_graphs),
-            character_nodes=character_nodes,
-            main_character_ids=main_character_ids,
-            main_place_ids=main_place_ids,
+        render_knowledge_graph_tabs_compatible(
+            combined=projection.combined,
+            character_sheet_combined=projection.character_sheet_combined,
+            character_sheet_detail_rows=projection.character_sheet_detail_rows,
+            party_view=party_view_presentation(projection),
+            character_nodes=projection.character_nodes,
+            main_character_ids=projection.main_character_ids,
+            main_place_ids=projection.main_place_ids,
             graph_revision=graph_revision,
             label_font_color=graph_edge_label_font_color(),
             active_main_tab=active_main_tab,
+            include_full_knowledge_graph=full_knowledge_graph_enabled(),
         )
 
 
-def load_lore_graphs():
-    graphs = []
-    for path in lore_markdown_files():
-        try:
-            document = load_backstory(path, character_id=compact(path.stem))
-            primary_name = session_note_source_name(path) if path_is_session_note(path) else None
-            graphs.append(extract_character_graph(document, primary_name=primary_name))
-        except (OSError, ValueError):
-            continue
-    return graphs
-
-
-def character_sheet_lore_graphs(graphs):
-    return [
-        graph
-        for graph in graphs
-        if is_character_lore_path(Path(graph.primary_character.source_file))
-    ]
-
-
-def combined_main_tab_nodes(combined, characters, places):
-    return graph_view_root_nodes(
-        combined,
-        [display_character_name(character) for character in characters],
-        [display_place_name(place) for place in places],
-    )
-
-
-def derived_lore_relationships(characters, places, graphs) -> list[dict[str, str]]:
-    graph_sources = {
-        Path(graph.primary_character.source_file).resolve(): graph
-        for graph in graphs
-    }
-    known_character_names = [display_character_name(character) for character in characters]
-    known_place_names = known_knowledge_graph_place_names(places)
-    relationships: list[dict[str, str]] = []
-    for path in lore_markdown_files():
-        if is_character_lore_path(path):
-            continue
-        graph = graph_sources.get(path.resolve())
-        source_id = graph.primary_character.id if graph and not is_place_lore_path(path) else lore_source_document_id(path)
-        source_name = combined_lore_source_name(path, graph)
-        source_type = "source_document" if is_place_lore_path(path) else "character"
-        try:
-            text = read_text(path)
-        except OSError:
-            continue
-        relationships.extend(
-            derived_lore_entity_relationships(
-                source_id=source_id,
-                source_name=source_name,
-                source_type=source_type,
-                source_file=str(path),
-                text=text,
-                known_character_names=known_character_names,
-                known_place_names=known_place_names,
-            )
-        )
-    return relationships
-
-
-def combined_lore_source_name(path: Path, graph) -> str:
-    if graph is not None and path_is_session_note(path):
-        return session_note_source_name(path)
-    if graph is not None:
-        return graph.primary_character.name
-    return path.stem.replace("_", " ")
-
-
-def known_knowledge_graph_place_names(places) -> list[str]:
-    names: list[str] = []
-    for place in places:
-        for name in place_name_aliases(place):
-            if name and name not in names:
-                names.append(name)
-    return names
-
-
-def place_name_aliases(place) -> list[str]:
-    display_name = display_place_name(place)
-    aliases = [display_name, place.path.stem.replace("_", " ")]
-    title = markdown_document_title(read_text(place.path))
-    if title:
-        aliases.append(title)
-    for name in list(aliases):
-        stripped = source_title_without_lore_suffix(name)
-        if stripped and stripped not in aliases:
-            aliases.append(stripped)
-    return aliases
-
-
-def source_title_without_lore_suffix(name: str) -> str:
-    return re.sub(r"\s+Lore$", "", name.strip(), flags=re.IGNORECASE)
-
-
-def lore_source_document_id(path: Path) -> str:
-    return f"source_document__{compact(path.stem)}"
-
-
-def is_character_lore_path(path: Path) -> bool:
-    return "character_sheets" in path.parts
-
-
-def is_place_lore_path(path: Path) -> bool:
-    return "places" in path.parts
-
-
-def path_is_session_note(path: Path) -> bool:
-    normalized = str(path).replace("\\", "/").lower()
-    try:
-        path.resolve().relative_to(SESSION_NOTES_DIR.resolve())
-        return True
-    except ValueError:
-        return "/session_notes/" in normalized or compact(path.stem) in {"sessionnote", "sessionnotes"}
-
-
-def session_note_source_name(path: Path) -> str:
-    name = path.stem.replace("_", " ")
-    return name if name else "Session Notes"
-
-
-def lore_markdown_files():
-    paths: dict[Path, Path] = {}
-    for directory in unique_lore_scan_dirs():
-        if not directory.exists():
-            continue
-        for path in sorted(directory.rglob("*.md")):
-            if (
-                "TEMPLATE" not in path.name.upper()
-                and not path.name.startswith(".")
-                and not should_skip_lore_scan_path(path)
-            ):
-                paths[path.resolve()] = path
-    return [paths[key] for key in sorted(paths, key=lambda item: str(item))]
-
-
-def unique_lore_scan_dirs() -> list[Path]:
-    directories: list[Path] = []
-    for directory in [LORE_DIR, CHARACTERS_DIR, PLACES_DIR, SESSION_NOTES_DIR]:
-        if directory not in directories:
-            directories.append(directory)
-    return directories
-
-
-def should_skip_lore_scan_path(path: Path) -> bool:
-    if not lore_backups_disabled():
-        return False
-    return any(part.lower() == "backup" for part in path.parts)
-
-
-def place_lore_relationships(places) -> list[dict[str, str]]:
-    relationships: list[dict[str, str]] = []
-    known_place_keys = {compact(place.name) for place in places}
-    for place in places:
-        text = read_text(place.path)
-        source_id = lore_source_document_id(place.path)
-        for line in place_connections_lines(text):
-            if ":" in line:
-                name, relationship = line.split(":", 1)
-            else:
-                name, relationship = line, "reference"
-            target_name = name.strip().lstrip("-").strip()
-            if not target_name:
-                continue
-            target_type = "place" if compact(target_name) in known_place_keys or looks_like_place_connection(target_name) else "character"
-            relationships.append(
-                {
-                    "source_id": source_id,
-                    "source_name": place.name,
-                    "source_type": "source_document",
-                    "source_file": str(place.path),
-                    "target_id": compact(target_name),
-                    "target_name": target_name,
-                    "target_type": target_type,
-                    "relationship": relationship.strip() or "reference",
-                    "evidence": line.strip(),
-                }
-            )
-    return relationships
-
-
-def place_connections_lines(text: str) -> list[str]:
-    sections = text.splitlines()
-    lines: list[str] = []
-    in_connections = False
-    for line in sections:
-        stripped = line.strip()
-        if stripped.lower().startswith("## "):
-            in_connections = stripped.lower() == "## place connections"
-            continue
-        if in_connections and stripped.startswith("-"):
-            lines.append(stripped.lstrip("-").strip())
-    return lines
-
-
-def looks_like_place_connection(name: str) -> bool:
-    lowered = name.strip().lower()
-    place_suffixes = {
-        "academy",
-        "bastion",
-        "cavern",
-        "city",
-        "college",
-        "coast",
-        "court",
-        "fortress",
-        "forest",
-        "guild",
-        "hall",
-        "harbor",
-        "keep",
-        "kingdom",
-        "library",
-        "mage college",
-        "monastery",
-        "school",
-        "sea",
-        "shore",
-        "temple",
-        "tower",
-        "tavern",
-        "university",
-        "village",
-    }
-    return any(lowered == suffix or lowered.endswith(f" {suffix}") for suffix in place_suffixes)
-
+def render_knowledge_graph_tabs_compatible(**kwargs) -> None:
+    supported = inspect.signature(render_knowledge_graph_tabs).parameters
+    render_knowledge_graph_tabs(**{key: value for key, value in kwargs.items() if key in supported})
 
 def connection_rows_for_character(combined, character_id: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
@@ -918,46 +700,36 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
         backstory="",
     )
     with st.form(key_prefix):
-        name = st.text_input("Name", value=draft_profile.name, placeholder="Ms. Glorious", key=f"{key_prefix}_name")
         name_cols = st.columns(2)
-        first_name = name_cols[0].text_input(
-            "First Name",
-            value=draft_profile.first_name,
-            placeholder="Glorious",
-            key=f"{key_prefix}_first_name",
+        name = name_cols[0].text_input("Character Name", value=draft_profile.name, key=f"{key_prefix}_name")
+        player_name = name_cols[1].text_input(
+            "Player Name",
+            value=profile_player_name(draft_profile),
+            key=f"{key_prefix}_player_name",
         )
-        family_name = name_cols[1].text_input(
-            "Family Name",
-            value=draft_profile.family_name,
-            placeholder="Maximus",
-            key=f"{key_prefix}_family_name",
-        )
+        st.caption("Aliases, first name, and family name are derived from saved character content.")
         stat_cols = st.columns(4)
-        level = stat_cols[0].text_input("Level", value=draft_profile.level, placeholder="3", key=f"{key_prefix}_level")
-        race = stat_cols[1].text_input("Race", value=draft_profile.race, placeholder="Elf", key=f"{key_prefix}_race")
+        level = stat_cols[0].text_input("Level", value=draft_profile.level, key=f"{key_prefix}_level")
+        race = stat_cols[1].text_input("Race", value=draft_profile.race, key=f"{key_prefix}_race")
         character_class = stat_cols[2].text_input(
             "Class",
             value=draft_profile.character_class,
-            placeholder="Wizard",
             key=f"{key_prefix}_class",
         )
         pronouns = stat_cols[3].text_input(
             "Pronouns",
             value=draft_profile.pronouns,
-            placeholder="she/her",
             key=f"{key_prefix}_pronouns",
         )
         summary = st.text_area(
             "Summary",
             value=draft_profile.summary,
-            placeholder="Ms. Glorious specializes in the study of the dark arts.",
             height=96,
             key=f"{key_prefix}_summary",
         )
         backstory = st.text_area(
             "Backstory",
             value=draft_profile.backstory,
-            placeholder="A careful scholar who keeps notes about every strange place they visit...",
             height=160,
             key=f"{key_prefix}_backstory",
         )
@@ -966,36 +738,32 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
             drives = detail_cols[0].text_area(
                 "Drives",
                 value=render_list_field(draft_profile.drives),
-                placeholder="Protect A Shared Home\nFollow A Longstanding Promise",
                 height=96,
                 key=f"{key_prefix}_drives",
             )
             alliances = detail_cols[1].text_area(
                 "Alliances",
                 value=render_list_field(draft_profile.alliances),
-                placeholder="The Harbor Circle",
                 height=96,
                 key=f"{key_prefix}_alliances",
             )
             enemies = detail_cols[2].text_area(
                 "Enemies",
                 value=render_list_field(draft_profile.enemies),
-                placeholder="The Hollow Council\nAlder Grin",
                 height=96,
                 key=f"{key_prefix}_enemies",
             )
             details = st.text_area(
                 "Character Details",
                 value=draft_profile.details,
-                placeholder="Add any extra notes, traits, or background details here.",
                 height=120,
                 key=f"{key_prefix}_details",
             )
 
         submitted = st.form_submit_button("Create Character", icon=":material/person_add:")
         if submitted:
-            if not all([name.strip(), race.strip(), character_class.strip(), backstory.strip()]):
-                st.error("Complete Name, Race, Class, And Backstory.")
+            if not all([name.strip(), backstory.strip()]):
+                st.error("Enter Name And Backstory.")
                 return
             try:
                 profile = CharacterProfile(
@@ -1005,8 +773,7 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
                     race=race.strip(),
                     character_class=character_class.strip(),
                     backstory=backstory.strip(),
-                    first_name=first_name.strip() or character_first_name(name),
-                    family_name=family_name.strip() or character_family_name(name),
+                    player_name=player_name.strip(),
                     summary=summary.strip(),
                     motivations=[],
                     drives=parse_list_field(drives),
@@ -1027,6 +794,19 @@ def render_character_creator(key_prefix: str = "new_character", draft_profile: C
                 st.rerun()
 
 
+def render_alias_metadata(*, aliases: dict[str, dict[str, str]] | None = None) -> str:
+    rows: list[str] = []
+    for group, values in (aliases or {}).items():
+        for label, value in values.items():
+            if value:
+                rows.append(f"{label}: {value}")
+    return "\n".join(dict.fromkeys(rows))
+
+
+def profile_player_name(profile: CharacterProfile) -> str:
+    return getattr(profile, "player_name", "")
+
+
 def graph_edge_label_font_color() -> str:
     return "#cbd5e1"
 
@@ -1034,8 +814,7 @@ def graph_edge_label_font_color() -> str:
 def clear_character_creator_state(key_prefix: str) -> None:
     for field in (
         "name",
-        "first_name",
-        "family_name",
+        "player_name",
         "level",
         "race",
         "class",
@@ -1063,18 +842,17 @@ def render_place_creator_form(key_prefix: str, draft_profile: PlaceProfile | Non
     draft_profile = draft_profile or PlaceProfile(name="", place_type="", summary="")
     with st.form(key_prefix):
         st.caption("Describe the place with a name and a short overview. You can add more detail later if you want to expand the lore.")
-        name = st.text_input("Name", value=draft_profile.name, placeholder="Lantern House", key=f"{key_prefix}_name")
+        name = st.text_input("Name", value=draft_profile.name, key=f"{key_prefix}_name")
         markdown = st.text_area(
             "New Place Markdown",
             value=draft_place_markdown(draft_profile),
-            placeholder="# Lantern House\n\nA welcoming inn where travelers share stories and quiet conversations.",
             height=220,
             key=f"{key_prefix}_markdown",
         )
         submitted = st.form_submit_button("Create Place", icon=":material/add_location_alt:")
         if submitted:
             if not all([name.strip(), markdown.strip()]):
-                st.error("Complete Name And Place Markdown.")
+                st.error("Enter Name And Place Description")
                 return
             try:
                 place = create_place_markdown(name.strip(), markdown.strip())
@@ -1250,7 +1028,7 @@ def render_lore_import_tools() -> None:
         st.subheader("Bulk Lore Directory")
         source_dir = st.text_input(
             "Source Directory",
-            value=str(TEST_FIXTURES_DIRECTORY),
+            value=str(WORLD_BUILDING_IMPORT_DIR),
             help="Choose a directory under world_building/import that contains character_sheets, places, and session_notes folders.",
             key="lore_directory_import_source",
         )
@@ -1260,7 +1038,7 @@ def render_lore_import_tools() -> None:
             key="lore_directory_import_overwrite",
         )
         action_cols = st.columns(4)
-        if action_cols[0].button("Import Testing Lore", icon=":material/folder_copy:", key="import_testing_lore"):
+        if action_cols[0].button("Import Lore Directory", icon=":material/folder_copy:", key="import_testing_lore"):
             try:
                 summary = import_lore_directory(Path(source_dir), overwrite=overwrite_existing)
             except FileNotFoundError:
@@ -1437,7 +1215,7 @@ def import_session_note():
         )
         title = st.text_input(
             "Imported File Name",
-            placeholder=uploaded_notes.name if uploaded_notes is not None else "Optional title or source filename",
+            placeholder=uploaded_notes.name if uploaded_notes is not None else "source filename",
             key="markdown_import_source_name",
         )
         if st.button("Upload Session Note", icon=":material/upload_file:", key="upload_session_notes"):
@@ -1498,6 +1276,8 @@ def render_session_notes() -> None:
             index=current_index,
             key="main_existing_session_note",
         )
+        if selected_note_label not in display_names:
+            selected_note_label = display_names[current_index]
         selected_option = select_options[display_names.index(selected_note_label)]
         selected_note = next(path for path in note_files if path.name == selected_option["path"])
         if st.button("Open Session Note", icon=":material/event_note:", key="main_open_session_note"):
@@ -1534,14 +1314,7 @@ def render_session_note_editor(path, show_dates: bool = False, section_key: str 
         st.subheader(note_label)
     if selected_section:
         top_action_cols = st.columns(3)
-        if selected_section.level == 1:
-            if top_action_cols[0].button(
-                "Hide Heading",
-                icon=":material/visibility_off:",
-                key=f"top_hide_heading_{path.name}_{section_key}",
-            ):
-                st.session_state["pending_hide_session_heading"] = {"path": path.name, "section": section_key}
-        elif not is_first_title_section and top_action_cols[0].button(
+        if not is_first_title_section and top_action_cols[0].button(
             "Add Previous Section",
             icon=":material/vertical_align_top:",
             key=f"add_previous_section_{path.name}_{section_key}",
@@ -1576,38 +1349,6 @@ def render_session_note_editor(path, show_dates: bool = False, section_key: str 
             st.session_state["active_session_note_editor"] = f"{path.name}:{new_section_key or 'full'}"
             st.session_state["session_notes_status"] = "Next Section Added."
             st.rerun()
-        pending_hide = st.session_state.get("pending_hide_session_heading", {})
-        if pending_hide.get("path") == path.name and pending_hide.get("section") == section_key:
-            promoted_section = next(iter(child_markdown_sections(read_session_note(path), section_key)), None)
-            st.warning(f'Are you sure you want to hide "{selected_section.text}" heading')
-            if promoted_section:
-                st.write(
-                    f'Hiding this heading will promote "{promoted_section.text}" heading top level heading for this document'
-                )
-            else:
-                st.write("Hiding this heading will leave this document without a top level heading.")
-            confirm_cols = st.columns(2)
-            if confirm_cols[0].button(
-                "Hide Heading",
-                icon=":material/visibility_off:",
-                key=f"confirm_hide_heading_{path.name}_{section_key}",
-            ):
-                push_session_notes_undo()
-                hide_markdown_section_heading(path, section_key)
-                set_active_session_note(path)
-                set_active_session_note_section()
-                st.session_state.pop("active_session_note_editor", None)
-                st.session_state.pop("pending_hide_session_heading", None)
-                mark_combined_graph_dirty()
-                st.session_state["session_notes_status"] = "Heading Hidden."
-                st.rerun()
-            if confirm_cols[1].button(
-                "Cancel",
-                icon=":material/close:",
-                key=f"cancel_hide_heading_{path.name}_{section_key}",
-            ):
-                st.session_state.pop("pending_hide_session_heading", None)
-                st.rerun()
     if display_body:
         st.markdown(display_body)
     if selected_section:
@@ -1685,13 +1426,11 @@ def render_session_note_editor(path, show_dates: bool = False, section_key: str 
                 session_date = st.text_input(
                     "Session Date",
                     value=note_date,
-                    placeholder="Session date",
                     key=f"session_note_date_{path.name}_{editor_revision}",
                 )
                 title = st.text_input(
                     "Title",
                     value=note_title,
-                    placeholder="Optional session heading",
                     key=f"session_note_title_{path.name}_{editor_revision}",
                 )
             body = st.text_area(
@@ -1703,21 +1442,17 @@ def render_session_note_editor(path, show_dates: bool = False, section_key: str 
             action_cols = st.columns(3)
             save_requested = action_cols[0].form_submit_button("Save Session Note", icon=":material/save:")
             delete_requested = action_cols[1].form_submit_button(
-                "Hide Heading"
-                if selected_section and selected_section.level == 1
-                else "Delete Section"
+                "Delete Section"
                 if section_key
                 else "Delete Session Note",
-                icon=":material/visibility_off:" if selected_section and selected_section.level == 1 else ":material/delete_forever:",
+                icon=":material/delete_forever:",
             )
             undo_requested = action_cols[2].form_submit_button("Undo Changes", icon=":material/undo:")
             if undo_requested:
                 undo_session_notes_changes()
             if delete_requested:
                 if section_key:
-                    if selected_section and selected_section.level == 1:
-                        st.session_state["pending_hide_session_heading"] = {"path": path.name, "section": section_key}
-                    elif removing_markdown_section_removes_file(read_session_note(path), section_key):
+                    if removing_markdown_section_removes_file(read_session_note(path), section_key):
                         st.session_state["pending_delete_session_note_file"] = {"path": path.name, "section": section_key}
                     else:
                         push_session_notes_undo()
@@ -1794,22 +1529,69 @@ def render_character_panel() -> None:
     st.subheader("New Character")
     with st.expander("Create Character", expanded=not characters):
         render_character_creator("main_new_character")
+    if external_character_import_enabled():
+        render_external_character_sheet_import()
+
+
+def render_external_character_sheet_import() -> None:
+    with st.expander("Import External Character Sheet", expanded=False):
+        uploaded_sheet = st.file_uploader(
+            "Character Sheet File",
+            type=["pdf", "png", "jpg", "jpeg", "webp"],
+            key="external_character_sheet_file",
+        )
+        display_name = st.text_input(
+            "Display Name",
+            value=Path(uploaded_sheet.name).stem if uploaded_sheet is not None else "",
+            key="external_character_sheet_display_name",
+        )
+        if st.button("Import Character Sheet", icon=":material/upload_file:", key="import_external_character_sheet"):
+            if uploaded_sheet is None:
+                st.error("Choose A Character Sheet File.")
+                return
+            try:
+                imported = import_external_character_sheet(
+                    uploaded_sheet.name,
+                    uploaded_sheet.getvalue(),
+                    display_name=display_name,
+                )
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                st.success(f"Imported External Character Sheet: {imported.path.name}.")
 
 def render_character_editor(character: Character) -> None:
     profile = read_character_profile(character)
+    editor_revision = st.session_state.get(f"character_editor_revision_{character.name}", 0)
+    key_suffix = f"{character.name}_{editor_revision}"
     st.markdown("#### Edit Character")
     editor_context = st.container()
     with editor_context:
-        with st.form(f"edit_character_{character.name}"):
-            st.text_input("Name", value=profile.name, disabled=True)
+        with st.form(f"edit_character_{key_suffix}"):
             name_cols = st.columns(2)
-            first_name = name_cols[0].text_input("First Name", value=profile.first_name)
-            family_name = name_cols[1].text_input("Family Name", value=profile.family_name)
+            name_cols[0].text_input(
+                "Character Name",
+                value=profile.name,
+                disabled=True,
+                key=f"edit_character_name_{key_suffix}",
+            )
+            player_name = name_cols[1].text_input(
+                "Player Name",
+                value=profile_player_name(profile),
+                key=f"edit_player_name_{key_suffix}",
+            )
+            st.text_area(
+                "Aliases",
+                value=render_alias_metadata(aliases=profile.aliases),
+                height=80,
+                disabled=True,
+                key=f"edit_aliases_{key_suffix}",
+            )
             stat_cols = st.columns(4)
-            level = stat_cols[0].text_input("Level", value=profile.level)
-            race = stat_cols[1].text_input("Race", value=profile.race)
-            character_class = stat_cols[2].text_input("Class", value=profile.character_class)
-            pronouns = stat_cols[3].text_input("Pronouns", value=profile.pronouns)
+            level = stat_cols[0].text_input("Level", value=profile.level, key=f"edit_level_{key_suffix}")
+            race = stat_cols[1].text_input("Race", value=profile.race, key=f"edit_race_{key_suffix}")
+            character_class = stat_cols[2].text_input("Class", value=profile.character_class, key=f"edit_class_{key_suffix}")
+            pronouns = stat_cols[3].text_input("Pronouns", value=profile.pronouns, key=f"edit_pronouns_{key_suffix}")
             if has_distinct_original(profile.summary, profile.original_summary):
                 summary_cols = st.columns(2)
                 summary_cols[0].caption(section_status_label("Character Summary", profile))
@@ -1817,6 +1599,7 @@ def render_character_editor(character: Character) -> None:
                     "Summary",
                     value=profile.summary,
                     height=96,
+                    key=f"edit_summary_{key_suffix}",
                 )
                 summary_cols[1].caption("Original Character Summary")
                 summary_cols[1].text_area(
@@ -1824,10 +1607,11 @@ def render_character_editor(character: Character) -> None:
                     value=profile.original_summary,
                     height=96,
                     disabled=True,
+                    key=f"edit_original_summary_{key_suffix}",
                 )
             else:
                 render_section_status("Character Summary", profile)
-                summary = st.text_area("Summary", value=profile.summary, height=96)
+                summary = st.text_area("Summary", value=profile.summary, height=96, key=f"edit_summary_{key_suffix}")
             if has_distinct_original(profile.backstory, profile.original_backstory):
                 backstory_cols = st.columns(2)
                 backstory_cols[0].caption(section_status_label("Character Backstory", profile))
@@ -1835,6 +1619,7 @@ def render_character_editor(character: Character) -> None:
                     "Backstory",
                     value=profile.backstory,
                     height=180,
+                    key=f"edit_backstory_{key_suffix}",
                 )
                 backstory_cols[1].caption("Original Character Backstory")
                 backstory_cols[1].text_area(
@@ -1842,18 +1627,19 @@ def render_character_editor(character: Character) -> None:
                     value=profile.original_backstory,
                     height=180,
                     disabled=True,
+                    key=f"edit_original_backstory_{key_suffix}",
                 )
             else:
                 render_section_status("Character Backstory", profile)
-                backstory = st.text_area("Backstory", value=profile.backstory, height=180)
+                backstory = st.text_area("Backstory", value=profile.backstory, height=180, key=f"edit_backstory_{key_suffix}")
 
             with st.expander("Optional Metadata", expanded=character_optional_metadata_present(profile)):
                 detail_cols = st.columns(3)
-                drives = detail_cols[0].text_area("Drives", value=render_list_field(profile.drives), height=96)
-                alliances = detail_cols[1].text_area("Alliances", value=render_list_field(profile.alliances), height=96)
-                enemies = detail_cols[2].text_area("Enemies", value=render_list_field(profile.enemies), height=96)
+                drives = detail_cols[0].text_area("Drives", value=render_list_field(profile.drives), height=96, key=f"edit_drives_{key_suffix}")
+                alliances = detail_cols[1].text_area("Alliances", value=render_list_field(profile.alliances), height=96, key=f"edit_alliances_{key_suffix}")
+                enemies = detail_cols[2].text_area("Enemies", value=render_list_field(profile.enemies), height=96, key=f"edit_enemies_{key_suffix}")
                 details_value = profile.details or default_details(profile)
-                details = st.text_area("Character Details", value=details_value, height=120)
+                details = st.text_area("Character Details", value=details_value, height=120, key=f"edit_details_{key_suffix}")
             action_cols = st.columns(5)
             save_requested = action_cols[0].form_submit_button(
                 "Save Character",
@@ -1953,8 +1739,7 @@ def render_character_editor(character: Character) -> None:
                     race=race.strip(),
                     character_class=character_class.strip(),
                     backstory=next_backstory,
-                    first_name=first_name.strip(),
-                    family_name=family_name.strip(),
+                    player_name=player_name.strip(),
                     summary=next_summary,
                     motivations=profile.motivations,
                     drives=parse_list_field(drives),

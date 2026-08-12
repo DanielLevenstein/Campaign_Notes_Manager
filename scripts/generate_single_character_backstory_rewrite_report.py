@@ -8,22 +8,21 @@ from typing import Any, Callable
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
-from character_graph.extraction import extract_character_graph
-from character_graph.ingest import load_backstory
-from language_model.character_rewrites import (
+from src.extraction.extraction import extract_character_graph
+from src.ingest.ingest import load_backstory
+from src.writing.character_rewrites import (
     RewriteClient,
     RewriteResult,
     candidate_paragraphs,
     graph_generated_backstory_result,
-    graph_generated_summary_result,
     rewrite_contract_issues,
     rewrite_quality_context,
     rewrite_required_terms,
     semantic_rewrite_score,
 )
-from language_model.rewrite_model import LOCAL_REWRITE_MODEL_ENGINE, LocalRewriteModelClient, load_local_config
-from language_model.rewrite_quality import writing_quality_score
-from language_model.storage import Character, read_character_profile
+from src.writing.rewrite_model import LOCAL_REWRITE_MODEL_ENGINE, LocalRewriteModelClient, load_local_config
+from src.writing.rewrite_quality import writing_quality_score
+from src.persistence.lore_documents import Character, read_character_profile
 
 
 DEFAULT_CHARACTER_PATH = ROOT_DIR / "tests" / "fixtures" / "character_sheets" / "Orin_Nightbloom.md"
