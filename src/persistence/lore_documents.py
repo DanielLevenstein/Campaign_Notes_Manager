@@ -6,7 +6,7 @@ from pathlib import Path
 
 from src.persistence import storage as persistence
 
-from paths import (
+from src.app_paths import (
     CHARACTER_METADATA_DIR,
     CHARACTERS_DIR,
     GENERATED_CHARACTER_SHEETS_DIR,

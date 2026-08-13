@@ -23,7 +23,7 @@ from src.persistence.lore_documents import (
     read_place_markdown,
     read_text,
 )
-from paths import CHARACTERS_DIR, LORE_DIR, PLACES_DIR, SESSION_NOTES_DIR
+from src.app_paths import CHARACTERS_DIR, LORE_DIR, PLACES_DIR, SESSION_NOTES_DIR
 
 
 DISABLE_LORE_BACKUPS = "LOCAL_CHATBOT_DISABLE_LORE_BACKUPS"

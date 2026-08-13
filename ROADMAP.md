@@ -1,6 +1,4 @@
-# TODO
-
-## Knowledge Graph Implementation Roadmap
+# v1.3.0 Graph View Rewrite
 This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4.md and the review workflow in docs/design/NODE_DEDUPLICATION_DESIGN.md.
 
 ## Phase 0 — Persistence Layer
@@ -25,6 +23,8 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Add file hashes persistence layer so that if no changes are made to markdown file no graph updates are done. 
 - [x] And folder level hash code to back up lore files so that the app doesn't create backups when no changes were made. 
 
+## Phase 2 - Standardize Graph Design
+
 ### Phase 2.1 Projection And Presentation Layer
 - [x] Established the first projection read model for combined graph rendering, including lore graph loading, source scanning, place source rows, derived lore relationships, character-sheet graph filtering, and root-node selection outside the Streamlit entry point.
 - [x] Added projection tests that verify combined graph contracts, character-sheet filtering, graph loading through the projection layer, and guardrails that prevent `streamlit_app.py` from reintroducing direct graph assembly calls.
@@ -41,12 +41,13 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Split compound connection types such as `Investigate Cult` into a target node named `Cult` and an `Investigate` edge.
 - [x] Moved graph node and edge allow-lists into split config files under `config/nodes` and `config/edges`.
 - [x] Derived lore edge values from the combined evidence block for the two connected nodes, while preserving configured and dominant relationship labels.
-- [ ] Fix bugs in node deduplication
+- [x] Fix bugs in node deduplication
 - [x] Fix artifact edge direction bug
 
-## Phase 3.1 – Decouple UI rendering from graph internals
+# Phase 3 - Standardize Graph Views
+### Phase 3.1 – Decouple UI rendering from graph internals
 - [x] Replace direct graph reads in graphviz_rendering.py and streamlit_app.py with projection API calls.
-- [ ] Make the UI consume projection results rather than infer behavior from internal node-type heuristics.
+- [x] Make the UI consume projection results rather than infer behavior from internal node-type heuristics.
 - [x] Unify the rendering behavior for Characters Graph, Places Graph, Session Notes Graph, and Full Structured Graph so they share the same layout and routing rules.
 
 ### Phase 3.2 Graph UI Improvements
@@ -55,25 +56,31 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Streamlit should handle filtering based on files while graph projection should handle filtering based on heading. Only nodes from the selected source file should be sent to projection module.
 - [x] In streamlit heading filters should be displayed as a separate dropdown from the "Source File" dropdown.
 
-## Phase 3.3 Implement the tab parity work
+### Phase 3.3 Implement the tab parity work
 - [x] Add the Characters Graph views with Single Character and Party View and preserve the three-column layout.
 - [x] Add the Places Graph views with Location View and Heading View and support document/heading grouping.
 - [x] Add the Session Notes Graph views with Location View and Directory File View and align them with the same projection behavior.
 - [x] Implement the Full Structured Graph view with straight-line routing, stable columns, and the family-name trapezoid shape.
 
-## Phase 4 Context Aware Edges
-- [ ] Create design doc for context-aware edges
+
+# v1.4.0 Context Aware Edges
+## Phase 1 Context Aware Edges
+- [x] Create a design doc for context-aware edges
 - [ ] Move session-note derived relationships onto the occurrence model
 - [ ] Persist occurrence metadata in canonical graph edges.
 - [ ] Replace hidden-heading bridge creation with visible-anchor selection from occurrence metadata.
 - 
-## Phase 5 Deduplication review workflow
+## Phase 2 Deduplication review workflow
 - [ ] Add a Character Deduplication view that groups likely duplicate characters and supports canonical/alias decisions.
 - [ ] Add a Place Deduplication view that groups likely duplicate places and supports canonical/alias decisions.
 - [ ] Add a Node Removal view for low-confidence nodes that should be hidden from rendered graphs while preserving evidence.
 - [ ] Store review decisions separately from generated graph JSON so they can be reapplied during regeneration.
 
-## Phase 6 Testing, migration, and rollout
+## Phase 3 Creation of Stub Characters & Places & Artifacts
+- [ ] Add UI for creating artifacts through the gui
+- [ ] Update UI
+## Phase 4 Testing, migration, and rollout
+
 - [ ] Add unit tests for canonicalization adapters, projection results, and review-rule application.
 - [ ] Add integration tests covering ingestion -> canonical store -> projection -> UI rendering for session-note imports.
 - [ ] Add UI contract tests and a small e2e flow for deduplication and graph rendering.

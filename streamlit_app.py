@@ -84,10 +84,8 @@ from src.persistence.lore_import import (
 )
 from src.graph.presentation import party_view_presentation
 from src.graph.projections import build_combined_graph_projection
-from paths import (
-    WORLD_BUILDING_IMPORT_DIR,
-    WORLD_BUILDING_BACKUP_DIR,
-)
+
+from src import app_paths
 
 ENABLE_ATTRIBUTE_GRAPH_OVERRIDE = "LOCAL_CHATBOT_ENABLE_ATTRIBUTE_GRAPH_OVERRIDE"
 ENABLE_FULL_KNOWLEDGE_GRAPH = "LOCAL_CHATBOT_ENABLE_FULL_KNOWLEDGE_GRAPH"
@@ -1028,8 +1026,8 @@ def render_lore_import_tools() -> None:
         st.subheader("Bulk Lore Directory")
         source_dir = st.text_input(
             "Source Directory",
-            value=str(WORLD_BUILDING_IMPORT_DIR),
-            help="Choose a directory under world_building/import that contains character_sheets, places, and session_notes folders.",
+            value=str(app_paths.TEST_FIXTURES_DIR),
+            help="Choose a directory under tests/fixtures that contains character_sheets, places, and session_notes folders.",
             key="lore_directory_import_source",
         )
         overwrite_existing = st.checkbox(
@@ -1070,7 +1068,7 @@ def format_backup_date(value: datetime | None) -> str:
 
 @st.dialog("Import Lore Backup")
 def render_lore_backup_restore_dialog(overwrite_existing: bool) -> None:
-    backup_options = list_lore_backups(WORLD_BUILDING_BACKUP_DIR)
+    backup_options = list_lore_backups(app_paths.WORLD_BUILDING_BACKUP_DIR)
     if not backup_options:
         st.warning("No Lore Backups Are Available.")
         if st.button("Close", icon=":material/close:", width="stretch"):
