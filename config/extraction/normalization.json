@@ -350,7 +350,7 @@
       "keywords": ["betray", "betrayed", "betraying"]
     },
     {
-      "type": "former_mentor",
+      "type": "mentor",
       "label": "Former mentor",
       "sentiment": "complicated",
       "keywords": ["former mentor", "trained", "teacher", "mentor"]

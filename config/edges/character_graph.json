@@ -7,7 +7,7 @@
     {"type": "client", "label": "Client", "category": "relationships", "aliases": ["patron"]},
     {"type": "enemy", "label": "Enemy", "category": "relationships", "aliases": ["foe", "opposed"]},
     {"type": "family", "label": "Family", "category": "relationships", "aliases": ["parent", "mother", "father"]},
-    {"type": "former_mentor", "label": "Former Mentor", "category": "relationships", "aliases": ["former mentor", "mentor"]},
+    {"type": "mentor", "label": "Former Mentor", "category": "relationships", "aliases": ["former mentor", "mentor"]},
     {"type": "investigate", "label": "Investigate", "category": "relationships", "aliases": ["investigates", "investigated", "investigating", "investigation"]},
     {"type": "lover", "label": "Lover", "category": "relationships", "aliases": ["love", "romance"]},
     {"type": "mentioned", "label": "Mentioned", "category": "relationships", "aliases": []},

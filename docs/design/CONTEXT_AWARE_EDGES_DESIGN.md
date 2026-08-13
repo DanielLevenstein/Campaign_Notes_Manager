@@ -1,5 +1,20 @@
 # Context-Aware Knowledge Graph Edges
 
+## Components
+
+
+1) An extraction model which extracts likely nodes. 
+2) A classification model, which can be used to determine node type based on the information in normalization.json
+3) A second classification model which can be used to determine edge connection type when heading elements are removed from visible graphs._ 
+
+Context info currently stored in normalization.json should slowly be moved to these three models. 
+## ROADMAP
+
+1) Context-aware occurrence model 
+2) Node type classification enrichment
+3) Edge connection classification 
+4) GLiNER extraction
+
 ## Problem
 
 The current knowledge graph mostly creates edges from a source document or Markdown heading to extracted entities. That makes directory-style views possible, but it also means relationship meaning is inferred later from heading visibility. When a user hides headings, projection code has to bridge through removed nodes and can keep the wrong edge, such as a generic `Session Notes` edge, while losing the more useful month or session context.

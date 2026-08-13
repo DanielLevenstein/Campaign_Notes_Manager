@@ -849,7 +849,7 @@ def infer_relationship(
             re.IGNORECASE,
         ):
             continue
-        if relationship_type == "former_mentor" and not re.search(
+        if relationship_type == "mentor" and not re.search(
             rf"\b{target_pattern}\b[^.!?]*\b(?:trained|teacher|mentor)",
             " ".join(evidence),
             re.IGNORECASE,
