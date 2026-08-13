@@ -15,6 +15,7 @@ This roadmap covers every bug currently documented in `docs/bugs`. The order is 
 - [x] Move session-note upload source files for e2e tests outside watched lore/session-note directories.
 - [x] Add a dedicated unwatched temporary upload fixture path for session-note upload tests.
 - [x] Remove or simplify retry/reload workarounds once file staging is deterministic.
+- [x] Treat sandboxed local Streamlit port-bind denial as an e2e environment skip instead of a startup error.
 - [ ] Keep `test_ui_creates_loads_and_undoes_character_changes` active as the regression for the resolved character undo bug.
 - [ ] Capture fresh baseline screenshots only after the upload test harness is stable.
 

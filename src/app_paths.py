@@ -1,17 +1,36 @@
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+
+SOURCE_ROOT = Path(__file__).resolve().parent
 
 
 def find_project_root(start: Path) -> Path:
     for candidate in (start, *start.parents):
         if (candidate / "streamlit_app.py").exists() and (candidate / "tests" / "fixtures").exists():
             return candidate
-    return start.parents[2]
+    return SOURCE_ROOT.parent
 
 
-ROOT_DIR = find_project_root(Path(__file__).resolve())
+ROOT_DIR = find_project_root(SOURCE_ROOT)
 CONFIG_DIR = ROOT_DIR / "config"
+TEST_FIXTURES_DIR = ROOT_DIR / "tests" / "fixtures"
+WORLD_BUILDING_DIR = ROOT_DIR / "world_building"
+WORLD_BUILDING_IMPORT_DIR = WORLD_BUILDING_DIR / "import"
+WORLD_BUILDING_BACKUP_DIR = WORLD_BUILDING_DIR / "backup"
+META_DATA_DIR = WORLD_BUILDING_DIR / "meta_data"
+LORE_DIR = WORLD_BUILDING_DIR / "lore"
+DOCS_LORE_DIR = LORE_DIR
+CHARACTERS_DIR = LORE_DIR / "character_sheets"
+PLACES_DIR = LORE_DIR / "places"
+SESSION_NOTES_DIR = LORE_DIR / "session_notes"
+GENERATED_LORE_DIR = LORE_DIR / "generated"
+GENERATED_CHARACTER_SHEETS_DIR = GENERATED_LORE_DIR / "character_sheets"
+CHARACTER_GRAPHS_DIR = META_DATA_DIR / "character_graph"
+CHARACTER_METADATA_DIR = META_DATA_DIR / "character_metadata"
 
 
 @dataclass(frozen=True)

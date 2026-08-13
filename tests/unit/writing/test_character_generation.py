@@ -5,7 +5,7 @@ from pathlib import Path
 
 import src.persistence.lore_documents as storage
 from src.writing.character_generator import RandomCharacterGenerator
-from paths import CHARACTER_METADATA_DIR, CHARACTERS_DIR, ROOT_DIR
+from src.app_paths import CHARACTER_METADATA_DIR, CHARACTERS_DIR, ROOT_DIR
 from src.persistence.lore_documents import (
     Character,
     CharacterProfile,

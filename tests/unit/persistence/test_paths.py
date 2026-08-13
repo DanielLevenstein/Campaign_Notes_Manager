@@ -1,7 +1,7 @@
 from pathlib import Path
 
-import paths as paths
-from paths import ROOT_DIR
+from src import app_paths as paths
+from src.app_paths import ROOT_DIR
 
 
 def test_default_paths_point_to_project_root_and_world_building_directories():

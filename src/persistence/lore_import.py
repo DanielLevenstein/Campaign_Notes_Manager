@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from paths import (
+from src.app_paths import (
     CHARACTER_METADATA_DIR,
     CHARACTERS_DIR,
     GENERATED_LORE_DIR,

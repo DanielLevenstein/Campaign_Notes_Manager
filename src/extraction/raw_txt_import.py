@@ -8,7 +8,7 @@ from typing import Any
 
 from src.persistence import storage as persistence
 
-from paths import SESSION_NOTES_DIR
+from src.app_paths import SESSION_NOTES_DIR
 
 
 ISO_DATE_PATTERN = re.compile(r"\b(?P<year>20\d{2})-(?P<month>\d{1,2})-(?P<day>\d{1,2})\b")
