@@ -69,6 +69,14 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 2) A classification model which can be used to determine node type based on the information in normalization.json
 3) A second classification model which can be used to determine edge connection type when heading elements are removed from visible graphs. 
 
+## Phase 0 Knowledge View Definition Migration
+- [x] Create a design doc for knowledge view definition migration.
+- [ ] Add typed dataclasses for knowledge view definitions.
+- [ ] Add a config loader with inheritance and validation.
+- [ ] Add app-facing config files for Location View and Session View.
+- [ ] Migrate directory views to loaded definitions while keeping existing projection functions.
+- [ ] Verify source-file filters, heading filters, hide-source controls, hide-heading controls, graph rendering, and connection tables.
+
 ## Phase 1.1 Context Aware Edges
 - [x] Create a design doc for context-aware edges
 - [ ] Move session-note derived relationships onto the occurrence model
@@ -123,4 +131,3 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [ ] Move all code under the character_graph directory into the new source directory using modules extract, ingest, and deduplication.
 - [ ] Move the world_building folder out of source code. Let user choose the local directory they want to save their project files.
 - [ ] Change the import test lore UI to a proper file picker which defaults to the test fixtures directory.
-
