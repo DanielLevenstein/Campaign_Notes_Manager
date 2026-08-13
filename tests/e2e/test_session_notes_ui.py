@@ -29,6 +29,8 @@ def wait_for_streamlit(url: str, process: subprocess.Popen, timeout: int = 30) -
     while time.monotonic() < deadline:
         if process.poll() is not None:
             output = process.stdout.read() if process.stdout else ""
+            if "PermissionError: [Errno 1] Operation not permitted" in output and "sock.bind" in output:
+                pytest.skip("Local Streamlit port binding is not permitted in this test environment.")
             raise RuntimeError(f"Streamlit exited before startup.\n{output}")
         try:
             response = requests.get(url, timeout=1)
@@ -47,7 +49,7 @@ def open_streamlit_app(page, app_url: str) -> None:
 
 
 @pytest.fixture()
-def isolated_session_notes_app(tmp_path):
+def isolated_session_notes_app(tmp_path, free_tcp_port):
     world_building_dir = tmp_path / "world_building"
     docs_lore_dir = world_building_dir / "lore"
     upload_source_dir = tmp_path / "upload_sources"
@@ -66,13 +68,14 @@ def isolated_session_notes_app(tmp_path):
     env["LOCAL_CHATBOT_CHARACTERS_DIR"] = str(docs_lore_dir / "character_sheets")
     env["LOCAL_CHATBOT_PLACES_DIR"] = str(docs_lore_dir / "places")
     env["LOCAL_CHATBOT_SESSION_NOTES_DIR"] = str(docs_lore_dir / "session_notes")
+    app_url = f"http://127.0.0.1:{free_tcp_port}"
     process = subprocess.Popen(
         [
             *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",
-            "8513",
+            str(free_tcp_port),
             "--server.headless",
             "true",
         ],
@@ -83,8 +86,8 @@ def isolated_session_notes_app(tmp_path):
         text=True,
     )
     try:
-        wait_for_streamlit(APP_URL, process)
-        yield APP_URL, docs_lore_dir, upload_source_dir
+        wait_for_streamlit(app_url, process)
+        yield app_url, docs_lore_dir, upload_source_dir
     finally:
         process.terminate()
         try:
@@ -94,7 +97,7 @@ def isolated_session_notes_app(tmp_path):
 
 
 @pytest.fixture()
-def isolated_session_notes_graph_app(tmp_path):
+def isolated_session_notes_graph_app(tmp_path, free_tcp_port):
     world_building_dir = tmp_path / "world_building"
     docs_lore_dir = world_building_dir / "lore"
     upload_source_dir = tmp_path / "upload_sources"
@@ -138,13 +141,14 @@ Neal is a bard.
     env["LOCAL_CHATBOT_PLACES_DIR"] = str(places_dir)
     env["LOCAL_CHATBOT_SESSION_NOTES_DIR"] = str(session_notes_dir)
     env["LOCAL_CHATBOT_META_DATA_DIR"] = str(meta_data_dir)
+    app_url = f"http://127.0.0.1:{free_tcp_port}"
     process = subprocess.Popen(
         [
             *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",
-            "8514",
+            str(free_tcp_port),
             "--server.headless",
             "true",
         ],
@@ -155,8 +159,8 @@ Neal is a bard.
         text=True,
     )
     try:
-        wait_for_streamlit(GRAPH_APP_URL, process)
-        yield GRAPH_APP_URL, docs_lore_dir, session_notes_dir, upload_source_dir
+        wait_for_streamlit(app_url, process)
+        yield app_url, docs_lore_dir, session_notes_dir, upload_source_dir
     finally:
         process.terminate()
         try:

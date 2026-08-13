@@ -6,7 +6,6 @@ from playwright.sync_api import expect, sync_playwright
 
 from src.persistence.lore_documents import Character, read_character_profile
 from tests.e2e.test_character_sheet_roundtrip_ui import (
-    APP_URL,
     ROOT_DIR,
     seed_lore_fixture,
     select_character,
@@ -16,9 +15,10 @@ from tests.e2e.test_character_sheet_roundtrip_ui import (
 
 
 @pytest.fixture()
-def graph_rewrite_app(tmp_path):
+def graph_rewrite_app(tmp_path, free_tcp_port):
     process, app_state = launch_graph_rewrite_app(
         tmp_path,
+        port=free_tcp_port,
         extra_env={
             "LOCAL_CHATBOT_MODEL_CACHE_DIR": str(tmp_path / "missing_models"),
             "PATH": "/usr/bin:/bin",
@@ -30,7 +30,7 @@ def graph_rewrite_app(tmp_path):
         stop_streamlit(process)
 
 
-def launch_graph_rewrite_app(tmp_path, extra_env: dict[str, str] | None = None):
+def launch_graph_rewrite_app(tmp_path, *, port: int, extra_env: dict[str, str] | None = None):
     world_building_dir = tmp_path / "world_building"
     docs_lore_dir = world_building_dir / "lore"
     characters_dir = docs_lore_dir / "character_sheets"
@@ -49,13 +49,14 @@ def launch_graph_rewrite_app(tmp_path, extra_env: dict[str, str] | None = None):
     env["LOCAL_CHATBOT_SESSION_NOTES_DIR"] = str(session_notes_dir)
     env["LOCAL_CHATBOT_META_DATA_DIR"] = str(meta_data_dir)
     env.update(extra_env or {})
+    app_url = f"http://127.0.0.1:{port}"
     process = subprocess.Popen(
         [
             *streamlit_command(),
             "run",
             "streamlit_app.py",
             "--server.port",
-            "8512",
+            str(port),
             "--server.headless",
             "true",
         ],
@@ -65,8 +66,8 @@ def launch_graph_rewrite_app(tmp_path, extra_env: dict[str, str] | None = None):
         stderr=subprocess.STDOUT,
         text=True,
     )
-    wait_for_streamlit(APP_URL, process)
-    return process, (APP_URL, characters_dir, meta_data_dir)
+    wait_for_streamlit(app_url, process)
+    return process, (app_url, characters_dir, meta_data_dir)
 
 
 def stop_streamlit(process: subprocess.Popen) -> None:

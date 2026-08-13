@@ -779,11 +779,7 @@ def lore_source_file_options(
 ) -> list[tuple[str, str]]:
     options = []
     for node in graph.characters.values():
-        # Accept any node that has a source_file and matches the predicate.
-        # Some imports create session-note related nodes that are not typed
-        # as `source_document` but still reference a source file. Include
-        # those so the file dropdown reflects actual files in lore.
-        if not node.source_file or not source_predicate(node):
+        if not is_lore_projection_source_node(node, source_predicate):
             continue
         source_path = Path(node.source_file)
         label = source_path.name or node.name
@@ -2066,6 +2062,8 @@ def place_lore_connection_rows(graph: CombinedCharacterGraph) -> list[dict[str, 
 
 def lore_graph_connection_rows(graph: CombinedCharacterGraph) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
+    seen_evidence: set[str] = set()
+    seen_subjects: set[str] = set()
     for edge in graph.edges:
         source = graph.characters.get(edge.source)
         target = graph.characters.get(edge.target)
@@ -2076,6 +2074,12 @@ def lore_graph_connection_rows(graph: CombinedCharacterGraph) -> list[dict[str, 
             compacted_evidence = clean_evidence_text(evidence)
             if not compacted_evidence:
                 continue
+            evidence_key = compacted_evidence.casefold()
+            subject_key = subject.name.casefold()
+            if evidence_key in seen_evidence and subject_key in seen_subjects:
+                continue
+            seen_evidence.add(evidence_key)
+            seen_subjects.add(subject_key)
             rows.append(
                 {
                     "Character": subject.name,
