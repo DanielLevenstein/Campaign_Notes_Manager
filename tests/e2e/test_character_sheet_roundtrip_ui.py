@@ -366,8 +366,8 @@ def capture_graph_view_screenshot(page, graph_expander, view_name: str, screensh
         expect(tab).to_have_attribute("aria-selected", "true", timeout=10000)
         graph_panel = graph_expander.get_by_role("tabpanel", name=view_name)
         try:
-            scroll_graph_image_into_view(graph_panel)
-            page.screenshot(path=str(screenshot_path))
+            graph_image = scroll_graph_image_into_view(graph_panel)
+            graph_image.screenshot(path=str(screenshot_path))
             return
         except AssertionError:
             dynamic_import_error = graph_expander.get_by_text(

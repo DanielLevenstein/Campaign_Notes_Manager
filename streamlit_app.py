@@ -1815,6 +1815,9 @@ render_lore_import_tools()
 main_navigation_default = st.session_state.get("main_navigation_tab_default", "Characters")
 main_navigation_revision = st.session_state.get("main_navigation_tab_revision", 0)
 main_navigation_key = f"main_navigation_tab_{main_navigation_revision}"
+active_main_navigation_tab = st.session_state.get(main_navigation_key, main_navigation_default)
+render_combined_character_graph(active_main_navigation_tab)
+
 characters_tab, places_tab, session_notes_tab = st.tabs(
     MAIN_NAVIGATION_TABS,
     default=main_navigation_default,
@@ -1835,6 +1838,3 @@ with places_tab:
 with session_notes_tab:
     import_session_note()
     render_session_notes()
-
-active_main_navigation_tab = st.session_state.get(main_navigation_key, main_navigation_default)
-render_combined_character_graph(active_main_navigation_tab)

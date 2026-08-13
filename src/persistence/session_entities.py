@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from typing import Any
 
 from src.extraction.config import CharacterExtractionConfig, load_character_extraction_config
 
@@ -12,6 +13,7 @@ ENTITY_PATTERN = re.compile(SESSION_ENTITY_CONFIG.session_entity_pattern)
 GROUP_PATTERN = re.compile(SESSION_ENTITY_CONFIG.session_group_pattern, flags=re.IGNORECASE)
 FAMILY_HEADING_PATTERN = re.compile(SESSION_ENTITY_CONFIG.session_family_heading_pattern, re.MULTILINE)
 SENTENCE_PATTERN = re.compile(SESSION_ENTITY_CONFIG.session_sentence_pattern)
+MARKDOWN_HEADING_PATTERN = re.compile(r"^(?P<marker>#{1,6})\s+(?P<text>.*?)\s*#*\s*$")
 
 
 @dataclass
@@ -27,6 +29,14 @@ class EntityCandidate:
         return (100 if self.known else 0) + self.count * 5 + (8 if " " in self.name else 0)
 
 
+@dataclass(frozen=True)
+class EvidenceContext:
+    source_line: int
+    heading_stack: list[dict[str, str | int]]
+    context_anchor_id: str
+    visible_ancestor_context_ids: dict[str, str]
+
+
 def derived_lore_entity_relationships(
     source_id: str,
     source_name: str,
@@ -39,7 +49,7 @@ def derived_lore_entity_relationships(
     max_places: int | None = None,
     max_groups: int | None = None,
     max_artifacts: int | None = None,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     config = session_entity_config()
     max_characters = max_characters if max_characters is not None else config.session_max_derived_characters
     max_places = max_places if max_places is not None else config.session_max_derived_places
@@ -67,8 +77,10 @@ def derived_lore_entity_relationships(
         key=lambda candidate: (-candidate.score, candidate.name.lower()),
     )[:max_artifacts]
 
+    evidence_contexts = evidence_contexts_by_sentence(text)
     relationships = family_heading_relationships(source_id, source_name, source_type, source_file, text)
-    for candidate in [*characters, *places, *groups, *artifacts]:
+    selected_candidates = [*characters, *places, *groups, *artifacts]
+    for candidate in selected_candidates:
         relationship = {
             "character": "Mentioned",
             "place": "Location",
@@ -87,10 +99,146 @@ def derived_lore_entity_relationships(
                     "target_name": candidate.name,
                     "target_type": candidate.entity_type,
                     "relationship": relationship,
+                    "relationship_kind": "context_anchor",
                     "evidence": evidence,
+                    **relationship_context_fields(evidence_contexts.get(evidence)),
                 }
             )
+    relationships.extend(
+        direct_context_relationships(
+            selected_candidates,
+            source_file=source_file,
+            evidence_contexts=evidence_contexts,
+        )
+    )
     return relationships
+
+
+def direct_context_relationships(
+    candidates: list[EntityCandidate],
+    *,
+    source_file: str,
+    evidence_contexts: dict[str, EvidenceContext],
+) -> list[dict[str, Any]]:
+    by_evidence: dict[str, list[EntityCandidate]] = {}
+    for candidate in candidates:
+        for evidence in candidate.evidence:
+            by_evidence.setdefault(evidence, []).append(candidate)
+
+    relationships: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for evidence, evidence_candidates in by_evidence.items():
+        unique_candidates = list({compact(candidate.name): candidate for candidate in evidence_candidates}.values())
+        if len(unique_candidates) < 2:
+            continue
+        for source_candidate in unique_candidates:
+            for target_candidate in unique_candidates:
+                if source_candidate is target_candidate:
+                    continue
+                if source_candidate.entity_type != "character":
+                    continue
+                if target_candidate.entity_type == "character":
+                    continue
+                key = (compact(source_candidate.name), compact(target_candidate.name), evidence)
+                if key in seen:
+                    continue
+                seen.add(key)
+                relationships.append(
+                    {
+                        "source_id": compact(source_candidate.name),
+                        "source_name": source_candidate.name,
+                        "source_type": source_candidate.entity_type,
+                        "source_file": source_file,
+                        "target_id": compact(target_candidate.name),
+                        "target_name": target_candidate.name,
+                        "target_type": target_candidate.entity_type,
+                        "relationship": "Mentioned With",
+                        "relationship_kind": "direct_context",
+                        "evidence": evidence,
+                        **relationship_context_fields(evidence_contexts.get(evidence), include_heading_stack=False),
+                    }
+                )
+    return relationships
+
+
+def relationship_context_fields(
+    context: EvidenceContext | None,
+    *,
+    include_heading_stack: bool = True,
+) -> dict[str, Any]:
+    if context is None:
+        return {}
+    fields: dict[str, Any] = {
+        "source_line": context.source_line,
+        "context_anchor_id": context.context_anchor_id,
+    }
+    if include_heading_stack:
+        fields["heading_stack"] = context.heading_stack
+        fields["visible_ancestor_context_ids"] = context.visible_ancestor_context_ids
+    return fields
+
+
+def evidence_contexts_by_sentence(text: str) -> dict[str, EvidenceContext]:
+    contexts: dict[str, EvidenceContext] = {}
+    heading_stack: list[dict[str, str | int]] = []
+    for line_number, line in enumerate(text.replace("\r\n", "\n").splitlines(), start=1):
+        heading = MARKDOWN_HEADING_PATTERN.match(line.strip())
+        if heading:
+            level = len(heading.group("marker"))
+            heading_text = heading.group("text").strip()
+            heading_stack = [
+                item for item in heading_stack if isinstance(item["level"], int) and item["level"] < level
+            ]
+            heading_stack.append(
+                {
+                    "level": level,
+                    "text": heading_text,
+                    "id": source_heading_id(level, heading_text),
+                }
+            )
+            continue
+        for sentence in split_sentences(line):
+            contexts.setdefault(
+                sentence,
+                EvidenceContext(
+                    source_line=line_number,
+                    heading_stack=list(heading_stack),
+                    context_anchor_id=context_anchor_id(heading_stack),
+                    visible_ancestor_context_ids=visible_ancestor_context_ids(heading_stack),
+                ),
+            )
+    return contexts
+
+
+def source_heading_id(level: int, text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+    return f"source_heading_{level}_{slug}"
+
+
+def context_anchor_id(heading_stack: list[dict[str, str | int]]) -> str:
+    if not heading_stack:
+        return ""
+    return str(heading_stack[-1]["id"])
+
+
+def visible_ancestor_context_ids(heading_stack: list[dict[str, str | int]]) -> dict[str, str]:
+    return {
+        f"hide_h{level}": str(visible_heading["id"])
+        for level in (1, 2, 3)
+        if (visible_heading := visible_heading_for_hidden_level(heading_stack, level)) is not None
+    }
+
+
+def visible_heading_for_hidden_level(
+    heading_stack: list[dict[str, str | int]],
+    hidden_level: int,
+) -> dict[str, str | int] | None:
+    visible = [
+        heading
+        for heading in heading_stack
+        if isinstance(heading["level"], int) and heading["level"] < hidden_level
+    ]
+    return visible[-1] if visible else None
 
 
 def family_heading_relationships(
