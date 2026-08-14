@@ -24,6 +24,11 @@ from src.graph.combined_graph import (
     other_connections_graph,
 )
 from src.graph.graphviz_config import load_graphviz_config
+from src.graph.knowledge_view_config import (
+    KnowledgeViewDefinition,
+    load_knowledge_view_definition,
+    load_knowledge_view_definitions,
+)
 from src.graph.presentation import RelationshipGraphPresentation
 from src.persistence.storage import read_markdown
 
@@ -53,6 +58,9 @@ class LoreGraphViewDefinition:
     supports_directory_hide_options: bool = False
     include_all_heading_option: bool = False
     default_source_file: str | None = None
+    hidden_elements: tuple[str, ...] = ()
+    unhidden_elements: tuple[str, ...] = ()
+    graphviz_columns: tuple[tuple[str, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -73,25 +81,7 @@ class MarkdownSubheading:
     parent_id: str
 
 
-SINGLE_CHARACTER_TAB = "Character View"
-PARTY_VIEW_TAB = "Party View"
-FILE_VIEW_TAB = "File View"
-SESSION_VIEW_TAB = "Section View"
-DIRECTORY_FILE_VIEW_TAB = "Directory View"
-DIRECTORY_VIEW_TAB = DIRECTORY_FILE_VIEW_TAB
-PLACES_HEADING_VIEW_TAB = "Heading View"
-PLACES_FILE_VIEW_TAB = "Location View"
-SESSION_HEADING_VIEW_TAB = "Heading View"
-SESSION_FILE_VIEW_TAB = "Session View"
 FULL_KNOWLEDGE_GRAPH_TAB = "Full Knowledge Graph"
-GRAPH_VIEW_TABS = [
-    SINGLE_CHARACTER_TAB,
-    PARTY_VIEW_TAB,
-    PLACES_FILE_VIEW_TAB,
-    SESSION_FILE_VIEW_TAB,
-]
-
-DIRECTORY_SESSION_VIEW_TAB = "Directory Section View"
 
 STRUCTURED_CHARACTER_VIEW = KnowledgeGraphView(
     key="character_view",
@@ -115,48 +105,72 @@ STRUCTURED_KNOWLEDGE_VIEW = KnowledgeGraphView(
 )
 
 def graph_tab_names(active_main_tab: str, *, include_full_knowledge_graph: bool = False) -> list[str]:
-    tabs = list(GRAPH_VIEW_TABS)
+    tabs = [definition.view_name for definition in load_knowledge_view_definitions()]
     if include_full_knowledge_graph:
         tabs.append(FULL_KNOWLEDGE_GRAPH_TAB)
     return tabs
 
+def directory_lore_graph_view_definition(
+    knowledge_view: KnowledgeViewDefinition,
+    *,
+    default_source_file: str | None = None,
+) -> LoreGraphViewDefinition:
+    return LoreGraphViewDefinition(
+        view_name=knowledge_view.view_name,
+        source_predicate=knowledge_view_source_predicate(knowledge_view.source_predicate),
+        projection=knowledge_view_projection(knowledge_view.projection),
+        column_layout=required_knowledge_view_value(knowledge_view.column_layout, knowledge_view.view_name, "column_layout"),
+        graphviz_config_key=knowledge_view.graphviz_view,
+        graphviz_columns=knowledge_view.columns,
+        source_empty_message=required_knowledge_view_value(
+            knowledge_view.source_empty_message,
+            knowledge_view.view_name,
+            "source_empty_message",
+        ),
+        heading_empty_message=knowledge_view.heading_empty_message,
+        graph_empty_message=required_knowledge_view_value(
+            knowledge_view.graph_empty_message,
+            knowledge_view.view_name,
+            "graph_empty_message",
+        ),
+        source_key=required_knowledge_view_value(knowledge_view.source_key, knowledge_view.view_name, "source_key"),
+        heading_key=knowledge_view.heading_key or None,
+        hide_source_document_roots=False,
+        supports_heading_filter=bool(knowledge_view.heading_key),
+        supports_directory_hide_options=bool(knowledge_view.hidden_elements or knowledge_view.unhidden_elements),
+        include_all_heading_option=knowledge_view.include_all_heading_option,
+        default_source_file=default_source_file,
+        hidden_elements=knowledge_view.hidden_elements,
+        unhidden_elements=knowledge_view.unhidden_elements,
+    )
 
-def lore_graph_view_definitions(active_main_tab: str, *, default_session_source_file: str | None = None) -> dict[str, LoreGraphViewDefinition]:
-    return {
-        PLACES_FILE_VIEW_TAB: LoreGraphViewDefinition(
-            view_name=PLACES_FILE_VIEW_TAB,
-            source_predicate=is_place_source_document_node,
-            projection=place_lore_graph,
-            column_layout="place_lore_directory",
-            graphviz_config_key="location_view",
-            source_empty_message="Add Place Lore To Use Location View.",
-            heading_empty_message="Add Markdown Headings To Place Lore To Use Location View.",
-            graph_empty_message="No Place Lore Connections Were Found For This File.",
-            source_key="location_view_source_file",
-            heading_key="location_view_heading",
-            hide_source_document_roots=True,
-            supports_heading_filter=True,
-            supports_directory_hide_options=True,
-            include_all_heading_option=True,
-        ),
-        SESSION_FILE_VIEW_TAB: LoreGraphViewDefinition(
-            view_name=SESSION_FILE_VIEW_TAB,
-            source_predicate=is_session_note_node,
-            projection=markdown_header_lore_graph,
-            column_layout="session_note_lore_directory",
-            graphviz_config_key="session_view",
-            source_empty_message="Add Session Notes To Use Session View.",
-            heading_empty_message="Add Markdown Headings To Session Notes To Use Session View.",
-            graph_empty_message="No Session Note Connections Were Found For This File.",
-            source_key="session_view_source_file",
-            heading_key="session_view_heading",
-            hide_source_document_roots=True,
-            supports_heading_filter=True,
-            supports_directory_hide_options=True,
-            include_all_heading_option=True,
-            default_source_file=default_session_source_file,
-        ),
+
+def knowledge_view_source_predicate(name: str) -> Callable[[CombinedCharacterNode], bool]:
+    predicates: dict[str, Callable[[CombinedCharacterNode], bool]] = {
+        "places": is_place_source_document_node,
+        "session_notes": is_session_note_node,
     }
+    try:
+        return predicates[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown knowledge view source_predicate `{name}`.") from exc
+
+
+def knowledge_view_projection(name: str) -> Callable[..., CombinedCharacterGraph]:
+    projections: dict[str, Callable[..., CombinedCharacterGraph]] = {
+        "place_lore_graph": place_lore_graph,
+        "markdown_header_lore_graph": markdown_header_lore_graph,
+    }
+    try:
+        return projections[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown knowledge view projection `{name}`.") from exc
+
+
+def required_knowledge_view_value(value: str, view_name: str, field_name: str) -> str:
+    if not value:
+        raise ValueError(f"Knowledge view `{view_name}` must define `{field_name}`.")
+    return value
 
 
 DISALLOWED_PLACE_GRAPH_CHARACTER_KEYS = {"family", "stone", "students"}
@@ -179,18 +193,24 @@ def render_knowledge_graph_tabs(
     include_full_knowledge_graph: bool = False,
 ) -> None:
     pending_import_source_file = st.session_state.pop("session_notes_imported_source_file", None)
-    lore_view_definitions = lore_graph_view_definitions(
-        active_main_tab,
-        default_session_source_file=pending_import_source_file,
-    )
-    tab_names = graph_tab_names(
-        active_main_tab,
-        include_full_knowledge_graph=include_full_knowledge_graph,
-    )
+    knowledge_views = load_knowledge_view_definitions()
+    knowledge_view_by_name = {definition.view_name: definition for definition in knowledge_views}
+    directory_view_definitions = {
+        definition.view_key: directory_lore_graph_view_definition(
+            definition,
+            default_source_file=pending_import_source_file if definition.view_key == "session_view" else None,
+        )
+        for definition in knowledge_views
+        if definition.projection and definition.source_predicate
+    }
+    tab_names = [definition.view_name for definition in knowledge_views]
+    if include_full_knowledge_graph:
+        tab_names.append(FULL_KNOWLEDGE_GRAPH_TAB)
     tabs = st.tabs(tab_names)
     for tab, tab_name in zip(tabs, tab_names):
         with tab:
-            if tab_name == SINGLE_CHARACTER_TAB:
+            knowledge_view = knowledge_view_by_name.get(tab_name)
+            if knowledge_view is not None and knowledge_view.view_key == "character_view":
                 render_single_character_tab(
                     combined=combined,
                     character_nodes=character_nodes,
@@ -198,13 +218,14 @@ def render_knowledge_graph_tabs(
                     main_place_ids=main_place_ids,
                     graph_revision=graph_revision,
                     label_font_color=label_font_color,
+                    knowledge_view=knowledge_view,
                 )
-            elif tab_name == PARTY_VIEW_TAB:
-                render_party_view_tab(party_view, label_font_color)
-            elif tab_name in lore_view_definitions:
+            elif knowledge_view is not None and knowledge_view.view_key == "party_view":
+                render_party_view_tab(party_view, label_font_color, knowledge_view=knowledge_view)
+            elif knowledge_view is not None and knowledge_view.view_key in directory_view_definitions:
                 render_lore_graph_view(
                     combined,
-                    definition=lore_view_definitions[tab_name],
+                    definition=directory_view_definitions[knowledge_view.view_key],
                     main_character_ids=main_character_ids,
                     label_font_color=label_font_color,
                 )
@@ -224,6 +245,7 @@ def render_single_character_tab(
     main_place_ids: set[str],
     graph_revision: int,
     label_font_color: str,
+    knowledge_view: KnowledgeViewDefinition,
 ) -> None:
     if not character_nodes:
         st.info("Add Main Character Or Place Lore To See Graph Roots.")
@@ -235,15 +257,21 @@ def render_single_character_tab(
         main_character_ids,
         main_place_ids,
         label_font_color,
-        load_graphviz_config(STRUCTURED_CHARACTER_VIEW.key),
+        knowledge_view_graphviz_config(knowledge_view),
     )
 
 
 def render_party_view_tab(
     presentation: RelationshipGraphPresentation,
     label_font_color: str,
+    *,
+    knowledge_view: KnowledgeViewDefinition,
 ) -> None:
-    render_presented_relationship_graph(presentation, label_font_color)
+    render_presented_relationship_graph(
+        presentation,
+        label_font_color,
+        graphviz_config=knowledge_view_graphviz_config(knowledge_view),
+    )
 
 
 def render_lore_graph_view(
@@ -266,6 +294,7 @@ def render_lore_graph_view(
         label_font_color=label_font_color,
         column_layout=definition.column_layout,
         graphviz_config_key=definition.graphviz_config_key,
+        graphviz_columns=definition.graphviz_columns,
         main_character_ids=main_character_ids,
         show_lore_notes=definition.show_lore_notes,
         hide_source_document_roots=selection.hide_source_document_roots,
@@ -293,6 +322,8 @@ def render_lore_graph_view_controls(
         hide_source_document_roots, hidden_heading_levels = render_session_directory_hide_options(
             key=f"{definition.source_key}_hidden_elements",
             default_hide_file_name=definition.hide_source_document_roots,
+            hidden_elements=definition.hidden_elements,
+            unhidden_elements=definition.unhidden_elements,
         )
     selected_heading_id = None
     if definition.supports_heading_filter:
@@ -368,79 +399,22 @@ def project_lore_graph(
     return projected_graph
 
 
-def render_place_file_view_tab(
-    *,
-    combined: CombinedCharacterGraph,
-    label_font_color: str,
-    column_layout: str = "place_lore",
-    title: str = PLACES_FILE_VIEW_TAB,
-    key: str = "place_lore_file_view_source_file",
-    show_lore_notes: bool = False,
-    hide_source_document_roots: bool = False,
-) -> None:
-    render_lore_graph_view(
-        combined,
-        definition=LoreGraphViewDefinition(
-            view_name=title,
-            source_predicate=is_place_source_document_node,
-            projection=place_lore_graph,
-            column_layout=column_layout,
-            graphviz_config_key="location_view",
-            source_empty_message="Add Place Lore To Use File View.",
-            graph_empty_message="No Place Lore Connections Were Found For This File.",
-            source_key=key,
-            show_lore_notes=show_lore_notes,
-            hide_source_document_roots=hide_source_document_roots,
-        ),
-        label_font_color=label_font_color,
-    )
-
-
-def render_place_heading_view_tab(
-    *,
-    combined: CombinedCharacterGraph,
-    label_font_color: str,
-    column_layout: str = "place_lore",
-    title: str = SESSION_VIEW_TAB,
-    key: str = "place_lore_session_view_heading",
-    show_lore_notes: bool = True,
-    hide_source_document_roots=True,
-) -> None:
-    render_lore_graph_view(
-        combined,
-        definition=LoreGraphViewDefinition(
-            view_name=title,
-            source_predicate=is_place_source_document_node,
-            projection=place_lore_graph,
-            column_layout=column_layout,
-            graphviz_config_key="location_view",
-            source_empty_message="Add Place Lore To Use Heading View.",
-            heading_empty_message="Add Markdown Headings To Place Lore To Use Heading View.",
-            graph_empty_message="No Place Lore Connections Were Found For This Heading.",
-            source_key=f"{key}_source_file",
-            heading_key=key,
-            show_lore_notes=show_lore_notes,
-            hide_source_document_roots=hide_source_document_roots,
-            supports_heading_filter=True,
-        ),
-        label_font_color=label_font_color,
-    )
-
-
 def render_lore_graph(
     lore_graph: CombinedCharacterGraph,
     *,
     label_font_color: str,
     column_layout: str,
     graphviz_config_key: str = LORE_GRAPH_CONFIG.key,
+    graphviz_columns: tuple[tuple[str, ...], ...] = (),
     main_character_ids: set[str] | None = None,
     show_lore_notes: bool = False,
     hide_source_document_roots: bool = False,
 ) -> None:
-    graphviz_config = {
-        **load_graphviz_config(graphviz_config_key),
-        "column_layout": column_layout,
-    }
+    graphviz_config = graphviz_config_with_knowledge_view_overrides(
+        graphviz_config_key,
+        graphviz_columns=graphviz_columns,
+        column_layout=column_layout,
+    )
     deduplicate_source_document_nodes(lore_graph)
     note_rows = lore_information_rows(lore_graph) if show_lore_notes else []
     render_relationship_graph(
@@ -451,68 +425,6 @@ def render_lore_graph(
         relationship_rows=place_lore_connection_rows(lore_graph),
         lore_note_rows=note_rows,
         hide_source_document_roots=hide_source_document_roots
-    )
-
-
-def render_session_file_view_tab(
-    *,
-    combined: CombinedCharacterGraph,
-    label_font_color: str,
-    column_layout: str = "session_note_lore",
-    title: str = FILE_VIEW_TAB,
-    key: str = "session_lore_file_view_source_file",
-    show_lore_notes: bool = False,
-    hide_source_document_roots: bool = True,
-) -> None:
-    pending_import_source_file = st.session_state.pop("session_notes_imported_source_file", None)
-    render_lore_graph_view(
-        combined,
-        definition=LoreGraphViewDefinition(
-            view_name=title,
-            source_predicate=is_session_note_node,
-            projection=markdown_header_lore_graph,
-            column_layout=column_layout,
-            graphviz_config_key="session_view",
-            source_empty_message="Add Session Notes To Use File View.",
-            graph_empty_message="No Session Note Connections Were Found For This File.",
-            source_key=key,
-            show_lore_notes=show_lore_notes,
-            hide_source_document_roots=hide_source_document_roots,
-            supports_directory_hide_options=column_layout == "session_note_lore_directory",
-            default_source_file=pending_import_source_file,
-        ),
-        label_font_color=label_font_color,
-    )
-
-
-def render_session_heading_view_tab(
-    *,
-    combined: CombinedCharacterGraph,
-    label_font_color: str,
-    column_layout: str = "session_note_lore",
-    title: str = SESSION_VIEW_TAB,
-    key: str = "session_lore_session_view_heading",
-    show_lore_notes: bool = True,
-    hide_source_document_roots: bool = True,
-) -> None:
-    render_lore_graph_view(
-        combined,
-        definition=LoreGraphViewDefinition(
-            view_name=title,
-            source_predicate=is_session_note_node,
-            projection=markdown_header_lore_graph,
-            column_layout=column_layout,
-            graphviz_config_key="session_view",
-            source_empty_message="Add Session Notes To Use Heading View.",
-            heading_empty_message="Add Markdown Headings To Session Notes To Use Heading View.",
-            graph_empty_message="No Session Note Connections Were Found For This Heading.",
-            source_key=f"{key}_source_file",
-            heading_key=f"{key}_heading",
-            show_lore_notes=show_lore_notes,
-            hide_source_document_roots=hide_source_document_roots,
-            supports_heading_filter=True,
-        ),
-        label_font_color=label_font_color,
     )
 
 
@@ -595,6 +507,8 @@ def render_structured_character_view(
 def render_presented_relationship_graph(
     presentation: RelationshipGraphPresentation,
     label_font_color: str,
+    *,
+    graphviz_config: dict[str, Any] | None = None,
 ) -> None:
     if not presentation.has_graph:
         st.info(presentation.empty_message)
@@ -604,9 +518,37 @@ def render_presented_relationship_graph(
         main_character_ids=presentation.main_character_ids,
         main_place_ids=presentation.main_place_ids,
         label_font_color=label_font_color,
-        graphviz_config=load_graphviz_config(presentation.graphviz_config_key),
+        graphviz_config=graphviz_config
+        if graphviz_config is not None
+        else load_graphviz_config(presentation.graphviz_config_key),
         relationship_rows=presentation.relationship_rows,
     )
+
+
+def knowledge_view_graphviz_config(
+    knowledge_view: KnowledgeViewDefinition,
+    *,
+    column_layout: str | None = None,
+) -> dict[str, Any]:
+    return graphviz_config_with_knowledge_view_overrides(
+        knowledge_view.graphviz_view,
+        graphviz_columns=knowledge_view.columns,
+        column_layout=column_layout,
+    )
+
+
+def graphviz_config_with_knowledge_view_overrides(
+    graphviz_config_key: str,
+    *,
+    graphviz_columns: tuple[tuple[str, ...], ...] = (),
+    column_layout: str | None = None,
+) -> dict[str, Any]:
+    graphviz_config = load_graphviz_config(graphviz_config_key)
+    if column_layout is not None:
+        graphviz_config["column_layout"] = column_layout
+    if graphviz_columns:
+        graphviz_config["columns"] = [list(column) for column in graphviz_columns]
+    return graphviz_config
 
 
 def render_full_knowledge_graph_view(
@@ -757,20 +699,44 @@ def render_session_directory_hide_options(
     *,
     key: str,
     default_hide_file_name: bool,
+    hidden_elements: tuple[str, ...] = ("file_name", "h1", "h2", "h3"),
+    unhidden_elements: tuple[str, ...] = (),
 ) -> tuple[bool, set[int]]:
-    columns = st.columns(4)
-    with columns[0]:
-        hide_file_name = st.checkbox(
-            "Hide File Name",
-            value=default_hide_file_name,
-            key=f"{key}_file_name",
-        )
+    configured_elements = [*hidden_elements, *unhidden_elements]
+    controls = [
+        element
+        for element in ("file_name", "h1", "h2", "h3")
+        if element in configured_elements
+    ]
+    if not controls:
+        return False, set()
+    columns = st.columns([1.2, *([1] * len(controls))])
+    hide_file_name = False
     hidden_levels: set[int] = set()
-    for column, level in zip(columns[1:], (1, 2, 3)):
+    with columns[0]:
+        st.markdown("Hide Elements")
+    for column, element in zip(columns[1:], controls):
         with column:
-            if st.checkbox(f"Hide H{level} Headings", key=f"{key}_h{level}"):
-                hidden_levels.add(level)
+            default_hidden = element in hidden_elements and element not in unhidden_elements
+            if element == "file_name":
+                hide_file_name = st.checkbox(
+                    hidden_element_label(element),
+                    value=default_hidden,
+                    key=f"{key}_file_name",
+                )
+            elif element.startswith("h") and element[1:].isdigit():
+                level = int(element[1:])
+                if st.checkbox(hidden_element_label(element), value=default_hidden, key=f"{key}_h{level}"):
+                    hidden_levels.add(level)
     return hide_file_name, hidden_levels
+
+
+def hidden_element_label(element: str) -> str:
+    if element == "file_name":
+        return "File Name"
+    if element.startswith("h") and element[1:].isdigit():
+        return f"H{element[1:]} Headings"
+    return element.replace("_", " ").title()
 
 
 def lore_source_file_options(

@@ -1050,7 +1050,7 @@ def test_places_top_level_shows_character_and_place_graphs(isolated_character_ap
         place_graph_panel = graph_expander.get_by_role("tabpanel", name="Location View")
         expect(place_graph_panel.get_by_role("combobox", name="Source File", exact=True)).to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_role("combobox", name="Heading Selected", exact=True)).to_be_visible(timeout=10000)
-        for label in ("Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
+        for label in ("File Name", "H1 Headings", "H2 Headings", "H3 Headings"):
             expect(place_graph_panel.get_by_label(label, exact=True)).to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_role("img").first).to_be_visible(timeout=10000)
         expect(place_graph_panel.get_by_role("heading", name="Connections", exact=True)).to_be_visible(timeout=10000)
@@ -1189,7 +1189,7 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
         heading_select.click()
         page.keyboard.type("Ravenmark")
         page.keyboard.press("Enter")
-        for label in ("Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
+        for label in ("File Name", "H1 Headings", "H2 Headings", "H3 Headings"):
             checkbox = location_panel.get_by_label(label, exact=True)
             expect(checkbox).to_be_visible(timeout=10000)
 
@@ -1203,7 +1203,7 @@ def test_session_note_location_view_edge_labels_are_located_on_their_edges(isola
         full_tab.click()
         full_panel = graph_expander.get_by_role("tabpanel", name="Full Knowledge Graph")
         expect(full_panel.get_by_label("Hide File Name", exact=True)).to_be_visible(timeout=10000)
-        for label in ("Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
+        for label in ("H1 Headings", "H2 Headings", "H3 Headings"):
             expect(full_panel.get_by_label(label, exact=True)).not_to_be_visible(timeout=10000)
         expect(full_panel.get_by_role("combobox", name="Heading Selected", exact=True)).not_to_be_visible(timeout=10000)
         scroll_graph_image_into_view(full_panel, timeout=10000)
@@ -1242,7 +1242,7 @@ def test_session_note_directory_file_view_can_hide_headings_and_keep_context_edg
         expect(file_select).to_have_value("complex_session_graph.md", timeout=10000)
         expect(directory_panel.get_by_role("combobox", name="Heading Selected", exact=True)).to_be_visible(timeout=10000)
 
-        for label in ("Hide H1 Headings", "Hide H2 Headings", "Hide H3 Headings"):
+        for label in ("File Name", "H1 Headings", "H2 Headings", "H3 Headings"):
             checkbox = directory_panel.get_by_label(label, exact=True)
             expect(checkbox).to_be_visible(timeout=10000)
             if not checkbox.is_checked():

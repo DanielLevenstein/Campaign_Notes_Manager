@@ -9,7 +9,6 @@
   - `session_note_select_options`
   - `display_session_note_option`
   - `render_session_notes`
-  - `render_session_file_view_tab`
   - `render_session_import_heading_dialog`
 - `graphviz_rendering.py`
   - `render_lore_file_filter`

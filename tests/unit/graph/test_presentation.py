@@ -74,5 +74,5 @@ def test_party_view_is_wired_through_presentation_layer():
     rendering_source = (PROJECT_ROOT / "src" / "rendering" / "graphviz_rendering.py").read_text(encoding="utf-8")
 
     assert "party_view=party_view_presentation(projection)" in app_source
-    assert "render_party_view_tab(party_view, label_font_color)" in rendering_source
+    assert "render_party_view_tab(party_view, label_font_color, knowledge_view=knowledge_view)" in rendering_source
     assert "def render_character_data_only_graph_view" not in rendering_source

@@ -71,9 +71,9 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 
 ## Phase 0 Knowledge View Definition Migration
 - [x] Create a design doc for knowledge view definition migration.
-- [ ] Add typed dataclasses for knowledge view definitions.
-- [ ] Add a config loader with inheritance and validation.
-- [ ] Add app-facing config files for Location View and Session View.
+- [x] Add typed dataclasses for knowledge view definitions.
+- [x] Add a config loader with inheritance and validation.
+- [x] Add app-facing stub config files for Character View, Party View, Location View, and Session View.
 - [ ] Migrate directory views to loaded definitions while keeping existing projection functions.
 - [ ] Verify source-file filters, heading filters, hide-source controls, hide-heading controls, graph rendering, and connection tables.
 

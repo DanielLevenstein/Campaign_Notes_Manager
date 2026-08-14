@@ -8,16 +8,14 @@ from src.graph.combined_graph import (
     combined_relationship_dot,
 )
 from src.graph.graphviz_config import load_graphviz_config
+from src.graph.knowledge_view_config import load_knowledge_view_definition, load_knowledge_view_definitions
 from src.rendering.graphviz_rendering import (
     FULL_KNOWLEDGE_GRAPH_TAB,
-    PARTY_VIEW_TAB,
-    PLACES_FILE_VIEW_TAB,
-    SINGLE_CHARACTER_TAB,
-    SESSION_FILE_VIEW_TAB,
     graph_without_lore_source_knots,
     graph_tab_names,
-    lore_graph_view_definitions,
+    directory_lore_graph_view_definition,
     lore_context_edge_direction,
+    hidden_element_label,
     place_lore_connection_rows,
     lore_graph_connection_rows,
     place_lore_graph,
@@ -27,6 +25,9 @@ from src.rendering.graphviz_rendering import (
     graph_without_source_document_roots,
     graph_without_markdown_heading_levels,
     project_lore_graph_for_view,
+    render_session_directory_hide_options,
+    knowledge_view_graphviz_config,
+    graphviz_config_with_knowledge_view_overrides,
     render_lore_graph,
     LoreGraphViewSelection,
 )
@@ -34,15 +35,13 @@ from src.rendering.graphviz_rendering import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 TEST_GRAPHVIZ_CONFIG_DIR = PROJECT_ROOT / "tests" / "fixtures" / "graphviz"
+TEST_KNOWLEDGE_VIEW_CONFIG_DIR = PROJECT_ROOT / "tests" / "fixtures" / "knowledge_views"
 
 
-def test_graph_tabs_follow_active_main_tab():
-    expected_tabs = [
-        SINGLE_CHARACTER_TAB,
-        PARTY_VIEW_TAB,
-        PLACES_FILE_VIEW_TAB,
-        SESSION_FILE_VIEW_TAB,
-    ]
+def test_graph_tabs_follow_active_main_tab(monkeypatch):
+    definitions = load_knowledge_view_definitions(TEST_KNOWLEDGE_VIEW_CONFIG_DIR)
+    monkeypatch.setattr("src.rendering.graphviz_rendering.load_knowledge_view_definitions", lambda: definitions)
+    expected_tabs = [definition.view_name for definition in definitions]
     experimental_tabs = [*expected_tabs, FULL_KNOWLEDGE_GRAPH_TAB]
 
     assert graph_tab_names("Characters") == expected_tabs
@@ -51,26 +50,221 @@ def test_graph_tabs_follow_active_main_tab():
     assert graph_tab_names("Characters", include_full_knowledge_graph=True) == experimental_tabs
 
 
-def test_lore_view_definitions_standardize_source_and_heading_projection_contracts():
-    place_views = lore_graph_view_definitions("Places")
-    session_views = lore_graph_view_definitions("Session Notes", default_session_source_file="Session_Notes.md")
+def test_directory_knowledge_view_adapter_standardizes_source_and_heading_projection_contracts():
+    location_view = load_knowledge_view_definition("location_view", TEST_KNOWLEDGE_VIEW_CONFIG_DIR)
+    loaded_session_view = load_knowledge_view_definition("session_view", TEST_KNOWLEDGE_VIEW_CONFIG_DIR)
+    place_view = directory_lore_graph_view_definition(location_view)
+    session_view = directory_lore_graph_view_definition(
+        loaded_session_view,
+        default_source_file="Session_Notes.md",
+    )
 
-    assert set(place_views) == {PLACES_FILE_VIEW_TAB, SESSION_FILE_VIEW_TAB}
-    assert set(session_views) == {PLACES_FILE_VIEW_TAB, SESSION_FILE_VIEW_TAB}
-    assert place_views[PLACES_FILE_VIEW_TAB].view_name == PLACES_FILE_VIEW_TAB
-    assert place_views[PLACES_FILE_VIEW_TAB].graphviz_config_key == "location_view"
-    assert place_views[PLACES_FILE_VIEW_TAB].source_key == "location_view_source_file"
-    assert place_views[PLACES_FILE_VIEW_TAB].heading_key == "location_view_heading"
-    assert place_views[PLACES_FILE_VIEW_TAB].supports_heading_filter is True
-    assert place_views[PLACES_FILE_VIEW_TAB].supports_directory_hide_options is True
-    assert place_views[PLACES_FILE_VIEW_TAB].include_all_heading_option is True
-    assert session_views[SESSION_FILE_VIEW_TAB].view_name == SESSION_FILE_VIEW_TAB
-    assert session_views[SESSION_FILE_VIEW_TAB].graphviz_config_key == "session_view"
-    assert session_views[SESSION_FILE_VIEW_TAB].source_key == "session_view_source_file"
-    assert session_views[SESSION_FILE_VIEW_TAB].heading_key == "session_view_heading"
-    assert session_views[SESSION_FILE_VIEW_TAB].default_source_file == "Session_Notes.md"
-    assert session_views[SESSION_FILE_VIEW_TAB].supports_heading_filter is True
-    assert session_views[SESSION_FILE_VIEW_TAB].supports_directory_hide_options is True
+    assert place_view.view_name == location_view.view_name
+    assert place_view.graphviz_config_key == "default_view_fixture"
+    assert place_view.graphviz_columns == (
+        ("source_files", "h1", "places"),
+        ("h2",),
+        ("h3",),
+        ("groups",),
+        ("artifacts",),
+        ("linked_characters",),
+    )
+    assert place_view.source_key == "location_view_source_file"
+    assert place_view.heading_key == "location_view_heading"
+    assert place_view.supports_heading_filter is True
+    assert place_view.supports_directory_hide_options is True
+    assert place_view.include_all_heading_option is True
+    assert place_view.hide_source_document_roots is False
+    assert place_view.hidden_elements == ("file_name",)
+    assert place_view.unhidden_elements == ("h1", "h2", "h3")
+    assert session_view.view_name == loaded_session_view.view_name
+    assert session_view.graphviz_config_key == "default_view_fixture"
+    assert session_view.graphviz_columns == (
+        ("source_files",),
+        ("h1", "places"),
+        ("main_characters",),
+        ("h2", "groups", "artifacts"),
+        ("h3",),
+        ("secondary_characters",),
+    )
+    assert session_view.source_key == "session_view_source_file"
+    assert session_view.heading_key == "session_view_heading"
+    assert session_view.default_source_file == "Session_Notes.md"
+    assert session_view.supports_heading_filter is True
+    assert session_view.supports_directory_hide_options is True
+    assert session_view.hide_source_document_roots is False
+    assert session_view.hidden_elements == ("file_name", "h1", "h2", "h3")
+    assert session_view.unhidden_elements == ("file_name",)
+
+
+def test_knowledge_view_columns_override_graphviz_columns(monkeypatch):
+    location_view = load_knowledge_view_definition("location_view", TEST_KNOWLEDGE_VIEW_CONFIG_DIR)
+
+    monkeypatch.setattr(
+        "src.rendering.graphviz_rendering.load_graphviz_config",
+        lambda view_key: {
+            "view_key": view_key,
+            "columns": [["graphviz_column"]],
+            "graph": {"rankdir": "LR"},
+        },
+    )
+
+    graphviz_config = knowledge_view_graphviz_config(
+        location_view,
+        column_layout="place_lore_directory",
+    )
+
+    assert graphviz_config["view_key"] == "default_view_fixture"
+    assert graphviz_config["graph"] == {"rankdir": "LR"}
+    assert graphviz_config["column_layout"] == "place_lore_directory"
+    assert graphviz_config["columns"] == [
+        ["source_files", "h1", "places"],
+        ["h2"],
+        ["h3"],
+        ["groups"],
+        ["artifacts"],
+        ["linked_characters"],
+    ]
+
+
+def test_graphviz_columns_remain_when_knowledge_view_has_no_column_override(monkeypatch):
+    monkeypatch.setattr(
+        "src.rendering.graphviz_rendering.load_graphviz_config",
+        lambda view_key: {
+            "view_key": view_key,
+            "columns": [["graphviz_column"]],
+        },
+    )
+
+    graphviz_config = graphviz_config_with_knowledge_view_overrides("default_view_fixture")
+
+    assert graphviz_config["columns"] == [["graphviz_column"]]
+
+
+def test_hidden_element_labels_use_config_field_names():
+    assert hidden_element_label("file_name") == "File Name"
+    assert hidden_element_label("h1") == "H1 Headings"
+    assert hidden_element_label("h2") == "H2 Headings"
+    assert hidden_element_label("custom_field") == "Custom Field"
+
+
+def test_unhidden_element_controls_start_unchecked(monkeypatch):
+    class Column:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    checkbox_defaults = []
+    markdown_values = []
+
+    def fake_columns(spec):
+        assert spec == [1.2, 1, 1, 1, 1]
+        return [Column() for _ in spec]
+
+    def fake_checkbox(label, *, value=False, key):
+        checkbox_defaults.append((label, value, key))
+        return value
+
+    monkeypatch.setattr("src.rendering.graphviz_rendering.st.columns", fake_columns)
+    monkeypatch.setattr("src.rendering.graphviz_rendering.st.checkbox", fake_checkbox)
+    monkeypatch.setattr("src.rendering.graphviz_rendering.st.markdown", markdown_values.append)
+
+    hide_file_name, hidden_levels = render_session_directory_hide_options(
+        key="session_view_source_file_hidden_elements",
+        default_hide_file_name=True,
+        hidden_elements=(),
+        unhidden_elements=("file_name", "h1", "h2", "h3"),
+    )
+
+    assert hide_file_name is False
+    assert hidden_levels == set()
+    assert markdown_values == ["Hide Elements"]
+    assert checkbox_defaults == [
+        ("File Name", False, "session_view_source_file_hidden_elements_file_name"),
+        ("H1 Headings", False, "session_view_source_file_hidden_elements_h1"),
+        ("H2 Headings", False, "session_view_source_file_hidden_elements_h2"),
+        ("H3 Headings", False, "session_view_source_file_hidden_elements_h3"),
+    ]
+
+
+def test_hidden_element_controls_start_checked_for_hidden_config(monkeypatch):
+    class Column:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    checkbox_defaults = []
+
+    def fake_columns(spec):
+        assert spec == [1.2, 1, 1, 1, 1]
+        return [Column() for _ in spec]
+
+    def fake_checkbox(label, *, value=False, key):
+        checkbox_defaults.append((label, value, key))
+        return value
+
+    monkeypatch.setattr("src.rendering.graphviz_rendering.st.columns", fake_columns)
+    monkeypatch.setattr("src.rendering.graphviz_rendering.st.checkbox", fake_checkbox)
+    monkeypatch.setattr("src.rendering.graphviz_rendering.st.markdown", lambda value: None)
+
+    hide_file_name, hidden_levels = render_session_directory_hide_options(
+        key="location_view_source_file_hidden_elements",
+        default_hide_file_name=False,
+        hidden_elements=("file_name", "h2"),
+        unhidden_elements=("h1", "h3"),
+    )
+
+    assert hide_file_name is True
+    assert hidden_levels == {2}
+    assert checkbox_defaults == [
+        ("File Name", True, "location_view_source_file_hidden_elements_file_name"),
+        ("H1 Headings", False, "location_view_source_file_hidden_elements_h1"),
+        ("H2 Headings", True, "location_view_source_file_hidden_elements_h2"),
+        ("H3 Headings", False, "location_view_source_file_hidden_elements_h3"),
+    ]
+
+
+def test_unhidden_elements_override_hidden_elements_for_default_visibility(monkeypatch):
+    class Column:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    checkbox_defaults = []
+
+    def fake_columns(spec):
+        assert spec == [1.2, 1, 1, 1, 1]
+        return [Column() for _ in spec]
+
+    def fake_checkbox(label, *, value=False, key):
+        checkbox_defaults.append((label, value, key))
+        return value
+
+    monkeypatch.setattr("src.rendering.graphviz_rendering.st.columns", fake_columns)
+    monkeypatch.setattr("src.rendering.graphviz_rendering.st.checkbox", fake_checkbox)
+    monkeypatch.setattr("src.rendering.graphviz_rendering.st.markdown", lambda value: None)
+
+    hide_file_name, hidden_levels = render_session_directory_hide_options(
+        key="session_view_source_file_hidden_elements",
+        default_hide_file_name=True,
+        hidden_elements=("file_name", "h1", "h2", "h3"),
+        unhidden_elements=("file_name",),
+    )
+
+    assert hide_file_name is False
+    assert hidden_levels == {1, 2, 3}
+    assert checkbox_defaults == [
+        ("File Name", False, "session_view_source_file_hidden_elements_file_name"),
+        ("H1 Headings", True, "session_view_source_file_hidden_elements_h1"),
+        ("H2 Headings", True, "session_view_source_file_hidden_elements_h2"),
+        ("H3 Headings", True, "session_view_source_file_hidden_elements_h3"),
+    ]
 
 
 def test_lore_context_edges_point_from_character_to_semantic_lore_nodes():
@@ -184,13 +378,14 @@ def test_heading_view_projection_applies_source_file_before_heading_filter(tmp_p
         ],
     )
     heading_id = "source_heading__sourcedocumentatlantialore__line_3__harbor"
-    definition = lore_graph_view_definitions("Places")[PLACES_FILE_VIEW_TAB]
+    location_view = load_knowledge_view_definition("location_view", TEST_KNOWLEDGE_VIEW_CONFIG_DIR)
+    definition = directory_lore_graph_view_definition(location_view)
 
     projected = project_lore_graph_for_view(
         graph,
         definition=definition,
         selection=LoreGraphViewSelection(
-            view_name=PLACES_FILE_VIEW_TAB,
+            view_name=location_view.view_name,
             source_file=str(atlantia_path),
             heading_id=heading_id,
             hide_source_document_roots=True,

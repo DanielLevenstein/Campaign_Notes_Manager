@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.1.0",
+  "config_scope": "knowledge_view",
+  "view_name": "Session View",
+  "description": "Directory-style graph for a selected session-note source file or heading.",
+  "source_fixtures": [
+    "tests/fixtures/character_sheets",
+    "tests/fixtures/session_notes/complex_session_graph.md"
+  ],
+  "hidden_elements": [
+    "file_name",
+    "h1",
+    "h2",
+    "h3"
+  ],
+  "unhidden_elements": [
+    "h1"
+  ],
+  "columns": [
+    ["source_files", "h1"],
+    [ "places"],
+    ["main_characters"],
+    ["h2", "groups", "artifacts"],
+    ["h3"],
+    ["secondary_characters"]
+  ],
+  "graphviz_view": "default_view_fixture",
+  "projection": "markdown_header_lore_graph",
+  "source_predicate": "session_notes",
+  "column_layout": "session_note_lore_directory",
+  "source_key": "session_view_source_file",
+  "heading_key": "session_view_heading",
+  "include_all_heading_option": true,
+  "source_empty_message": "Add Session Notes To Use Session View.",
+  "heading_empty_message": "Add Markdown Headings To Session Notes To Use Session View.",
+  "graph_empty_message": "No Session Note Connections Were Found For This File.",
+  "migration_status": "stub"
+}

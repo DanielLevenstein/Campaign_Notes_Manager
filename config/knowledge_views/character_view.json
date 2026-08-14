@@ -1,0 +1,18 @@
+{
+  "schema_version": "0.1.0",
+  "config_scope": "knowledge_view",
+  "view_name": "Character View",
+  "description": "Focused graph for a selected character or place root.",
+  "source_fixtures": [
+    "tests/fixtures/character_sheets"
+  ],
+  "columns": [
+    ["main_characters"],
+    ["family_names", "places", "groups"],
+    ["secondary_characters", "artifacts"]
+  ],
+  "hidden_elements": [],
+  "unhidden_elements": [],
+  "graphviz_view": "character_view",
+  "migration_status": "stub"
+}

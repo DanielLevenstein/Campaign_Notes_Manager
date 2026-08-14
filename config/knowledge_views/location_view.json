@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.1.0",
+  "config_scope": "knowledge_view",
+  "view_name": "Location View",
+  "description": "Directory-style graph for a selected place-lore source file or heading.",
+  "source_fixtures": [
+    "tests/fixtures/character_sheets",
+    "tests/fixtures/places/Atlantia_Lore.md",
+    "tests/fixtures/session_notes/Family_Tree.md"
+  ],
+  "hidden_elements": [
+    "file_name"
+  ],
+  "unhidden_elements": [
+    "h1",
+    "h2",
+    "h3"
+  ],
+  "columns": [
+    ["source_files", "h1", "places"],
+    ["h2"],
+    ["h3"],
+    ["groups"],
+    ["artifacts"],
+    ["linked_characters"]
+  ],
+  "graphviz_view": "default_view_fixture",
+  "projection": "place_lore_graph",
+  "source_predicate": "places",
+  "column_layout": "place_lore_directory",
+  "source_key": "location_view_source_file",
+  "heading_key": "location_view_heading",
+  "include_all_heading_option": true,
+  "source_empty_message": "Add Place Lore To Use Location View.",
+  "heading_empty_message": "Add Markdown Headings To Place Lore To Use Location View.",
+  "graph_empty_message": "No Place Lore Connections Were Found For This File.",
+  "migration_status": "stub"
+}

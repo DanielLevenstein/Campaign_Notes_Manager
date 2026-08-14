@@ -32,9 +32,9 @@
     }
   },
   "columns": [
-    ["family_names", "artifacts", "groups"],
+    ["family_names", "places", "groups"],
     ["main_characters"],
-    ["secondary_characters", "places"]
+    ["secondary_characters", "artifacts"]
   ],
   "editing_notes": [
     "Override only values that should differ from config/graphviz/global_graph_view.json.",

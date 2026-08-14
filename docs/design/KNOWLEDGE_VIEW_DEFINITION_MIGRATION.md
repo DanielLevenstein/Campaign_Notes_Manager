@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document captures a backlog migration for making knowledge graph views data-driven in the main Streamlit app.
+This document captures the Phase 0 migration roadmap for the next release. The work makes knowledge graph views data-driven in the main Streamlit app before the context-aware edge phases depend on those views.
 
 The current branch has three related concepts that are useful but not fully unified:
 
@@ -12,7 +12,7 @@ The current branch has three related concepts that are useful but not fully unif
 
 The migration goal is to turn graph view definitions and Graphviz config into one hierarchical view-definition system used by the app, tests, and documentation. The renderer should execute view definitions instead of carrying custom per-view branching logic.
 
-This is backlog work. It does not need to happen on the current `feature/knowledge_graph3` branch.
+This is planned as next-release Phase 0 work. It does not need to happen on the current `feature/knowledge_graph3` branch, but the design should remain small enough that the migration can be back-ported if the current release needs the hierarchical view-definition path.
 
 ## Problem
 
@@ -39,17 +39,14 @@ Knowledge graph views should be defined by a hierarchical configuration model.
 
 At minimum, each app-facing view definition should declare:
 
-- Stable `view_key`.
-- User-facing `label`.
-- Top-level graph families or app tabs where it appears.
-- Projection strategy.
-- Source predicate strategy.
-- Graphviz config key.
-- Column layout key when still needed by the graph projection/layout engine.
-- UI controls.
-- Table policy.
-- Empty-state messages.
-- Optional screenshot or fixture metadata for tests.
+- `view_name`.
+- `graphviz_view`.
+- `source_fixtures`.
+- `hidden_elements`.
+- `unhidden_elements`.
+- Optional `columns`.
+
+Additional renderer, projection, table, and empty-state behavior can be added later after the stubs prove useful. Phase 0 should not commit to those execution details too early.
 
 The Streamlit renderer should be mostly generic:
 
@@ -66,7 +63,6 @@ The exact file layout can change, but the preferred direction is to add app-faci
 
 ```text
 config/knowledge_views/
-  global_view_defaults.json
   character_view.json
   party_view.json
   location_view.json
@@ -79,36 +75,31 @@ Example:
 ```json
 {
   "schema_version": "0.1.0",
-  "view_key": "session_view",
-  "label": "Session View",
+  "view_name": "Session View",
   "description": "Directory-style graph for a selected session-note source file or heading.",
-  "inherits": "config/knowledge_views/global_view_defaults.json",
-  "visible_in": ["Characters", "Places", "Session Notes"],
-  "projection": {
-    "strategy": "markdown_header_lore_graph",
-    "source_predicate": "session_notes",
-    "fanout_linked_characters": true
-  },
-  "controls": {
-    "source_file": true,
-    "heading": true,
-    "include_all_heading_option": true,
-    "hide_source_document_roots": true,
-    "hide_heading_levels": [1, 2, 3]
-  },
-  "graphviz": {
-    "config_key": "session_view",
-    "column_layout": "session_note_lore_directory"
-  },
-  "tables": {
-    "connections": "character_connections_only",
-    "lore_notes": false
-  },
-  "empty_states": {
-    "source": "Add Session Notes To Use Session View.",
-    "heading": "Add Markdown Headings To Session Notes To Use Session View.",
-    "graph": "No Session Note Connections Were Found For This File."
-  }
+  "source_fixtures": [
+    "tests/fixtures/character_sheets",
+    "tests/fixtures/session_notes/complex_session_graph.md"
+  ],
+  "hidden_elements": [
+    "file_name",
+    "h1",
+    "h2",
+    "h3"
+  ],
+  "unhidden_elements": [
+    "file_name"
+  ],
+  "columns": [
+    ["source_files"],
+    ["h1", "places"],
+    ["main_characters"],
+    ["h2", "groups", "artifacts"],
+    ["h3"],
+    ["secondary_characters"]
+  ],
+  "graphviz_view": "heading_view",
+  "migration_status": "stub"
 }
 ```
 
@@ -124,7 +115,7 @@ Graphviz config should remain focused on DOT rendering behavior:
 - Constraint policy.
 - Invisible layout guides.
 
-Knowledge view definitions should reference Graphviz config by key rather than duplicating style/layout values.
+Knowledge view definitions should reference Graphviz config with `graphviz_view` rather than duplicating DOT styling values. Semantic column grouping can live in knowledge view definitions because it describes the view, not the Graphviz renderer.
 
 The hierarchy should look like:
 
@@ -133,19 +124,26 @@ knowledge view definition
   -> projection strategy
   -> control contract
   -> table policy
-  -> graphviz config key
+  -> graphviz_view
        -> global graphviz defaults
        -> shared heading/directory graphviz config
-       -> concrete view graphviz override
 ```
 
 This keeps app behavior and DOT rendering related but separate.
 
+Knowledge views should not have a `global_view_defaults.json` or `inherits` chain. Each knowledge view file should be explicit. This avoids recreating the hierarchy confusion this migration is meant to remove.
+
+During the transition, Graphviz configs may still contain `columns` for compatibility. Once the renderer reads `knowledge_views.columns`, `config/graphviz/location_view.json` and `config/graphviz/session_view.json` can be deleted and both app views can use `graphviz_view: "heading_view"`.
+
 ## Python Registry
 
-The config should not contain Python import paths. It should use stable strategy names resolved by a registry.
+The Phase 0 stubs should not contain Python import paths or strategy names. They only identify the view, source fixtures, hidden and unhidden elements, optional columns, and the backing Graphviz view.
 
-Initial registries:
+When rendered as UI controls, the union of `hidden_elements` and `unhidden_elements` appears in the `Hide Elements` row. Entries in `hidden_elements` start checked, and entries in `unhidden_elements` start unchecked. If an element appears in both lists, `unhidden_elements` wins so the element is listed but visible by default.
+
+When runtime migration starts, renderer and projection behavior should be added through stable strategy names resolved by a registry.
+
+Possible future registries:
 
 - Projection strategies:
   - `focused_character_graph`
@@ -172,45 +170,165 @@ Small Python registries are acceptable. The migration target is to remove custom
 
 ## Migration Plan
 
-### Phase 1: Model And Loader
+### Phase 0.1: Model And Loader
 
 - Add typed dataclasses for knowledge view definitions.
 - Add a config loader with inheritance and validation.
 - Add tests for merge order, unknown strategy names, missing required fields, and malformed control/table declarations.
 - Keep the existing renderer unchanged.
 
-### Phase 2: Promote Test Fixtures Into View Contracts
+### Phase 0.2: Promote Test Fixtures Into View Contracts
 
 - Add app-facing config files for Character View, Party View, Location View, Session View, and Full Knowledge Graph.
 - Cross-check the new configs against `tests/fixtures/graph_views/*.json`.
 - Decide whether test fixtures should become generated from app config or remain scenario-specific fixtures that reference app config keys.
 
-### Phase 3: Migrate Directory Views First
+### Phase 0.3: Migrate Directory Views First
 
 - Replace Python-defined `LoreGraphViewDefinition` objects for Location View and Session View with loaded configs.
 - Keep existing projection functions.
 - Keep existing Graphviz config files.
 - Verify source-file filters, heading filters, hide-source controls, hide-heading controls, graph rendering, and connection tables.
 
-### Phase 4: Migrate Party And Character Views
+### Phase 0.4: Migrate Party And Character Views
 
 - Move Party View into a `presented_relationship_graph` renderer strategy.
 - Move Character View into a `focused_root_selector` renderer strategy.
 - Keep strategy-specific code small and isolated.
 - Remove duplicate tab and view-name branching from `graphviz_rendering.py`.
 
-### Phase 5: Migrate Full Knowledge Graph
+### Phase 0.5: Migrate Full Knowledge Graph
 
 - Add a `full_graph` renderer strategy.
 - Define hide-source-file and future hide-heading controls in config.
 - Keep this separate from the legacy Month Selection view until that view is intentionally retired or migrated.
 
-### Phase 6: Cleanup And Documentation
+### Phase 0.6: Cleanup And Documentation
 
 - Delete obsolete compatibility wrappers once all callers use the new definitions.
 - Update `docs/specs/KNOWLEDGE_GRAPH_UI_SPEC.md` and `docs/specs/GRAPH_PROJECTION_SPEC.md`.
 - Update screenshot fixtures or regenerate them if the rendered view structure intentionally changes.
 - Add a short README for `config/knowledge_views/`.
+
+## Old View Retirement Plan
+
+The migration is not complete until the app has one active knowledge-view path and the old Graphviz-view-specific path is removed. The desired final state is:
+
+- `config/knowledge_views/*.json` defines every app-visible graph view.
+- `config/graphviz/*.json` defines only Graphviz styling and shared renderer behavior.
+- `graphviz_rendering.py` renders loaded view definitions instead of branching on hardcoded tab names.
+- Location View and Session View both use `graphviz_view: "heading_view"` plus their own `columns`.
+- `config/graphviz/location_view.json` and `config/graphviz/session_view.json` are deleted.
+- Tests load the same view definitions as the app instead of maintaining parallel graph-view scenario contracts.
+
+### Retirement Step 1: Freeze Legacy View Additions
+
+- Treat `config/graphviz/location_view.json` and `config/graphviz/session_view.json` as compatibility-only files.
+- Do not add new app behavior to Graphviz configs.
+- Do not add new hardcoded graph tab names to `graphviz_rendering.py`.
+- Add a short comment or test assertion that Location View and Session View must resolve through `knowledge_views`.
+
+Exit gate:
+
+- Unit tests prove `graph_tab_names()` and directory view definitions load from `config/knowledge_views`.
+
+### Retirement Step 2: Move Remaining View Semantics Into Knowledge Views
+
+Add the missing app semantics to each knowledge view definition only when the renderer needs them:
+
+- Renderer strategy.
+- Projection strategy.
+- Source predicate.
+- Source and heading control labels.
+- Empty-state messages.
+- Connection table policy.
+
+Keep these as stable string keys resolved by Python registries. Do not put Python import paths in JSON.
+
+Exit gate:
+
+- Character View, Party View, Location View, and Session View can each be constructed from `KnowledgeViewDefinition` without custom tab-name branching.
+
+### Retirement Step 3: Replace Legacy Directory View Construction
+
+- Remove direct Python construction of Location View and Session View from the renderer.
+- Replace it with a generic directory-view adapter that consumes loaded knowledge view definitions.
+- Inject `knowledge_view.columns` into the loaded Graphviz config.
+- Keep `column_layout` only as an internal transition field while `combined_graph.py` still needs it.
+
+Exit gate:
+
+- Location View and Session View screenshots match or intentionally update approved fixtures.
+- Source-file filters, heading filters, and Hide Elements controls work from loaded config.
+- No runtime call loads `config/graphviz/location_view.json` or `config/graphviz/session_view.json`.
+
+### Retirement Step 4: Delete Redundant Graphviz View Files
+
+Delete:
+
+```text
+config/graphviz/location_view.json
+config/graphviz/session_view.json
+tests/fixtures/graphviz/location_view.json
+tests/fixtures/graphviz/session_view.json
+```
+
+Update tests that referenced those files to use:
+
+- `config/knowledge_views/location_view.json`
+- `config/knowledge_views/session_view.json`
+- `config/graphviz/heading_view.json`
+
+Exit gate:
+
+- `rg '"location_view"|"session_view"' config/graphviz tests/fixtures/graphviz src tests` shows no Graphviz config-key dependency on deleted files.
+- Graphviz config tests prove `heading_view` remains the shared Graphviz base for directory views.
+
+### Retirement Step 5: Retire Legacy View Constants And Compatibility Wrappers
+
+Delete or reduce legacy constants, compatibility wrappers, and standalone render helpers when no longer needed.
+
+Keep constants only when they are stable public labels used by tests and app config.
+
+Exit gate:
+
+- `graphviz_rendering.py` has one entry point for rendering loaded graph views.
+- There is no code path that renders Directory View, Heading View, Directory File View, Directory Section View, or Place Lore as app-visible tabs.
+
+### Retirement Step 6: Merge Test Scenario And App Config Contracts
+
+- Decide whether `tests/fixtures/graph_views/*.json` should reference app `view_key`s or be generated from `config/knowledge_views`.
+- Remove duplicate fields from test fixtures when they are already owned by app config.
+- Keep screenshot-specific fields, source fixture bundles, and expected table assertions in test fixtures if they are test-only concerns.
+- Keep unit-test knowledge view fixtures under `tests/fixtures/knowledge_views` so test data does not depend on live production config while the UI migration is still settling.
+
+Exit gate:
+
+- A change to a knowledge view's `view_name`, `columns`, `hidden_elements`, `unhidden_elements`, or `graphviz_view` affects both app behavior and view-contract tests.
+- No test passes because it uses an old fixture definition that the app ignores.
+
+### Retirement Step 7: Final Guardrails
+
+Add tests that fail if legacy paths reappear:
+
+- No `config/graphviz/location_view.json` or `config/graphviz/session_view.json` files exist.
+- Directory views reference `graphviz_view: "heading_view"`.
+- `graphviz_rendering.py` loads view names from `config/knowledge_views`.
+- No hardcoded app-visible graph tab list exists outside the knowledge view loader.
+- No Graphviz config file contains app-facing source fixture or hidden-element settings.
+
+Retirement is complete when those guardrails pass and the app has no fallback path for the old view definitions.
+
+## Back-Port Option
+
+If this work needs to be back-ported into the current release, keep the scope to the smallest useful vertical slice:
+
+- Add the typed definition loader.
+- Add Location View and Session View configs.
+- Route only the directory-style views through loaded definitions.
+- Leave Character View, Party View, Full Knowledge Graph, and Month Selection on their current code paths.
+
+This provides the hierarchical view-definition path without forcing the whole renderer migration into the release branch.
 
 ## Testing Strategy
 
@@ -261,4 +379,3 @@ Recommended first milestone:
 - Keep Character View and Party View on their current renderer strategies until the directory views prove the approach.
 
 This gives the app a real hierarchical view-definition path while keeping the blast radius contained.
-

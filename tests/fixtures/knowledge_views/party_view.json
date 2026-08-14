@@ -1,0 +1,18 @@
+{
+  "schema_version": "0.1.0",
+  "config_scope": "knowledge_view",
+  "view_name": "Party View",
+  "description": "Character-sheet-only relationship graph for party and character connection review.",
+  "source_fixtures": [
+    "tests/fixtures/character_sheets"
+  ],
+  "columns": [
+    ["Family Names"],
+    ["Main Characters"],
+    ["Secondary Characters & Places"]
+  ],
+  "hidden_elements": [],
+  "unhidden_elements": [],
+  "graphviz_view": "default_view_fixture",
+  "migration_status": "stub"
+}

@@ -1,5 +1,5 @@
 # TODO
-- [ ] Backlog the hierarchical knowledge view definition migration described in `docs/design/KNOWLEDGE_VIEW_DEFINITION_MIGRATION.md`.
+- [ ] Track the Phase 0 hierarchical knowledge view definition migration described in `docs/design/KNOWLEDGE_VIEW_DEFINITION_MIGRATION.md`, with optional back-porting if the current release needs it.
 - [ ] Rename the graph schema root from `primary_character` to a type-neutral primary node after node-type normalization is stable, and migrate validation, persistence, projections, fixtures, and generated `.graph.json` files to the new field.
 - [ ] Move constants out of session_entities.py
 ## Pre-Context-Aware Edge Bug Fixes
