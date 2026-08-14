@@ -7,9 +7,9 @@
     "tests/fixtures/character_sheets"
   ],
   "columns": [
-    ["Family Names"],
-    ["Main Characters"],
-    ["Secondary Characters & Places"]
+    ["family_names", "artifacts", "groups"],
+    ["main_characters"],
+    ["secondary_characters", "places"]
   ],
   "hidden_elements": [],
   "unhidden_elements": [],

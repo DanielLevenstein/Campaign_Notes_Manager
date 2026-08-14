@@ -6,9 +6,12 @@
   "top_level_tab": "Characters",
   "screenshot": "Characters_Graph_Party_View.png",
   "columns": [
-    "Family Names",
-    "Main Characters",
-    "Secondary Characters & Places"
+    "family_names",
+    "artifacts",
+    "groups",
+    "main_characters",
+    "secondary_characters",
+    "places"
   ],
   "source_fixtures": [
     "tests/fixtures/character_sheets"

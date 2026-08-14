@@ -141,6 +141,27 @@ def test_graphviz_columns_remain_when_knowledge_view_has_no_column_override(monk
     assert graphviz_config["columns"] == [["graphviz_column"]]
 
 
+def test_party_knowledge_view_columns_override_graphviz_columns(monkeypatch):
+    party_view = load_knowledge_view_definition("party_view", TEST_KNOWLEDGE_VIEW_CONFIG_DIR)
+
+    monkeypatch.setattr(
+        "src.rendering.graphviz_rendering.load_graphviz_config",
+        lambda view_key: {
+            "view_key": view_key,
+            "columns": [["graphviz_column"]],
+        },
+    )
+
+    graphviz_config = knowledge_view_graphviz_config(party_view)
+
+    assert graphviz_config["view_key"] == "default_view_fixture"
+    assert graphviz_config["columns"] == [
+        ["family_names", "artifacts", "groups"],
+        ["main_characters"],
+        ["secondary_characters", "places"],
+    ]
+
+
 def test_hidden_element_labels_use_config_field_names():
     assert hidden_element_label("file_name") == "File Name"
     assert hidden_element_label("h1") == "H1 Headings"

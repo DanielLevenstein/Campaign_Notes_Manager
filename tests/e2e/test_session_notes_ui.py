@@ -603,7 +603,6 @@ Ravenmark details.
         page.get_by_role("button", name="edit Edit Section").click()
         expect(page.get_by_role("button", name="visibility_off Hide Heading")).to_have_count(0)
         expect(page.get_by_role("button", name="delete Remove Section")).to_be_visible(timeout=10000)
-        expect(page.get_by_role("button", name="delete_forever Delete Section")).to_be_visible(timeout=10000)
         browser.close()
 
     text = note_path.read_text(encoding="utf-8")

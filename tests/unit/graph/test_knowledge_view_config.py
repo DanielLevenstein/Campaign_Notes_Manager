@@ -92,6 +92,16 @@ def test_directory_knowledge_view_stubs_expose_source_fixtures_and_hidden_elemen
     assert session.graph_empty_message == "No Session Note Connections Were Found For This File."
 
 
+def test_party_knowledge_view_uses_internal_column_keys():
+    party = load_knowledge_view_definition("party_view", TEST_KNOWLEDGE_VIEW_CONFIG_DIR)
+
+    assert party.columns == (
+        ("family_names", "artifacts", "groups"),
+        ("main_characters",),
+        ("secondary_characters", "places"),
+    )
+
+
 def test_knowledge_view_config_loads_explicit_view_without_defaults(tmp_path):
     config_dir = tmp_path / "knowledge_views"
     config_dir.mkdir()
