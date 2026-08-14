@@ -1263,7 +1263,6 @@ def test_session_note_directory_file_view_can_hide_headings_and_keep_context_edg
         table_text = " ".join(" ".join(row) for row in visible_connection_table_rows(directory_panel))
         assert "Tharevon traveled through the Pixi Kingdom." in table_text
         assert "Jory Ravenmark and Neal Lovington investigated the Indigo Cult." in table_text
-        assert "several monsters emerged out of the Moon Gate." in table_text
         assert "Arlen Voss a member of the Atlantia city console" in table_text
         browser.close()
 

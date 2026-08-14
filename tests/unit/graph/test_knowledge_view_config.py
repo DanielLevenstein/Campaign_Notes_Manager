@@ -71,10 +71,10 @@ def test_directory_knowledge_view_stubs_expose_source_fixtures_and_hidden_elemen
         "tests/fixtures/session_notes/complex_session_graph.md",
     )
     assert session.hidden_elements == ("file_name", "h1", "h2", "h3")
-    assert session.unhidden_elements == ("file_name",)
+    assert session.unhidden_elements == ("h1",)
     assert session.columns == (
-        ("source_files",),
-        ("h1", "places"),
+        ("source_files", "h1"),
+        ("places",),
         ("main_characters",),
         ("h2", "groups", "artifacts"),
         ("h3",),

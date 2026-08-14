@@ -143,6 +143,26 @@ When rendered as UI controls, the union of `hidden_elements` and `unhidden_eleme
 
 When runtime migration starts, renderer and projection behavior should be added through stable strategy names resolved by a registry.
 
+## Runtime Source Scope Gap
+
+Adding a fifth knowledge view is not only an ordering problem. The current app loads view definitions from config, but source selection still comes from the live Streamlit dropdowns and the active lore directory. The `source_fixtures` field is test/import metadata; it does not constrain runtime source files.
+
+Until this is redesigned, `config/knowledge_view_order.json` should activate only the four migrated views:
+
+- `character_view`
+- `party_view`
+- `location_view`
+- `session_view`
+
+Supporting additional views such as `family_tree` needs a source-scope contract first. A future design should decide whether each view can declare one of these policies:
+
+- Use all live sources matching `source_predicate`.
+- Use a configured source subset.
+- Use a configured default source while still allowing the live dropdown.
+- Use fixture paths only in tests, never at runtime.
+
+That decision belongs with the view definition model, not in Graphviz rendering.
+
 Possible future registries:
 
 - Projection strategies:

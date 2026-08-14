@@ -80,8 +80,8 @@ def test_directory_knowledge_view_adapter_standardizes_source_and_heading_projec
     assert session_view.view_name == loaded_session_view.view_name
     assert session_view.graphviz_config_key == "default_view_fixture"
     assert session_view.graphviz_columns == (
-        ("source_files",),
-        ("h1", "places"),
+        ("source_files", "h1"),
+        ("places",),
         ("main_characters",),
         ("h2", "groups", "artifacts"),
         ("h3",),
@@ -94,7 +94,7 @@ def test_directory_knowledge_view_adapter_standardizes_source_and_heading_projec
     assert session_view.supports_directory_hide_options is True
     assert session_view.hide_source_document_roots is False
     assert session_view.hidden_elements == ("file_name", "h1", "h2", "h3")
-    assert session_view.unhidden_elements == ("file_name",)
+    assert session_view.unhidden_elements == ("h1",)
 
 
 def test_knowledge_view_columns_override_graphviz_columns(monkeypatch):

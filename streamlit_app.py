@@ -1527,36 +1527,6 @@ def render_character_panel() -> None:
     st.subheader("New Character")
     with st.expander("Create Character", expanded=not characters):
         render_character_creator("main_new_character")
-    if external_character_import_enabled():
-        render_external_character_sheet_import()
-
-
-def render_external_character_sheet_import() -> None:
-    with st.expander("Import External Character Sheet", expanded=False):
-        uploaded_sheet = st.file_uploader(
-            "Character Sheet File",
-            type=["pdf", "png", "jpg", "jpeg", "webp"],
-            key="external_character_sheet_file",
-        )
-        display_name = st.text_input(
-            "Display Name",
-            value=Path(uploaded_sheet.name).stem if uploaded_sheet is not None else "",
-            key="external_character_sheet_display_name",
-        )
-        if st.button("Import Character Sheet", icon=":material/upload_file:", key="import_external_character_sheet"):
-            if uploaded_sheet is None:
-                st.error("Choose A Character Sheet File.")
-                return
-            try:
-                imported = import_external_character_sheet(
-                    uploaded_sheet.name,
-                    uploaded_sheet.getvalue(),
-                    display_name=display_name,
-                )
-            except ValueError as exc:
-                st.error(str(exc))
-            else:
-                st.success(f"Imported External Character Sheet: {imported.path.name}.")
 
 def render_character_editor(character: Character) -> None:
     profile = read_character_profile(character)

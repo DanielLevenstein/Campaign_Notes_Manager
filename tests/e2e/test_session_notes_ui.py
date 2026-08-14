@@ -883,33 +883,3 @@ def test_ui_bulk_lore_removal_confirms_before_cleaning_lore(isolated_session_not
         for path in backup_dir.iterdir()
         if path.is_dir() and path.name not in {"character_sheets", "places", "session_notes"}
     )
-
-def test_ui_imports_external_character_sheet(isolated_session_notes_app):
-    app_url, docs_lore_dir, _upload_source_dir = isolated_session_notes_app
-    characters_dir = docs_lore_dir / "character_sheets"
-    external_sheet = docs_lore_dir / "external_sheet.pdf"
-    external_sheet.write_bytes(b"%PDF-1.4\nexternal character sheet\n")
-
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 1000})
-        open_streamlit_app(page, app_url)
-
-        page.get_by_role("tab", name="Characters", exact=True).click()
-        page.get_by_text("Import External Character Sheet", exact=True).first.click()
-        file_uploader = page.get_by_label("Character Sheet File")
-        file_uploader.locator("input[type=file]").set_input_files(str(external_sheet))
-        expect(page.get_by_text("external_sheet.pdf")).to_be_visible(timeout=10000)
-        page.wait_for_timeout(1000)
-        import_sheet_button = page.get_by_role("button", name="upload_file Import Character Sheet")
-        expect(import_sheet_button).to_be_visible(timeout=10000)
-        import_sheet_button.click(force=True)
-        expect(page.get_by_text("Imported External Character Sheet: external_sheet.pdf.")).to_be_visible(timeout=10000)
-        expect(page.get_by_role("tab", name="Characters", exact=True)).to_have_attribute(
-            "aria-selected",
-            "true",
-            timeout=10000,
-        )
-        browser.close()
-
-    assert (characters_dir / "external" / "external_sheet.pdf").read_bytes() == b"%PDF-1.4\nexternal character sheet\n"
