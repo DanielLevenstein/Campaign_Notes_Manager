@@ -62,20 +62,19 @@ This roadmap is based on the architecture in docs/design/KNOWLEDGE_GRAPH_DESIGN4
 - [x] Add the Session Notes Graph views with Location View and Directory File View and align them with the same projection behavior.
 - [x] Implement the Full Structured Graph view with straight-line routing, stable columns, and the family-name trapezoid shape.
 
-
-# v1.4.0 Context Aware Edges
-
-1) A extraction model which extracts likely nodes. 
-2) A classification model which can be used to determine node type based on the information in normalization.json
-3) A second classification model which can be used to determine edge connection type when heading elements are removed from visible graphs. 
-
-## Phase 0 Knowledge View Definition Migration
+# Phase 4 Knowledge View Definition Migration
 - [x] Create a design doc for knowledge view definition migration.
 - [x] Add typed dataclasses for knowledge view definitions.
 - [x] Add a config loader with inheritance and validation.
 - [x] Add app-facing stub config files for Character View, Party View, Location View, and Session View.
 - [x] Migrate directory views to loaded definitions while keeping existing projection functions.
 - [ ] Verify source-file filters, heading filters, hide-source controls, hide-heading controls, graph rendering, and connection tables.
+
+# v1.4.0 Context Aware Edges
+
+1) A extraction model which extracts likely nodes. 
+2) A classification model which can be used to determine node type based on the information in normalization.json
+3) A second classification model which can be used to determine edge connection type when heading elements are removed from visible graphs. 
 
 ## Phase 1.1 Context Aware Edges
 - [x] Create a design doc for context-aware edges
